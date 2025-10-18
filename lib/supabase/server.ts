@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
