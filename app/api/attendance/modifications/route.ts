@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase';
+import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import { writeAuditTrail } from '../../../../lib/audit/log';
 import type { Tables } from '../../../../types/database';
 
@@ -26,8 +26,8 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 
 export const runtime = 'nodejs';
 
-const getActor = async (request: NextRequest) => {
-  const supabase = createRouteSupabaseClient();
+const getActor = async () => {
+  const supabase = await createRouteSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
     return { supabase, person: null } as const;
@@ -37,13 +37,13 @@ const getActor = async (request: NextRequest) => {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   return { supabase, person: person ?? null } as const;
 };
 
 export async function GET(request: NextRequest) {
-  const { supabase, person } = await getActor(request);
+  const { supabase, person } = await getActor();
   if (!person) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { supabase, person } = await getActor(request);
+  const { supabase, person } = await getActor();
   if (!person) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     .from('attendance_marks')
     .select('*')
     .eq('id', payload.markId)
-    .single();
+    .maybeSingle<Tables['attendance_marks']['Row']>();
 
   if (markError || !mark) {
     return NextResponse.json({ error: 'MARK_NOT_FOUND' }, { status: 404 });
@@ -107,17 +107,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
+  const modificationInsert: Tables['attendance_modifications']['Insert'] = {
+    mark_id: payload.markId,
+    requester_id: person.id,
+    reason: payload.reason,
+    requested_delta: payload.requestedDelta,
+    status: 'PENDING',
+  };
+
   const { data, error } = await supabase
     .from('attendance_modifications')
-    .insert({
-      mark_id: payload.markId,
-      requester_id: person.id,
-      reason: payload.reason,
-      requested_delta: payload.requestedDelta,
-      status: 'PENDING',
-    })
+    .insert(modificationInsert as never)
     .select('*')
-    .single();
+    .maybeSingle<Tables['attendance_modifications']['Row']>();
 
   if (error || !data) {
     return NextResponse.json({ error: 'CREATE_FAILED', details: error?.message }, { status: 500 });
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { supabase, person } = await getActor(request);
+  const { supabase, person } = await getActor();
   if (!person) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
@@ -156,7 +158,7 @@ export async function PATCH(request: NextRequest) {
     .from('attendance_modifications')
     .select('*')
     .eq('id', payload.id)
-    .single();
+    .maybeSingle<Tables['attendance_modifications']['Row']>();
 
   if (currentError || !current) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
@@ -166,17 +168,19 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'ALREADY_RESOLVED' }, { status: 409 });
   }
 
+  const modificationUpdate: Tables['attendance_modifications']['Update'] = {
+    status: payload.status,
+    notes: payload.notes ?? null,
+    resolver_id: person.id,
+    resolved_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('attendance_modifications')
-    .update({
-      status: payload.status,
-      notes: payload.notes ?? null,
-      resolver_id: person.id,
-      resolved_at: new Date().toISOString(),
-    })
+    .update(modificationUpdate as never)
     .eq('id', payload.id)
     .select('*')
-    .single();
+    .maybeSingle<Tables['attendance_modifications']['Row']>();
 
   if (error || !data) {
     return NextResponse.json({ error: 'UPDATE_FAILED', details: error?.message }, { status: 500 });
@@ -194,4 +198,3 @@ export async function PATCH(request: NextRequest) {
 
   return NextResponse.json({ item: data });
 }
-

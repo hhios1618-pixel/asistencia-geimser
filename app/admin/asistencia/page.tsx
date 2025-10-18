@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient } from '../../../lib/supabase';
+import { createServerSupabaseClient } from '../../../lib/supabase/server';
 import AdminAttendanceClient from './components/AdminAttendanceClient';
+import type { Tables } from '../../../types/database';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminAsistenciaPage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -18,7 +19,7 @@ export default async function AdminAsistenciaPage() {
     .from('people')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   if (!person || (person.role !== 'ADMIN' && person.role !== 'SUPERVISOR')) {
     redirect('/');
@@ -31,4 +32,3 @@ export default async function AdminAsistenciaPage() {
     </main>
   );
 }
-

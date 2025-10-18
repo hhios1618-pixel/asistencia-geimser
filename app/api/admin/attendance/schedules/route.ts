@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createRouteSupabaseClient } from '../../../../../lib/supabase';
+import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
 
 const scheduleSchema = z.object({
@@ -19,7 +19,7 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 export const runtime = 'nodejs';
 
 const authorize = async () => {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
     return { supabase, person: null } as const;
@@ -28,7 +28,7 @@ const authorize = async () => {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
   if (!person || !isManager(person.role)) {
     return { supabase, person: null } as const;
   }
@@ -71,9 +71,9 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('schedules')
-    .insert(payload)
+    .insert(payload as never)
     .select('*')
-    .single();
+    .maybeSingle<Tables['schedules']['Row']>();
 
   if (error || !data) {
     return NextResponse.json({ error: 'CREATE_FAILED', details: error?.message }, { status: 500 });
@@ -99,10 +99,10 @@ export async function PATCH(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('schedules')
-    .update(changes)
+    .update(changes as Tables['schedules']['Update'] as never)
     .eq('id', id)
     .select('*')
-    .single();
+    .maybeSingle<Tables['schedules']['Row']>();
 
   if (error || !data) {
     return NextResponse.json({ error: 'UPDATE_FAILED', details: error?.message }, { status: 500 });
@@ -129,4 +129,3 @@ export async function DELETE(request: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
-

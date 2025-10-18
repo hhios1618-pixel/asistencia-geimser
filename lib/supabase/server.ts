@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import type { Database } from '../types/database';
+import type { Database } from '../../types/database';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -13,15 +13,6 @@ if (!supabaseUrl) {
 if (!supabaseAnonKey) {
   throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
 }
-
-export const createBrowserSupabaseClient = (): SupabaseClient<Database> =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-  });
 
 export const getServiceSupabase = (): SupabaseClient<Database> => {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -50,16 +41,16 @@ export const getJwtSecret = (): string => {
   return secret;
 };
 
-export const createServerSupabaseClient = () => {
+export const createServerSupabaseClient = async () => {
   const cookieStore = cookies();
   return createServerComponentClient<Database>({
     cookies: () => cookieStore,
-  });
+  }) as unknown as SupabaseClient<Database>;
 };
 
-export const createRouteSupabaseClient = () => {
+export const createRouteSupabaseClient = async () => {
   const cookieStore = cookies();
   return createRouteHandlerClient<Database>({
     cookies: () => cookieStore,
-  });
+  }) as unknown as SupabaseClient<Database>;
 };

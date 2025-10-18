@@ -51,11 +51,12 @@ export function SitesAdmin() {
     }
     const isExisting = sites.some((site) => site.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const { id, ...payload } = editing;
+    const { id: siteId, ...createBase } = editing;
+    void siteId;
     const response = await fetch('/api/admin/attendance/sites', {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isExisting ? editing : payload),
+      body: JSON.stringify(isExisting ? editing : createBase),
     });
     if (!response.ok) {
       const body = await response.json();

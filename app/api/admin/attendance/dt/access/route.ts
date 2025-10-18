@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../../lib/supabase';
+import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../../lib/supabase/server';
 import { issueDtLink, validateDtToken } from '../../../../../../lib/dt/access';
 import type { Tables } from '../../../../../../types/database';
 
@@ -19,7 +19,7 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 export const runtime = 'nodejs';
 
 const authorizeAdmin = async () => {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
     return { supabase, person: null } as const;
@@ -28,7 +28,7 @@ const authorizeAdmin = async () => {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
   if (!person || !isManager(person.role)) {
     return { supabase, person: null } as const;
   }
@@ -36,7 +36,7 @@ const authorizeAdmin = async () => {
 };
 
 export async function POST(request: NextRequest) {
-  const { supabase, person } = await authorizeAdmin();
+  const { person } = await authorizeAdmin();
   if (!person) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
@@ -105,4 +105,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'TOKEN_INVALID', details: (error as Error).message }, { status: 403 });
   }
 }
-

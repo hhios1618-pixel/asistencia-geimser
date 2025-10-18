@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase';
+import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
 
 const personSchema = z.object({
@@ -19,7 +19,7 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 export const runtime = 'nodejs';
 
 const authorize = async () => {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
     return { supabase, person: null } as const;
@@ -28,7 +28,7 @@ const authorize = async () => {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
   if (!person || !isManager(person.role)) {
     return { supabase, person: null } as const;
   }
@@ -60,17 +60,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
   }
 
+  const insertValues: Tables['people']['Insert'] = {
+    name: payload.name,
+    rut: payload.rut ?? null,
+    email: payload.email ?? null,
+    role: payload.role,
+    is_active: payload.is_active ?? true,
+  };
+
   const { data, error } = await supabase
     .from('people')
-    .insert({
-      name: payload.name,
-      rut: payload.rut ?? null,
-      email: payload.email ?? null,
-      role: payload.role,
-      is_active: payload.is_active ?? true,
-    })
+    .insert(insertValues as never)
     .select('*')
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   if (error || !data) {
     return NextResponse.json({ error: 'CREATE_FAILED', details: error?.message }, { status: 500 });
@@ -103,12 +105,14 @@ export async function PATCH(request: NextRequest) {
 
   const { id, siteIds, ...changes } = payload;
 
+  const updateValues = changes as Tables['people']['Update'];
+
   const { data, error } = await supabase
     .from('people')
-    .update(changes)
+    .update(updateValues as never)
     .eq('id', id)
     .select('*')
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   if (error || !data) {
     return NextResponse.json({ error: 'UPDATE_FAILED', details: error?.message }, { status: 500 });

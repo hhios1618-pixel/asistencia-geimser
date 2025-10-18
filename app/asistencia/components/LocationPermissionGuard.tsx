@@ -15,7 +15,7 @@ const checkPermission = async (): Promise<PermissionStatus> => {
   try {
     const status = await navigator.permissions.query({ name: 'geolocation' });
     return status.state as PermissionStatus;
-  } catch (error) {
+  } catch {
     return 'unknown';
   }
 };
@@ -83,4 +83,3 @@ export function LocationPermissionGuard({ children }: Props) {
 }
 
 export default LocationPermissionGuard;
-

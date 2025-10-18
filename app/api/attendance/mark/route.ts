@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase';
+import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import { ensureConsentVersion, GEO_CONSENT_VERSION } from '../../../../lib/privacy/consent';
 import { getGeofenceStatus } from '../../../../lib/geo/geofence';
 import { computeHash } from '../../../../lib/dt/hashchain';
@@ -34,7 +34,7 @@ const respond = (status: number, payload: unknown) =>
   });
 
 export async function POST(request: NextRequest) {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData?.user) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   if (personError || !person) {
     return respond(403, { error: 'PERSON_NOT_FOUND' });
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     .from('sites')
     .select('*')
     .eq('id', body.siteId)
-    .single();
+    .maybeSingle<Tables['sites']['Row']>();
 
   if (siteError || !site) {
     return respond(404, { error: 'SITE_NOT_ACCESSIBLE' });
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     .eq('person_id', person.id)
     .order('event_ts', { ascending: false })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<Tables['attendance_marks']['Row']>();
 
   const prevHash = prevMark?.hash_self ?? null;
   const markId = randomUUID();
@@ -148,9 +148,9 @@ export async function POST(request: NextRequest) {
 
   const { error: insertError, data: insertedMark } = await supabase
     .from('attendance_marks')
-    .insert(markInsert)
+    .insert(markInsert as never)
     .select('*')
-    .single();
+    .maybeSingle<Tables['attendance_marks']['Row']>();
 
   if (insertError || !insertedMark) {
     return respond(500, { error: 'MARK_INSERT_FAILED', details: insertError?.message });

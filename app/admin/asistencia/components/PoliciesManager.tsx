@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useBrowserSupabase } from '../../../../lib/hooks/useBrowserSupabase';
 import type { TableInsert, Tables } from '../../../../types/database';
 
@@ -28,7 +28,7 @@ export function PoliciesManager() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data, error: fetchError } = await supabase
       .from('settings')
       .select('*')
@@ -43,11 +43,11 @@ export function PoliciesManager() {
       const value = record.value as PoliciesValue | null;
       setPolicies(value?.policies ?? []);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const addPolicy = async () => {
     setError(null);

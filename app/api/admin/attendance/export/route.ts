@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import PDFDocument from 'pdfkit';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase';
+import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
 
 const querySchema = z.object({
@@ -73,7 +73,7 @@ const buildPdf = async (marks: Tables['attendance_marks']['Row'][]): Promise<Buf
   });
 
 export async function GET(request: NextRequest) {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
     return new Response(JSON.stringify({ error: 'UNAUTHENTICATED' }), { status: 401 });
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   if (!person || !isManager(person.role)) {
     return new Response(JSON.stringify({ error: 'FORBIDDEN' }), { status: 403 });

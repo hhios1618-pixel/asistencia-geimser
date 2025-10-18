@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase';
+import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import type { Tables } from '../../../../types/database';
 
 const querySchema = z.object({
@@ -16,7 +16,7 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     .from('people')
     .select('*')
     .eq('id', authData.user.id)
-    .single();
+    .maybeSingle<Tables['people']['Row']>();
 
   if (personError || !person) {
     return NextResponse.json({ error: 'PERSON_NOT_FOUND' }, { status: 403 });
@@ -59,13 +59,14 @@ export async function GET(request: NextRequest) {
   }
 
   const { data: marks, error: marksError } = await query;
+  const attendanceMarks = (marks as Tables['attendance_marks']['Row'][] | null) ?? [];
   if (marksError) {
     return NextResponse.json({ error: 'HISTORY_FETCH_FAILED', details: marksError.message }, { status: 500 });
   }
 
   const serviceSupabase = getServiceSupabase();
   const signedMarks = await Promise.all(
-    (marks ?? []).map(async (mark) => {
+    attendanceMarks.map(async (mark) => {
       if (!mark.receipt_url) {
         return { ...mark, receipt_signed_url: null };
       }
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
           return { ...mark, receipt_signed_url: null };
         }
         return { ...mark, receipt_signed_url: signed?.signedUrl ?? null };
-      } catch (error) {
+      } catch {
         return { ...mark, receipt_signed_url: null };
       }
     })

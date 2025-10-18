@@ -74,14 +74,17 @@ export function PeopleAdmin() {
     event.preventDefault();
     const isExisting = people.some((person) => person.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const { id, ...payload } = editing;
+    const { id: _ignore, ...createBase } = editing;
+    void _ignore;
+    const createPayload = { ...createBase, siteIds: assignedSites };
+
     const response = await fetch('/api/admin/attendance/people', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
         isExisting
           ? { ...editing, siteIds: assignedSites }
-          : { ...payload, siteIds: assignedSites }
+          : createPayload
       ),
     });
     if (!response.ok) {

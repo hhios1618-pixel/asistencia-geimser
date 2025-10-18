@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
-import { getServiceSupabase } from '../supabase';
+import { getServiceSupabase } from '../supabase/server';
 import type { Tables } from '../../types/database';
 
 const RECEIPTS_BUCKET = 'receipts';

@@ -62,11 +62,12 @@ export function SchedulesAdmin() {
     }
     const isExisting = schedules.some((schedule) => schedule.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const { id, ...payload } = editing;
+    const { id: scheduleId, ...createBase } = editing;
+    void scheduleId;
     const response = await fetch('/api/admin/attendance/schedules', {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isExisting ? editing : payload),
+      body: JSON.stringify(isExisting ? editing : createBase),
     });
     if (!response.ok) {
       const body = await response.json();
