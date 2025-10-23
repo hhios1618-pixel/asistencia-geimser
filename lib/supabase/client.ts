@@ -1,6 +1,7 @@
 'use client';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -15,10 +16,10 @@ if (!supabaseAnonKey) {
 }
 
 export const createBrowserSupabaseClient = (): SupabaseClient<Database> =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
+  createClientComponentClient<Database>({
+    options: {
+      db: {
+        schema: 'asistencia',
+      },
     },
-  });
+  }) as unknown as SupabaseClient<Database>;

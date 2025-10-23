@@ -36,7 +36,7 @@ const getActor = async () => {
   const { data: person } = await supabase
     .from('people')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authData.user.id as string)
     .maybeSingle<Tables['people']['Row']>();
 
   return { supabase, person: person ?? null } as const;

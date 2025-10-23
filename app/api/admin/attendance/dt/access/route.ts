@@ -27,7 +27,7 @@ const authorizeAdmin = async () => {
   const { data: person } = await supabase
     .from('people')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authData.user.id as string)
     .maybeSingle<Tables['people']['Row']>();
   if (!person || !isManager(person.role)) {
     return { supabase, person: null } as const;

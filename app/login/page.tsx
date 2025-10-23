@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient } from '../../lib/supabase/server';
+import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
 import LoginForm from './components/LoginForm';
+import type { Tables } from '../../types/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,49 +11,94 @@ export default async function LoginPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  let unauthorizedUser = false;
+
   if (user) {
-    redirect('/asistencia');
+    const serviceSupabase = getServiceSupabase();
+    const { data: person, error: personError } = await serviceSupabase
+      .from('people')
+      .select('id')
+      .eq('id', user.id as string)
+      .maybeSingle<Tables['people']['Row']>();
+
+    if (person && !personError) {
+      redirect('/asistencia');
+    }
+
+    unauthorizedUser = true;
+    await supabase.auth.signOut();
   }
 
   const currentYear = new Date().getFullYear();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#f6f8ff] via-white to-[#ecf1ff] text-slate-900">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.3),rgba(15,23,42,0)_55%)]" />
-        <div className="absolute inset-y-0 left-1/2 w-[520px] -translate-x-1/2 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),rgba(15,23,42,0)_65%)] blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.18),rgba(255,255,255,0)_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.15),rgba(255,255,255,0)_50%)]" />
+        <div className="absolute inset-x-1/4 top-1/4 h-64 rounded-full bg-white/40 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
-        <div className="w-full max-w-lg space-y-10">
-          <header className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-base font-semibold text-white shadow-lg shadow-slate-900/40">
-              G
-            </span>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-300">Geimser</p>
-              <p className="text-xs text-slate-500">Asistencia 2025 • Acceso seguro</p>
-            </div>
-          </header>
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-16 sm:px-12 lg:px-20">
+        <div className="grid w-full max-w-5xl grid-cols-1 items-center gap-12 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="flex flex-col justify-between gap-12">
+            <header className="space-y-8">
+              <div className="inline-flex items-center gap-3 rounded-3xl bg-white/70 px-4 py-2 shadow-sm shadow-slate-200 ring-1 ring-white/60 backdrop-blur-md">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-semibold text-white">
+                  G
+                </span>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Geimser</p>
+                  <p className="text-xs text-slate-400">Asistencia 2025 · Acceso seguro</p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <h1 className="text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
+                  Controla tu asistencia con una experiencia impecable.
+                </h1>
+                <p className="text-base leading-relaxed text-slate-500">
+                  Gestiona turnos, marcaciones y reportes en un panel diseñado con precisión, seguridad y un acabado premium inspirado en la simplicidad de Apple.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs font-medium text-slate-500">
+                <span className="rounded-full bg-white/80 px-4 py-2 shadow-sm shadow-slate-200 ring-1 ring-white/70 backdrop-blur-md">
+                  Tiempo real
+                </span>
+                <span className="rounded-full bg-white/80 px-4 py-2 shadow-sm shadow-slate-200 ring-1 ring-white/70 backdrop-blur-md">
+                  Seguridad biométrica
+                </span>
+                <span className="rounded-full bg-white/80 px-4 py-2 shadow-sm shadow-slate-200 ring-1 ring-white/70 backdrop-blur-md">
+                  Reportes inteligentes
+                </span>
+              </div>
+            </header>
+            <footer className="hidden text-sm text-slate-400 lg:block">
+              © {currentYear} Geimser. Todos los derechos reservados.
+            </footer>
+          </div>
 
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-10 shadow-2xl shadow-slate-950/40 backdrop-blur-2xl ring-1 ring-white/10">
-            <div className="mb-8 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Inicio de sesión</p>
-              <h1 className="text-3xl font-semibold text-white">Panel de asistencia Geimser</h1>
-              <p className="text-sm text-slate-400">
-                Identifícate con tu correo corporativo para acceder a turnos, marcaciones y reportes.
-              </p>
-            </div>
-            <LoginForm />
-            <div className="mt-10 flex items-center justify-between border-t border-white/5 pt-6 text-xs text-slate-500">
-              <span>© {currentYear} Geimser</span>
-              <a
-                href="mailto:soporte@geimser.com"
-                className="text-sky-300 transition hover:text-sky-200"
-              >
-                soporte@geimser.com
-              </a>
+          <section className="relative overflow-hidden rounded-[32px] border border-white/80 bg-white/90 p-10 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.45)] backdrop-blur-2xl">
+            <div className="pointer-events-none absolute inset-0 rounded-[32px] border border-white/60" />
+            <div className="absolute inset-x-12 top-0 h-24 rounded-b-[32px] bg-gradient-to-b from-white/70 via-white/10 to-transparent" />
+            <div className="relative space-y-6">
+              <div className="space-y-2 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Inicia sesión</p>
+                <h2 className="text-3xl font-semibold text-slate-900">Panel de asistencia Geimser</h2>
+                <p className="text-sm text-slate-500">
+                  Identifícate con tu correo corporativo para continuar.
+                </p>
+              </div>
+              <LoginForm unauthorizedUser={unauthorizedUser} />
+              <div className="pt-6 text-center text-xs text-slate-400">
+                <p>Acceso exclusivo para personal autorizado.</p>
+                <p>Tus accesos quedan registrados para auditoría.</p>
+                <p className="mt-3">
+                  ¿Necesitas ayuda?{' '}
+                  <a href="mailto:soporte@geimser.com" className="font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-800">
+                    soporte@geimser.com
+                  </a>
+                </p>
+              </div>
             </div>
           </section>
         </div>

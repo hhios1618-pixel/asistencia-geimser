@@ -7,7 +7,7 @@ export type Json =
   | Json[];
 
 export interface Database {
-  public: {
+  asistencia: {
     Tables: {
       people: {
         Row: {
@@ -341,7 +341,7 @@ export interface Database {
   };
 }
 
-export type Tables = Database['public']['Tables'];
+export type Tables = Database['asistencia']['Tables'];
 export type TableRow<K extends keyof Tables> = Tables[K]['Row'];
 export type TableInsert<K extends keyof Tables> = Tables[K]['Insert'];
 export type TableUpdate<K extends keyof Tables> = Tables[K]['Update'];

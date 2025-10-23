@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import type { Database } from '../../types/database';
+import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -32,6 +33,9 @@ export const getServiceSupabase = (): SupabaseClient<Database> => {
         'X-Client-Info': 'asistencia-geimser-service',
       },
     },
+    db: {
+      schema: 'asistencia',
+    },
   });
 };
 
@@ -43,16 +47,41 @@ export const getJwtSecret = (): string => {
   return secret;
 };
 
+const decorateCookieStore = (store: ReadonlyRequestCookies) => {
+  const promise = Promise.resolve(store);
+  return new Proxy(promise, {
+    get(target, prop, receiver) {
+      if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+        return Reflect.get(target, prop, receiver);
+      }
+      const value = Reflect.get(store as unknown as object, prop, receiver);
+      return typeof value === 'function' ? value.bind(store) : value;
+    },
+  }) as ReturnType<typeof cookies>;
+};
+
 export const createServerSupabaseClient = async () => {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createServerComponentClient<Database>({
-    cookies: () => cookieStore,
+    cookies: () => decorateCookieStore(cookieStore),
+  }, {
+    options: {
+      db: {
+        schema: 'asistencia',
+      },
+    },
   }) as unknown as SupabaseClient<Database>;
 };
 
 export const createRouteSupabaseClient = async () => {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createRouteHandlerClient<Database>({
-    cookies: () => cookieStore,
+    cookies: () => decorateCookieStore(cookieStore),
+  }, {
+    options: {
+      db: {
+        schema: 'asistencia',
+      },
+    },
   }) as unknown as SupabaseClient<Database>;
 };

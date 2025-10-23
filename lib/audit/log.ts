@@ -16,7 +16,7 @@ export const writeAuditTrail = async (
   supabase: SupabaseClient<Database>,
   entry: AuditEntry
 ): Promise<string> => {
-  const args: Database['public']['Functions']['fn_register_audit']['Args'] = {
+  const args: Database['asistencia']['Functions']['fn_register_audit']['Args'] = {
     p_actor_id: entry.actorId,
     p_action: entry.action,
     p_entity: entry.entity,

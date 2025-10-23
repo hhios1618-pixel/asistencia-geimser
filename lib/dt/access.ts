@@ -15,7 +15,7 @@ export const issueDtLink = async (
   supabase: SupabaseClient<Database>,
   request: DtLinkRequest
 ): Promise<DtLinkResponse> => {
-  const args: Database['public']['Functions']['fn_issue_dt_signed_link']['Args'] = {
+  const args: Database['asistencia']['Functions']['fn_issue_dt_signed_link']['Args'] = {
     scope: request.scope,
     expires: request.expiresAt.toISOString(),
   };
@@ -39,7 +39,7 @@ export const validateDtToken = async (
   token: string,
   expiresEpoch: number
 ): Promise<ValidatedDtToken> => {
-  const args: Database['public']['Functions']['fn_validate_dt_token']['Args'] = {
+  const args: Database['asistencia']['Functions']['fn_validate_dt_token']['Args'] = {
     p_token: token,
     p_expires_epoch: expiresEpoch,
   };

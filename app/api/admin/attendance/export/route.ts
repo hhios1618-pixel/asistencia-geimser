@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
   const { data: person } = await supabase
     .from('people')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authData.user.id as string)
     .maybeSingle<Tables['people']['Row']>();
 
   if (!person || !isManager(person.role)) {

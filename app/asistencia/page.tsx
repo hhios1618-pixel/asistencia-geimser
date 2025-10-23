@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient } from '../../lib/supabase/server';
+import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
 import AttendanceClient from './components/AttendanceClient';
 import LocationPermissionGuard from './components/LocationPermissionGuard';
 import type { Tables } from '../../types/database';
@@ -16,35 +16,36 @@ export default async function AsistenciaPage() {
     redirect('/login');
   }
 
-  const { data: person } = await supabase
+  const serviceSupabase = getServiceSupabase();
+  const { data: person } = await serviceSupabase
     .from('people')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', user.id as string)
     .maybeSingle<Tables['people']['Row']>();
 
   if (!person) {
     redirect('/');
   }
 
-  const { data: assignments } = await supabase
+  const { data: assignments } = await serviceSupabase
     .from('people_sites')
     .select('site_id')
-    .eq('person_id', user.id)
+    .eq('person_id', user.id as string)
     .eq('active', true);
 
   const assignmentRows = (assignments as { site_id: string }[] | null) ?? [];
   const siteIds = assignmentRows.map((item) => item.site_id);
   let sites: Tables['sites']['Row'][] = [];
   if (siteIds.length > 0) {
-    const { data: sitesData } = await supabase.from('sites').select('*').in('id', siteIds);
+    const { data: sitesData } = await serviceSupabase.from('sites').select('*').in('id', siteIds);
     sites = (sitesData as Tables['sites']['Row'][] | null) ?? [];
   }
 
   const today = new Date();
-  const { data: schedule } = await supabase
+  const { data: schedule } = await serviceSupabase
     .from('schedules')
     .select('*')
-    .eq('person_id', user.id)
+    .eq('person_id', user.id as string)
     .eq('day_of_week', today.getDay())
     .maybeSingle<Tables['schedules']['Row']>();
 

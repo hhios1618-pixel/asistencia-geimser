@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   const { data: person, error: personError } = await supabase
     .from('people')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authData.user.id as string)
     .maybeSingle<Tables['people']['Row']>();
 
   if (personError || !person) {

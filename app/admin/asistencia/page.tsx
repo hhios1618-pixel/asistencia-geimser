@@ -18,7 +18,7 @@ export default async function AdminAsistenciaPage() {
   const { data: person } = await supabase
     .from('people')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', user.id as string)
     .maybeSingle<Tables['people']['Row']>();
 
   if (!person || (person.role !== 'ADMIN' && person.role !== 'SUPERVISOR')) {
