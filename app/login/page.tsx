@@ -11,22 +11,28 @@ export default async function LoginPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let unauthorizedUser = false;
-
   if (user) {
     const serviceSupabase = getServiceSupabase();
-    const { data: person, error: personError } = await serviceSupabase
+    const defaultName =
+      (user.user_metadata?.full_name as string | undefined) ??
+      user.email?.split('@')[0]?.replace(/\./g, ' ') ??
+      'Colaborador';
+    const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+
+    await serviceSupabase
       .from('people')
-      .select('id')
-      .eq('id', user.id as string)
-      .maybeSingle<Tables['people']['Row']>();
+      .upsert(
+        {
+          id: user.id as string,
+          name: defaultName.trim(),
+          email: user.email,
+          role: defaultRole,
+          is_active: true,
+        },
+        { onConflict: 'id' }
+      );
 
-    if (person && !personError) {
-      redirect('/asistencia');
-    }
-
-    unauthorizedUser = true;
-    await supabase.auth.signOut();
+    redirect('/asistencia');
   }
 
   const currentYear = new Date().getFullYear();
@@ -88,7 +94,7 @@ export default async function LoginPage() {
                   Identifícate con tu correo corporativo para continuar.
                 </p>
               </div>
-              <LoginForm unauthorizedUser={unauthorizedUser} />
+              <LoginForm />
               <div className="pt-6 text-center text-xs text-slate-400">
                 <p>Acceso exclusivo para personal autorizado.</p>
                 <p>Tus accesos quedan registrados para auditoría.</p>

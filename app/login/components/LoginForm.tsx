@@ -4,21 +4,13 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase/client';
 
-type LoginFormProps = {
-  unauthorizedUser?: boolean;
-};
-
-export function LoginForm({ unauthorizedUser = false }: LoginFormProps) {
+export function LoginForm() {
   const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(
-    unauthorizedUser
-      ? 'Tu usuario no tiene acceso al panel de asistencia. Intenta iniciar sesión con otra cuenta o contacta a soporte.'
-      : null,
-  );
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

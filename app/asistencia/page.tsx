@@ -17,14 +17,43 @@ export default async function AsistenciaPage() {
   }
 
   const serviceSupabase = getServiceSupabase();
-  const { data: person } = await serviceSupabase
+  let { data: person } = await serviceSupabase
     .from('people')
     .select('*')
     .eq('id', user.id as string)
     .maybeSingle<Tables['people']['Row']>();
 
   if (!person) {
-    redirect('/');
+    const fallbackName =
+      (user.user_metadata?.full_name as string | undefined) ??
+      user.email?.split('@')[0]?.replace(/\./g, ' ') ??
+      'Colaborador';
+    const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+
+    const { data: provisioned } = await serviceSupabase
+      .from('people')
+      .upsert(
+        {
+          id: user.id as string,
+          name: fallbackName.trim(),
+          email: user.email,
+          role: defaultRole,
+          is_active: true,
+        },
+        { onConflict: 'id' }
+      )
+      .select('*')
+      .maybeSingle<Tables['people']['Row']>();
+
+    person = provisioned ?? {
+      id: user.id as string,
+      name: fallbackName.trim(),
+      email: user.email,
+      role: defaultRole,
+      is_active: true,
+      rut: null,
+      created_at: new Date().toISOString(),
+    };
   }
 
   const { data: assignments } = await serviceSupabase
