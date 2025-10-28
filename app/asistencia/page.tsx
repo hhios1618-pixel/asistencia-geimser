@@ -1,8 +1,11 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
+import type { PostgrestError } from '@supabase/supabase-js';
 import AttendanceClient from './components/AttendanceClient';
 import LocationPermissionGuard from './components/LocationPermissionGuard';
 import type { Tables } from '../../types/database';
+import { runQuery } from '../../lib/db/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,44 +20,61 @@ export default async function AsistenciaPage() {
   }
 
   const serviceSupabase = getServiceSupabase();
-  let { data: person } = await serviceSupabase
+  const { data: personFromDb, error: personError } = await serviceSupabase
     .from('people')
     .select('*')
     .eq('id', user.id as string)
     .maybeSingle<Tables['people']['Row']>();
+
+  const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+
+  if (personError) {
+    const code = (personError as PostgrestError | null)?.code;
+    if (code === 'PGRST106' || code === 'PGRST205') {
+      console.warn('[asistencia] people table not accessible', personError.message);
+    } else {
+      console.error('[asistencia] person lookup failed', personError);
+    }
+  }
+
+  let person = personFromDb;
 
   if (!person) {
     const fallbackName =
       (user.user_metadata?.full_name as string | undefined) ??
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';
-    const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
 
-    const { data: provisioned } = await serviceSupabase
-      .from('people')
-      .upsert(
-        {
-          id: user.id as string,
-          name: fallbackName.trim(),
-          email: user.email,
-          role: defaultRole,
-          is_active: true,
-        },
-        { onConflict: 'id' }
-      )
-      .select('*')
-      .maybeSingle<Tables['people']['Row']>();
+    await runQuery(
+      `insert into asistencia.people (id, name, email, role, is_active)
+       values ($1, $2, $3, $4, $5)
+       on conflict (id) do update
+       set name = excluded.name,
+           email = excluded.email,
+           role = excluded.role,
+           is_active = excluded.is_active`,
+      [user.id as string, fallbackName.trim(), user.email ?? null, defaultRole, true]
+    );
 
-    person = provisioned ?? {
-      id: user.id as string,
-      name: fallbackName.trim(),
-      email: user.email,
-      role: defaultRole,
-      is_active: true,
-      rut: null,
-      created_at: new Date().toISOString(),
-    };
+    const { rows: provisioned } = await runQuery<Tables['people']['Row']>(
+      'select * from asistencia.people where id = $1',
+      [user.id as string]
+    );
+
+    person =
+      provisioned[0] ??
+      ({
+        id: user.id as string,
+        name: fallbackName.trim(),
+        email: user.email ?? null,
+        role: defaultRole,
+        is_active: true,
+        rut: null,
+        created_at: new Date().toISOString(),
+      } satisfies Tables['people']['Row']);
   }
+
+  const ensuredPerson = person!;
 
   const { data: assignments } = await serviceSupabase
     .from('people_sites')
@@ -79,13 +99,20 @@ export default async function AsistenciaPage() {
     .maybeSingle<Tables['schedules']['Row']>();
 
   return (
-    <main className="mx-auto max-w-3xl p-4">
+    <main className="glass-panel mx-auto max-w-4xl p-8">
       <LocationPermissionGuard>
-        <AttendanceClient
-          person={person}
-          sites={sites}
-          schedule={schedule ?? null}
-        />
+        {(ensuredPerson.role === 'ADMIN' || ensuredPerson.role === 'SUPERVISOR') && (
+          <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <p className="font-medium">¿Necesitas configurar usuarios, sitios o reportes?</p>
+            <Link
+              href="/admin/asistencia"
+              className="mt-2 inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-1 text-white transition hover:bg-blue-700"
+            >
+              Ir al panel administrativo
+            </Link>
+          </div>
+        )}
+        <AttendanceClient person={ensuredPerson} sites={sites} schedule={schedule ?? null} />
       </LocationPermissionGuard>
     </main>
   );

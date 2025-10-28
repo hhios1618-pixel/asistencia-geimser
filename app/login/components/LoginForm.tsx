@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase/client';
 
@@ -11,6 +11,17 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const clearStaleSession = async () => {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // ignore stale session errors
+      }
+    };
+    void clearStaleSession();
+  }, [supabase]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

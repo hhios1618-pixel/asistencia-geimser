@@ -41,6 +41,7 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          address: string | null;
           lat: number;
           lng: number;
           radius_m: number;
@@ -50,6 +51,7 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          address?: string | null;
           lat: number;
           lng: number;
           radius_m: number;
@@ -58,6 +60,7 @@ export interface Database {
         };
         Update: {
           name?: string;
+          address?: string | null;
           lat?: number;
           lng?: number;
           radius_m?: number;
@@ -309,7 +312,7 @@ export interface Database {
         Update: never;
       };
     };
-    Views: {};
+    Views: Record<string, never>;
     Functions: {
       fn_compute_mark_hash: {
         Args: { prev_hash: string | null; payload: Json };
@@ -337,7 +340,7 @@ export interface Database {
         Returns: string;
       };
     };
-    Enums: {};
+    Enums: Record<string, never>;
   };
 }
 

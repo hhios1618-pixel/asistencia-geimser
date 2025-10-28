@@ -1,36 +1,39 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useBrowserSupabase } from '../../../lib/hooks/useBrowserSupabase';
 import type { Tables } from '../../../types/database';
 
 export function AlertsBanner() {
-  const supabase = useBrowserSupabase();
   const [alerts, setAlerts] = useState<Tables['alerts']['Row'][]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const { data, error: fetchError } = await supabase
-        .from('alerts')
-        .select('*')
-        .eq('resolved', false)
-        .order('ts', { ascending: false });
-      if (!active) {
-        return;
+      try {
+        const response = await fetch('/api/attendance/alerts');
+        if (!response.ok) {
+          const body = (await response.json()) as { error?: string; details?: string };
+          throw new Error(body.details ?? body.error ?? 'No fue posible cargar alertas');
+        }
+        const body = (await response.json()) as { items: Tables['alerts']['Row'][] };
+        if (!active) {
+          return;
+        }
+        setAlerts(body.items ?? []);
+        setError(null);
+      } catch (fetchError) {
+        if (!active) {
+          return;
+        }
+        setError((fetchError as Error).message);
       }
-      if (fetchError) {
-        setError(fetchError.message);
-        return;
-      }
-      setAlerts(data ?? []);
     };
     void load();
     return () => {
       active = false;
     };
-  }, [supabase]);
+  }, []);
 
   if (alerts.length === 0 && !error) {
     return null;
@@ -52,4 +55,3 @@ export function AlertsBanner() {
 }
 
 export default AlertsBanner;
-

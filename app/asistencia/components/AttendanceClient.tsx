@@ -9,6 +9,7 @@ import SiteSelector from './SiteSelector';
 import GeofenceBadge from './GeofenceBadge';
 import ShiftInfoCard from './ShiftInfoCard';
 import HistoryTable from './HistoryTable';
+import LogoutButton from './LogoutButton';
 
 interface Props {
   person: Tables['people']['Row'];
@@ -38,7 +39,10 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Bienvenido {person.name}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Bienvenido {person.name}</h1>
+        <LogoutButton />
+      </div>
       <AlertsBanner />
       <SiteSelector
         sites={sites.map((site) => ({ id: site.id, name: site.name }))}
@@ -83,4 +87,3 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
 }
 
 export default AttendanceClient;
-

@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import PDFDocument from 'pdfkit';
-import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase/server';
+import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
+import { runQuery } from '../../../../../lib/db/postgres';
 
 const querySchema = z.object({
   from: z.string().datetime({ offset: true }),
@@ -79,13 +80,27 @@ export async function GET(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'UNAUTHENTICATED' }), { status: 401 });
   }
 
-  const { data: person } = await supabase
-    .from('people')
-    .select('*')
-    .eq('id', authData.user.id as string)
-    .maybeSingle<Tables['people']['Row']>();
+  const userId = authData.user.id as string;
+  const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+  const fallbackRole =
+    (authData.user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    (authData.user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    defaultRole;
 
-  if (!person || !isManager(person.role)) {
+  let role = fallbackRole;
+  try {
+    const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role'>>(
+      'select role from asistencia.people where id = $1',
+      [userId]
+    );
+    if (rows[0]?.role) {
+      role = rows[0].role;
+    }
+  } catch (error) {
+    console.warn('[attendance_export] role lookup failed', error);
+  }
+
+  if (!isManager(role)) {
     return new Response(JSON.stringify({ error: 'FORBIDDEN' }), { status: 403 });
   }
 
@@ -98,25 +113,25 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const service = getServiceSupabase();
-  const query = service
-    .from('attendance_marks')
-    .select('*')
-    .gte('event_ts', params.from)
-    .lte('event_ts', params.to)
-    .order('event_ts', { ascending: true });
+  const conditions = ['event_ts >= $1', 'event_ts <= $2'];
+  const values: unknown[] = [params.from, params.to];
+  let index = 3;
 
   if (params.siteId) {
-    query.eq('site_id', params.siteId);
+    conditions.push(`site_id = $${index++}`);
+    values.push(params.siteId);
   }
   if (params.personId) {
-    query.eq('person_id', params.personId);
+    conditions.push(`person_id = $${index++}`);
+    values.push(params.personId);
   }
 
-  const { data: marks, error } = await query;
-  if (error || !marks) {
-    return new Response(JSON.stringify({ error: 'EXPORT_FAILED', details: error?.message }), { status: 500 });
-  }
+  const { rows: marks } = await runQuery<Tables['attendance_marks']['Row']>(
+    `select * from asistencia.attendance_marks
+     where ${conditions.join(' and ')}
+     order by event_ts`,
+    values
+  );
 
   if (params.format === 'csv') {
     const csv = buildCsv(marks);

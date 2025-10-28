@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
+import { runQuery } from '../../../../../lib/db/postgres';
 import type { Tables } from '../../../../../types/database';
 
 const siteSchema = z.object({
   name: z.string().min(3),
+  address: z.string().min(3).max(255),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   radius_m: z.number().int().min(0),
@@ -17,37 +19,39 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 
 export const runtime = 'nodejs';
 
+const ensureAddressColumn = async () => {
+  await runQuery("alter table if exists asistencia.sites add column if not exists address text");
+};
+
 const authorize = async () => {
   const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
-    return { supabase, person: null } as const;
+    return { person: null } as const;
   }
-  const { data: person } = await supabase
-    .from('people')
-    .select('*')
-    .eq('id', authData.user.id as string)
-    .maybeSingle<Tables['people']['Row']>();
-  if (!person || !isManager(person.role)) {
-    return { supabase, person: null } as const;
+  const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+  const role =
+    (authData.user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    (authData.user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    defaultRole;
+  if (!isManager(role)) {
+    return { person: null } as const;
   }
-  return { supabase, person } as const;
+  return { person: { id: authData.user.id as string, role } } as const;
 };
 
 export async function GET() {
-  const { supabase, person } = await authorize();
+  const { person } = await authorize();
   if (!person) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
-  const { data, error } = await supabase.from('sites').select('*').order('created_at', { ascending: true });
-  if (error) {
-    return NextResponse.json({ error: 'FETCH_FAILED', details: error.message }, { status: 500 });
-  }
-  return NextResponse.json({ items: data ?? [] });
+  await ensureAddressColumn();
+  const { rows } = await runQuery<Tables['sites']['Row']>('select * from asistencia.sites order by created_at');
+  return NextResponse.json({ items: rows });
 }
 
 export async function POST(request: NextRequest) {
-  const { supabase, person } = await authorize();
+  const { person } = await authorize();
   if (!person) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
@@ -59,23 +63,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
   }
 
-  const insertValues: Tables['sites']['Insert'] = { ...payload, is_active: payload.is_active ?? true };
+  try {
+    await ensureAddressColumn();
+    const { rows } = await runQuery<Tables['sites']['Row']>(
+      `insert into asistencia.sites (name, address, lat, lng, radius_m, is_active)
+       values ($1, $2, $3, $4, $5, $6)
+       returning *`,
+      [
+        payload.name,
+        payload.address,
+        payload.lat,
+        payload.lng,
+        payload.radius_m,
+        payload.is_active ?? true,
+      ]
+    );
 
-  const { data, error } = await supabase
-    .from('sites')
-    .insert(insertValues as never)
-    .select('*')
-    .maybeSingle<Tables['sites']['Row']>();
-
-  if (error || !data) {
-    return NextResponse.json({ error: 'CREATE_FAILED', details: error?.message }, { status: 500 });
+    return NextResponse.json({ item: rows[0] }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: 'CREATE_FAILED', details: (error as Error).message }, { status: 500 });
   }
-
-  return NextResponse.json({ item: data }, { status: 201 });
 }
 
 export async function PATCH(request: NextRequest) {
-  const { supabase, person } = await authorize();
+  const { person } = await authorize();
   if (!person) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
@@ -88,23 +99,35 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { id, ...changes } = payload;
+  const entries = Object.entries(changes).filter(([, value]) => value !== undefined);
 
-  const { data, error } = await supabase
-    .from('sites')
-    .update(changes as Tables['sites']['Update'] as never)
-    .eq('id', id)
-    .select('*')
-    .maybeSingle<Tables['sites']['Row']>();
+  try {
+    await ensureAddressColumn();
+    if (entries.length === 0) {
+      const { rows } = await runQuery<Tables['sites']['Row']>('select * from asistencia.sites where id = $1', [id]);
+      return NextResponse.json({ item: rows[0] ?? null });
+    }
 
-  if (error || !data) {
-    return NextResponse.json({ error: 'UPDATE_FAILED', details: error?.message }, { status: 500 });
+    const setters = entries.map(([column], index) => `${column} = $${index + 2}`).join(', ');
+    const params = [id, ...entries.map(([, value]) => value)];
+
+    const { rows } = await runQuery<Tables['sites']['Row']>(
+      `update asistencia.sites set ${setters} where id = $1 returning *`,
+      params
+    );
+
+    if (!rows[0]) {
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    return NextResponse.json({ item: rows[0] });
+  } catch (error) {
+    return NextResponse.json({ error: 'UPDATE_FAILED', details: (error as Error).message }, { status: 500 });
   }
-
-  return NextResponse.json({ item: data });
 }
 
 export async function DELETE(request: NextRequest) {
-  const { supabase, person } = await authorize();
+  const { person } = await authorize();
   if (!person) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
@@ -114,9 +137,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'ID_REQUIRED' }, { status: 400 });
   }
 
-  const { error } = await supabase.from('sites').delete().eq('id', id);
-  if (error) {
-    return NextResponse.json({ error: 'DELETE_FAILED', details: error.message }, { status: 500 });
+  try {
+    await runQuery('delete from asistencia.people_sites where site_id = $1', [id]);
+    await runQuery('delete from asistencia.sites where id = $1', [id]);
+  } catch (error) {
+    return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

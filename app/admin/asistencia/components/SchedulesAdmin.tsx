@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface Schedule {
   id: string;
@@ -23,8 +23,11 @@ export function SchedulesAdmin() {
   const [people, setPeople] = useState<Person[]>([]);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadData = async () => {
+    setLoading(true);
     const [schedulesRes, peopleRes] = await Promise.all([
       fetch('/api/admin/attendance/schedules'),
       fetch('/api/admin/attendance/people'),
@@ -37,6 +40,7 @@ export function SchedulesAdmin() {
       const body = (await peopleRes.json()) as { items: { id: string; name: string }[] };
       setPeople(body.items.map(({ id, name }) => ({ id, name })));
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -64,6 +68,7 @@ export function SchedulesAdmin() {
     const method = isExisting ? 'PATCH' : 'POST';
     const { id: scheduleId, ...createBase } = editing;
     void scheduleId;
+    setSuccessMessage(null);
     const response = await fetch('/api/admin/attendance/schedules', {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -76,6 +81,7 @@ export function SchedulesAdmin() {
     }
     setEditing(null);
     await loadData();
+    setSuccessMessage(`Jornada ${isExisting ? 'actualizada' : 'creada'} correctamente.`);
   };
 
   const remove = async (id: string) => {
@@ -85,77 +91,105 @@ export function SchedulesAdmin() {
       return;
     }
     await loadData();
+    setSuccessMessage('Jornada eliminada con éxito.');
   };
 
+  const personOptions = useMemo(() => [{ id: '', name: 'Grupo / General' }, ...people], [people]);
+
   return (
-    <section className="flex flex-col gap-4">
-      <header className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Jornadas</h2>
-        <button type="button" className="rounded bg-blue-600 px-3 py-1 text-white" onClick={startNew}>
+    <section className="flex flex-col gap-6">
+      <header className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/70 bg-white/80 p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.55)]">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Jornadas de trabajo</h2>
+          <p className="text-sm text-slate-500">Define y gestiona los turnos individuales o grupales.</p>
+        </div>
+        <button
+          type="button"
+          className="rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(59,130,246,0.75)] transition hover:from-blue-600 hover:to-indigo-600"
+          onClick={startNew}
+        >
           Nueva jornada
         </button>
       </header>
-      <div className="overflow-auto text-sm">
-        <table className="w-full border-collapse">
+      {loading && <p className="text-sm text-slate-500">Cargando jornadas…</p>}
+      {successMessage && <div className="glass-panel rounded-3xl border border-emerald-200/70 bg-emerald-50/70 p-4 text-sm text-emerald-700">{successMessage}</div>}
+      {error && <p className="text-sm text-rose-500">{error}</p>}
+      <div className="glass-panel overflow-hidden rounded-3xl border border-white/60 bg-white/90">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border px-2 py-1 text-left">Trabajador</th>
-              <th className="border px-2 py-1 text-left">Día</th>
-              <th className="border px-2 py-1 text-left">Inicio</th>
-              <th className="border px-2 py-1 text-left">Fin</th>
-              <th className="border px-2 py-1 text-left">Colación</th>
-              <th className="border px-2 py-1" />
+            <tr className="bg-white/80 text-xs uppercase tracking-[0.3em] text-slate-500">
+              <th className="px-4 py-3 text-left">Colaborador</th>
+              <th className="px-4 py-3 text-left">Día</th>
+              <th className="px-4 py-3 text-left">Inicio</th>
+              <th className="px-4 py-3 text-left">Fin</th>
+              <th className="px-4 py-3 text-left">Colación</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {schedules.map((schedule) => (
-              <tr key={schedule.id}>
-                <td className="border px-2 py-1">
-                  {people.find((person) => person.id === schedule.person_id)?.name ?? '—'}
+              <tr key={schedule.id} className="transition hover:bg-blue-50/40">
+                <td className="px-4 py-3 text-sm font-medium text-slate-900">
+                  {people.find((person) => person.id === schedule.person_id)?.name ?? 'General'}
                 </td>
-                <td className="border px-2 py-1">{days[schedule.day_of_week]}</td>
-                <td className="border px-2 py-1">{schedule.start_time}</td>
-                <td className="border px-2 py-1">{schedule.end_time}</td>
-                <td className="border px-2 py-1">{schedule.break_minutes} min</td>
-                <td className="border px-2 py-1 text-right">
-                  <button className="mr-2 text-blue-600 underline" onClick={() => setEditing(schedule)}>
-                    Editar
-                  </button>
-                  <button className="text-red-600 underline" onClick={() => remove(schedule.id)}>
-                    Eliminar
-                  </button>
+                <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {days[schedule.day_of_week]}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-600">{schedule.start_time}</td>
+                <td className="px-4 py-3 text-sm text-slate-600">{schedule.end_time}</td>
+                <td className="px-4 py-3 text-xs text-slate-500">{schedule.break_minutes} min</td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-500/20"
+                      onClick={() => setEditing(schedule)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="rounded-full bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20"
+                      onClick={() => remove(schedule.id)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
+            {schedules.length === 0 && !loading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">
+                  No hay jornadas configuradas todavía.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
       {editing && (
-        <form onSubmit={submit} className="grid gap-2 rounded border p-4 md:grid-cols-3">
-          <label className="flex flex-col gap-1 text-sm md:col-span-3">
-            Trabajador
+        <form onSubmit={submit} className="glass-panel grid gap-4 rounded-3xl border border-white/60 bg-white/90 p-6 md:grid-cols-3">
+          <label className="flex flex-col gap-2 text-sm md:col-span-3">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Colaborador</span>
             <select
               value={editing.person_id ?? ''}
               onChange={(event) =>
                 setEditing({ ...editing, person_id: event.target.value ? event.target.value : null })
               }
-              className="rounded border p-2"
+              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             >
-              <option value="">Grupo / General</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
+              {personOptions.map((person) => (
+                <option key={person.id ?? 'general'} value={person.id ?? ''}>
                   {person.name}
                 </option>
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Día
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Día</span>
             <select
               value={editing.day_of_week}
               onChange={(event) => setEditing({ ...editing, day_of_week: Number(event.target.value) })}
-              className="rounded border p-2"
+              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             >
               {days.map((label, index) => (
                 <option key={label} value={index}>
@@ -164,39 +198,46 @@ export function SchedulesAdmin() {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Inicio
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Inicio</span>
             <input
               type="time"
               value={editing.start_time}
               onChange={(event) => setEditing({ ...editing, start_time: event.target.value })}
-              className="rounded border p-2"
+              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Fin
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Fin</span>
             <input
               type="time"
               value={editing.end_time}
               onChange={(event) => setEditing({ ...editing, end_time: event.target.value })}
-              className="rounded border p-2"
+              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Colación (min)
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Colación (min)</span>
             <input
               type="number"
               min={0}
               value={editing.break_minutes}
               onChange={(event) => setEditing({ ...editing, break_minutes: Number(event.target.value) })}
-              className="rounded border p-2"
+              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             />
           </label>
-          <div className="flex items-center gap-2 md:col-span-3">
-            <button type="submit" className="rounded bg-green-600 px-3 py-1 text-white">
+          <div className="flex flex-wrap items-center gap-3 md:col-span-3">
+            <button
+              type="submit"
+              className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600"
+            >
               Guardar
             </button>
-            <button type="button" className="rounded border px-3 py-1" onClick={() => setEditing(null)}>
+            <button
+              type="button"
+              className="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              onClick={() => setEditing(null)}
+            >
               Cancelar
             </button>
           </div>

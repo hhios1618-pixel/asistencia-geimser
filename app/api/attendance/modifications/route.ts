@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import { writeAuditTrail } from '../../../../lib/audit/log';
+import { runQuery } from '../../../../lib/db/postgres';
 import type { Tables } from '../../../../types/database';
 
 const modificationSchema = z.object({
@@ -24,27 +25,62 @@ const querySchema = z.object({
 
 const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' || role === 'SUPERVISOR';
 
+type ModificationWithMark = Tables['attendance_modifications']['Row'] & {
+  attendance_marks: Tables['attendance_marks']['Row'] | null;
+};
+
 export const runtime = 'nodejs';
+
+const selectModificationWithMarkById = async (id: string) => {
+  const { rows } = await runQuery<ModificationWithMark>(
+    `select m.*, row_to_json(am) as attendance_marks
+     from asistencia.attendance_modifications m
+     left join asistencia.attendance_marks am on am.id = m.mark_id
+     where m.id = $1`,
+    [id]
+  );
+  return rows[0] ?? null;
+};
 
 const getActor = async () => {
   const supabase = await createRouteSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
-    return { supabase, person: null } as const;
+    return {
+      userId: null as string | null,
+      person: null as Tables['people']['Row'] | null,
+      role: null as Tables['people']['Row']['role'] | null,
+    } as const;
   }
 
-  const { data: person } = await supabase
-    .from('people')
-    .select('*')
-    .eq('id', authData.user.id as string)
-    .maybeSingle<Tables['people']['Row']>();
+  const userId = authData.user.id as string;
+  const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'WORKER';
+  const fallbackRole =
+    (authData.user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    (authData.user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    defaultRole;
 
-  return { supabase, person: person ?? null } as const;
+  let person: Tables['people']['Row'] | null = null;
+  try {
+    const { rows } = await runQuery<Tables['people']['Row']>(
+      'select * from asistencia.people where id = $1',
+      [userId]
+    );
+    person = rows[0] ?? null;
+  } catch (error) {
+    console.warn('[attendance_modifications] person lookup failed', error);
+  }
+
+  return {
+    userId,
+    person,
+    role: person?.role ?? fallbackRole,
+  } as const;
 };
 
 export async function GET(request: NextRequest) {
-  const { supabase, person } = await getActor();
-  if (!person) {
+  const { userId, role } = await getActor();
+  if (!userId) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
@@ -55,34 +91,43 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_PARAMS', details: (error as Error).message }, { status: 400 });
   }
 
-  const query = supabase
-    .from('attendance_modifications')
-    .select('*, attendance_marks(*)')
-    .order('created_at', { ascending: false })
-    .limit(params.limit);
+  const filters: string[] = [];
+  const values: unknown[] = [];
+  let index = 1;
 
-  if (!isManager(person.role)) {
-    query.eq('requester_id', person.id);
+  if (!isManager(role ?? 'WORKER')) {
+    filters.push(`m.requester_id = $${index++}`);
+    values.push(userId);
   } else if (params.personId) {
-    query.eq('requester_id', params.personId);
+    filters.push(`m.requester_id = $${index++}`);
+    values.push(params.personId);
   }
 
   if (params.status) {
-    query.eq('status', params.status);
+    filters.push(`m.status = $${index++}`);
+    values.push(params.status);
   }
 
-  const { data, error } = await query;
+  const whereClause = filters.length > 0 ? `where ${filters.join(' and ')}` : '';
+  const limitIndex = index;
+  values.push(params.limit);
 
-  if (error) {
-    return NextResponse.json({ error: 'FETCH_FAILED', details: error.message }, { status: 500 });
-  }
+  const { rows } = await runQuery<ModificationWithMark>(
+    `select m.*, row_to_json(am) as attendance_marks
+     from asistencia.attendance_modifications m
+     left join asistencia.attendance_marks am on am.id = m.mark_id
+     ${whereClause}
+     order by m.created_at desc
+     limit $${limitIndex}`,
+    values
+  );
 
-  return NextResponse.json({ items: data ?? [] });
+  return NextResponse.json({ items: rows });
 }
 
 export async function POST(request: NextRequest) {
-  const { supabase, person } = await getActor();
-  if (!person) {
+  const { userId, role } = await getActor();
+  if (!userId) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
@@ -93,57 +138,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
   }
 
-  const { data: mark, error: markError } = await supabase
-    .from('attendance_marks')
-    .select('*')
-    .eq('id', payload.markId)
-    .maybeSingle<Tables['attendance_marks']['Row']>();
+  const { rows: markRows } = await runQuery<Tables['attendance_marks']['Row']>(
+    'select * from asistencia.attendance_marks where id = $1',
+    [payload.markId]
+  );
+  const mark = markRows[0] ?? null;
 
-  if (markError || !mark) {
+  if (!mark) {
     return NextResponse.json({ error: 'MARK_NOT_FOUND' }, { status: 404 });
   }
 
-  if (mark.person_id !== person.id && !isManager(person.role)) {
+  if (mark.person_id !== userId && !isManager(role ?? 'WORKER')) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const modificationInsert: Tables['attendance_modifications']['Insert'] = {
-    mark_id: payload.markId,
-    requester_id: person.id,
-    reason: payload.reason,
-    requested_delta: payload.requestedDelta,
-    status: 'PENDING',
-  };
+  const { rows: insertRows } = await runQuery<Tables['attendance_modifications']['Row']>(
+    `insert into asistencia.attendance_modifications (mark_id, requester_id, reason, requested_delta, status)
+     values ($1, $2, $3, $4, 'PENDING')
+     returning *`,
+    [payload.markId, userId, payload.reason, payload.requestedDelta]
+  );
 
-  const { data, error } = await supabase
-    .from('attendance_modifications')
-    .insert(modificationInsert as never)
-    .select('*')
-    .maybeSingle<Tables['attendance_modifications']['Row']>();
-
-  if (error || !data) {
-    return NextResponse.json({ error: 'CREATE_FAILED', details: error?.message }, { status: 500 });
+  const inserted = insertRows[0];
+  if (!inserted) {
+    return NextResponse.json({ error: 'CREATE_FAILED' }, { status: 500 });
   }
+
+  const detailed = (await selectModificationWithMarkById(inserted.id)) ?? {
+    ...inserted,
+    attendance_marks: mark,
+  };
 
   const service = getServiceSupabase();
   await writeAuditTrail(service, {
-    actorId: person.id,
+    actorId: userId,
     action: 'attendance.modification.requested',
     entity: 'attendance_modifications',
-    entityId: data.id,
-    after: data,
+    entityId: inserted.id,
+    after: detailed,
   }).catch(() => undefined);
 
-  return NextResponse.json({ item: data }, { status: 201 });
+  return NextResponse.json({ item: detailed }, { status: 201 });
 }
 
 export async function PATCH(request: NextRequest) {
-  const { supabase, person } = await getActor();
-  if (!person) {
+  const { userId, role } = await getActor();
+  if (!userId) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
-  if (!isManager(person.role)) {
+  if (!isManager(role ?? 'WORKER')) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -154,13 +198,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
   }
 
-  const { data: current, error: currentError } = await supabase
-    .from('attendance_modifications')
-    .select('*')
-    .eq('id', payload.id)
-    .maybeSingle<Tables['attendance_modifications']['Row']>();
-
-  if (currentError || !current) {
+  const current = await selectModificationWithMarkById(payload.id);
+  if (!current) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
   }
 
@@ -168,33 +207,35 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'ALREADY_RESOLVED' }, { status: 409 });
   }
 
-  const modificationUpdate: Tables['attendance_modifications']['Update'] = {
-    status: payload.status,
-    notes: payload.notes ?? null,
-    resolver_id: person.id,
-    resolved_at: new Date().toISOString(),
-  };
+  const resolvedAt = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('attendance_modifications')
-    .update(modificationUpdate as never)
-    .eq('id', payload.id)
-    .select('*')
-    .maybeSingle<Tables['attendance_modifications']['Row']>();
+  const { rows: updateRows } = await runQuery<Tables['attendance_modifications']['Row']>(
+    `update asistencia.attendance_modifications
+     set status = $2, notes = $3, resolver_id = $4, resolved_at = $5
+     where id = $1
+     returning *`,
+    [payload.id, payload.status, payload.notes ?? null, userId, resolvedAt]
+  );
 
-  if (error || !data) {
-    return NextResponse.json({ error: 'UPDATE_FAILED', details: error?.message }, { status: 500 });
+  if (!updateRows[0]) {
+    return NextResponse.json({ error: 'UPDATE_FAILED' }, { status: 500 });
   }
+
+  const updated = (await selectModificationWithMarkById(payload.id)) ?? {
+    ...updateRows[0],
+    attendance_marks: current.attendance_marks,
+  };
 
   const service = getServiceSupabase();
   await writeAuditTrail(service, {
-    actorId: person.id,
+    actorId: userId,
     action: `attendance.modification.${payload.status.toLowerCase()}`,
     entity: 'attendance_modifications',
     entityId: payload.id,
     before: current,
-    after: data,
+    after: updated,
   }).catch(() => undefined);
 
-  return NextResponse.json({ item: data });
+  return NextResponse.json({ item: updated });
 }
+

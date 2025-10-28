@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
+import { createServerSupabaseClient } from '../../lib/supabase/server';
 import LoginForm from './components/LoginForm';
 import type { Tables } from '../../types/database';
+import { runQuery } from '../../lib/db/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,25 +13,22 @@ export default async function LoginPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    const serviceSupabase = getServiceSupabase();
     const defaultName =
       (user.user_metadata?.full_name as string | undefined) ??
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
 
-    await serviceSupabase
-      .from('people')
-      .upsert(
-        {
-          id: user.id as string,
-          name: defaultName.trim(),
-          email: user.email,
-          role: defaultRole,
-          is_active: true,
-        },
-        { onConflict: 'id' }
-      );
+    await runQuery(
+      `insert into asistencia.people (id, name, email, role, is_active)
+       values ($1, $2, $3, $4, $5)
+       on conflict (id) do update
+       set name = excluded.name,
+           email = excluded.email,
+           role = excluded.role,
+           is_active = excluded.is_active`,
+      [user.id as string, defaultName.trim(), user.email ?? null, defaultRole, true]
+    );
 
     redirect('/asistencia');
   }
