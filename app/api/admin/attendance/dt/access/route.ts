@@ -19,6 +19,39 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 
 export const runtime = 'nodejs';
 
+const fetchPersonAccess = async (userId: string) => {
+  let record: Pick<Tables['people']['Row'], 'role' | 'is_active'> | null = null;
+  try {
+    const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role' | 'is_active'>>(
+      'select role, is_active from asistencia.people where id = $1',
+      [userId]
+    );
+    record = rows[0] ?? null;
+  } catch (error) {
+    console.warn('[dt_access] role lookup via pool failed, attempting service fallback', error);
+  }
+
+  if (!record) {
+    try {
+      const service = getServiceSupabase();
+      const { data, error } = await service
+        .from('people')
+        .select('role, is_active')
+        .eq('id', userId)
+        .maybeSingle<Pick<Tables['people']['Row'], 'role' | 'is_active'>>();
+      if (error) {
+        console.warn('[dt_access] service fallback role lookup failed', error);
+      } else if (data) {
+        record = data;
+      }
+    } catch (serviceError) {
+      console.error('[dt_access] service fallback role lookup threw', serviceError);
+    }
+  }
+
+  return record;
+};
+
 const authorizeAdmin = async () => {
   const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
@@ -33,16 +66,16 @@ const authorizeAdmin = async () => {
     defaultRole;
 
   let role = fallbackRole;
-  try {
-    const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role'>>(
-      'select role from asistencia.people where id = $1',
-      [userId]
-    );
-    if (rows[0]?.role) {
-      role = rows[0].role;
-    }
-  } catch (error) {
-    console.warn('[dt_access] role lookup failed', error);
+  let isActive = true;
+
+  const personRecord = await fetchPersonAccess(userId);
+  if (personRecord?.role) {
+    role = personRecord.role;
+    isActive = personRecord.is_active;
+  }
+
+  if (!isActive) {
+    return { userId, role: null } as const;
   }
 
   if (!isManager(role)) {
