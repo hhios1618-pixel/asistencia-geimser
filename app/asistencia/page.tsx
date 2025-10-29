@@ -106,9 +106,15 @@ export default async function AsistenciaPage() {
             <p className="font-medium">¿Necesitas configurar usuarios, sitios o reportes?</p>
             <Link
               href="/admin/asistencia"
-              className="mt-2 inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-1 text-white transition hover:bg-blue-700"
+              className="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_35px_-18px_rgba(59,130,246,0.65)] transition hover:from-blue-600 hover:via-indigo-600 hover:to-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
             >
-              Ir al panel administrativo
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs font-medium text-white">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                  <path d="M5 10h10" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="m11 6 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className="text-white drop-shadow-[0_10px_18px_rgba(15,23,42,0.35)]">Ir al panel administrativo</span>
             </Link>
           </div>
         )}
