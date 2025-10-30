@@ -4,12 +4,17 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = process.env.NODE_TLS_REJECT_UNAUTHORI
 
 import { Pool, PoolClient } from 'pg';
 
-let pool: Pool | null = null;
+type PoolSlot = {
+  pool: Pool;
+  key: string;
+};
+
+let poolSlot: PoolSlot | null = null;
 
 const getConnectionString = () => {
-  const url = process.env.POSTGRES_URL ?? process.env.POSTGRES_URL_NON_POOLING;
+  const url = process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
   if (!url) {
-    throw new Error('POSTGRES_URL or POSTGRES_URL_NON_POOLING must be defined');
+    throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL must be defined');
   }
   return url;
 };
@@ -43,11 +48,11 @@ const shouldResetPool = (error: unknown) => {
 };
 
 const resetPool = async () => {
-  if (!pool) {
+  if (!poolSlot) {
     return;
   }
-  const current = pool;
-  pool = null;
+  const current = poolSlot.pool;
+  poolSlot = null;
   try {
     await current.end();
   } catch (closeError) {
@@ -55,20 +60,32 @@ const resetPool = async () => {
   }
 };
 
-export const getPool = () => {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: getConnectionString(),
-      ssl: { rejectUnauthorized: false },
-    });
-    pool.on('error', (error) => {
-      console.error('[postgres] pool error', error);
-      if (shouldResetPool(error)) {
-        void resetPool();
-      }
-    });
-  }
+const createPool = () => {
+  const connectionString = getConnectionString();
+  const pool = new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    max: Number(process.env.PGPOOL_MAX ?? 10),
+  });
+  pool.on('error', (error) => {
+    console.error('[postgres] pool error', error);
+    if (shouldResetPool(error)) {
+      void resetPool();
+    }
+  });
+  poolSlot = { pool, key: connectionString };
   return pool;
+};
+
+export const getPool = () => {
+  const connectionString = getConnectionString();
+  if (!poolSlot || poolSlot.key !== connectionString) {
+    if (poolSlot) {
+      void resetPool();
+    }
+    return createPool();
+  }
+  return poolSlot.pool;
 };
 
 export const runQuery = async <T = unknown>(query: string, params: unknown[] = []) => {
