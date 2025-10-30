@@ -1,15 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  addDays,
-  addWeeks,
-  endOfWeek,
-  format,
-  getDay,
-  getYear,
-  startOfWeek,
-} from 'date-fns';
+import { addDays, addWeeks, endOfWeek, format, getYear, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 type PersonOption = {

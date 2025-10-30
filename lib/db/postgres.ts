@@ -65,7 +65,6 @@ const createPool = () => {
   const pool = new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
-    max: Number(process.env.PGPOOL_MAX ?? 10),
   });
   pool.on('error', (error) => {
     console.error('[postgres] pool error', error);
