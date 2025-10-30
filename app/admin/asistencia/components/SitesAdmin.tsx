@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import L from 'leaflet';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import type { DragEndEvent, Map as LeafletMap } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface Site {
   id: string;
@@ -38,11 +39,30 @@ export function SitesAdmin() {
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
   const [acceptedSuggestion, setAcceptedSuggestion] = useState<string | null>(null);
+  const [addressLookupPerformed, setAddressLookupPerformed] = useState(false);
+  const acceptedSuggestionRef = useRef<string | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const mapZoom = 16;
 
-  const defaultPosition: [number, number] = useMemo(
-    () => [editing?.lat ?? -33.45, editing?.lng ?? -70.66],
-    [editing?.lat, editing?.lng]
-  );
+  const updateEditing = (updater: (current: Site) => Site) => {
+    setEditing((current) => {
+      if (!current) {
+        return current;
+      }
+      const next = updater(current);
+      if (next.lat !== current.lat || next.lng !== current.lng) {
+        console.log('Update:', next.lat, next.lng);
+      }
+      return next;
+    });
+  };
+
+  // posición reactiva forzada (garantiza rerender real del mapa)
+  const currentLat = Number(editing?.lat ?? -33.45);
+  const currentLng = Number(editing?.lng ?? -70.66);
+  const defaultPosition: [number, number] = [currentLat, currentLng];
+  const mapKey = editing ? `map-${editing.id}-${currentLat.toFixed(6)}-${currentLng.toFixed(6)}` : 'map-default';
+  const markerKey = editing ? `marker-${editing.id}-${currentLat.toFixed(6)}-${currentLng.toFixed(6)}` : 'marker-default';
 
   const fetchSites = async () => {
     setLoading(true);
@@ -60,13 +80,24 @@ export function SitesAdmin() {
   };
 
   useEffect(() => {
-    void import('leaflet/dist/leaflet.css');
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    });
+    let mounted = true;
+    const setupLeaflet = async () => {
+      const leafletModule = await import('leaflet');
+      const L = leafletModule.default ?? leafletModule;
+      if (!mounted) {
+        return;
+      }
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+    };
+    void setupLeaflet();
     void fetchSites();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -75,57 +106,62 @@ export function SitesAdmin() {
       setAddressQuery(address);
       setAddressSuggestions([]);
       setAcceptedSuggestion(address || null);
+      setAddressLookupPerformed(false);
     } else {
       setAddressQuery('');
       setAddressSuggestions([]);
       setAcceptedSuggestion(null);
+      setAddressLookupPerformed(false);
     }
   }, [editing]);
 
   useEffect(() => {
+    acceptedSuggestionRef.current = acceptedSuggestion;
+  }, [acceptedSuggestion]);
+
+  useEffect(() => {
     if (!editing) {
-      setAddressQuery('');
       setAddressSuggestions([]);
       setAddressLoading(false);
+      setAddressLookupPerformed(false);
       return;
     }
+
     const query = addressQuery.trim();
     if (query.length < 3) {
       setAddressSuggestions([]);
       setAddressLoading(false);
+      setAddressLookupPerformed(false);
       return;
     }
     const controller = new AbortController();
     const timeout = setTimeout(async () => {
-      if (acceptedSuggestion && acceptedSuggestion.trim().toLowerCase() === query.toLowerCase()) {
+      const lastAccepted = acceptedSuggestionRef.current;
+      if (lastAccepted && lastAccepted.trim().toLowerCase() === query.toLowerCase()) {
         setAddressSuggestions([]);
         setAddressLoading(false);
+        setAddressLookupPerformed(true);
         return;
       }
+      setAddressLookupPerformed(false);
       setAddressLoading(true);
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=cl&q=${encodeURIComponent(query)}`,
-          {
-            headers: { 'Accept-Language': 'es', 'User-Agent': 'geimser-asistencia/1.0 (+support@geimser.com)' },
-            signal: controller.signal,
-          }
-        );
+        console.log('[SitesAdmin] fetching suggestions', { query });
+        const params = new URLSearchParams({ q: query, limit: '5' });
+        const response = await fetch(`/api/admin/attendance/geocode?${params.toString()}`, {
+          signal: controller.signal,
+        });
         if (!response.ok) {
-          throw new Error('No fue posible sugerir direcciones');
+          throw new Error(`status_${response.status}`);
         }
-        const data = (await response.json()) as { place_id: string; display_name: string; lat: string; lon: string }[];
-        setAddressSuggestions(
-          data.map((item) => ({
-            id: item.place_id,
-            displayName: item.display_name,
-            lat: Number(item.lat),
-            lng: Number(item.lon),
-          }))
-        );
+        const data = (await response.json()) as { suggestions?: AddressSuggestion[] };
+        setAddressSuggestions(data.suggestions ?? []);
+        setAddressLookupPerformed(true);
       } catch (suggestError) {
         if (!(suggestError instanceof DOMException && suggestError.name === 'AbortError')) {
           console.warn('address lookup failed', suggestError);
+          setAddressSuggestions([]);
+          setAddressLookupPerformed(true);
         }
       } finally {
         setAddressLoading(false);
@@ -135,7 +171,48 @@ export function SitesAdmin() {
       controller.abort();
       clearTimeout(timeout);
     };
-  }, [acceptedSuggestion, addressQuery, editing]);
+  }, [addressQuery, editing]);
+
+  const handleMapRef = useCallback(
+    (instance: LeafletMap | null) => {
+      mapRef.current = instance;
+      if (instance) {
+        console.log('[SitesAdmin] map ready', instance.getCenter());
+      }
+    },
+    []
+  );
+
+  const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
+    const lat = Number(suggestion.lat);
+    const lng = Number(suggestion.lng);
+    const normalizedAddress = suggestion.displayName;
+
+    console.log('[SitesAdmin] suggestion selected', {
+      displayName: normalizedAddress,
+      lat,
+      lng,
+    });
+
+    updateEditing((current) => ({
+      ...current,
+      address: normalizedAddress,
+      lat,
+      lng,
+    }));
+
+    setAddressQuery(normalizedAddress);
+    setAddressSuggestions([]);
+    setAcceptedSuggestion(normalizedAddress);
+    setAddressLoading(false);
+    setAddressLookupPerformed(true);
+
+    if (mapRef.current) {
+      mapRef.current.setView([lat, lng], mapZoom, { animate: true });
+    } else {
+      console.warn('[SitesAdmin] mapRef not ready to set view', { lat, lng });
+    }
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -143,14 +220,22 @@ export function SitesAdmin() {
       return;
     }
     setSuccess(null);
+    const normalizeForSubmit = (site: Site) => {
+      const trimmedAddress = (site.address ?? '').trim();
+      return {
+        ...site,
+        address: trimmedAddress.length > 0 ? trimmedAddress : null,
+      };
+    };
+    const normalized = normalizeForSubmit(editing);
     const isExisting = sites.some((site) => site.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const { id: siteId, ...createBase } = editing;
+    const { id: siteId, ...createBase } = normalized;
     void siteId;
     const response = await fetch('/api/admin/attendance/sites', {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isExisting ? editing : createBase),
+      body: JSON.stringify(isExisting ? normalized : createBase),
     });
     if (!response.ok) {
       const body = await response.json();
@@ -172,6 +257,7 @@ export function SitesAdmin() {
       radius_m: 100,
       is_active: true,
     });
+    console.log('Update:', -33.45, -70.66);
     setAddressQuery('');
     setAddressSuggestions([]);
     setAcceptedSuggestion(null);
@@ -179,6 +265,7 @@ export function SitesAdmin() {
 
   const startEdit = (site: Site) => {
     setEditing({ ...site, address: site.address ?? '' });
+    console.log('Update:', site.lat, site.lng);
     setAddressQuery(site.address ?? '');
     setAddressSuggestions([]);
     setAcceptedSuggestion(site.address ?? null);
@@ -313,7 +400,12 @@ export function SitesAdmin() {
             <input
               required
               value={editing.name}
-              onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+              onChange={(event) =>
+                updateEditing((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
               className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             />
           </label>
@@ -322,39 +414,29 @@ export function SitesAdmin() {
             <div className="relative">
               <input
                 required
-                value={editing.address ?? ''}
+                value={addressQuery}
                 onChange={(event) => {
                   const value = event.target.value;
-                  setEditing({ ...editing, address: value });
                   setAddressQuery(value);
                   setAcceptedSuggestion(null);
                 }}
                 className="w-full rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
               />
-              {addressQuery.trim().length >= 3 && (addressLoading || addressSuggestions.length > 0) && (
+              {addressQuery.trim().length >= 3 &&
+                (addressLoading || addressSuggestions.length > 0 || addressLookupPerformed) && (
                 <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-xl">
                   {addressLoading && (
                     <p className="px-4 py-2 text-xs text-slate-400">Buscando direcciones…</p>
                   )}
-                  {!addressLoading && addressSuggestions.length === 0 && (
+                  {!addressLoading && addressSuggestions.length === 0 && addressLookupPerformed && (
                     <p className="px-4 py-2 text-xs text-slate-400">No se encontraron coincidencias.</p>
                   )}
                   {addressSuggestions.map((suggestion) => (
                     <button
                       key={suggestion.id}
                       type="button"
-                      onClick={() => {
-                        setEditing({
-                          ...editing,
-                          address: suggestion.displayName,
-                          lat: suggestion.lat,
-                          lng: suggestion.lng,
-                        });
-                        setAddressQuery(suggestion.displayName);
-                        setAddressSuggestions([]);
-                        setAcceptedSuggestion(suggestion.displayName);
-                        setAddressLoading(false);
-                      }}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSelectSuggestion(suggestion)}
                       className="flex w-full items-start gap-2 px-4 py-2 text-left text-xs text-slate-600 hover:bg-blue-50/70"
                     >
                       <span className="flex-1 leading-snug">{suggestion.displayName}</span>
@@ -369,7 +451,12 @@ export function SitesAdmin() {
             <input
               type="number"
               value={editing.lat}
-              onChange={(event) => setEditing({ ...editing, lat: Number(event.target.value) })}
+              onChange={(event) =>
+                updateEditing((current) => ({
+                  ...current,
+                  lat: Number(event.target.value),
+                }))
+              }
               className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
               step={0.000001}
             />
@@ -379,7 +466,12 @@ export function SitesAdmin() {
             <input
               type="number"
               value={editing.lng}
-              onChange={(event) => setEditing({ ...editing, lng: Number(event.target.value) })}
+              onChange={(event) =>
+                updateEditing((current) => ({
+                  ...current,
+                  lng: Number(event.target.value),
+                }))
+              }
               className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
               step={0.000001}
             />
@@ -390,15 +482,41 @@ export function SitesAdmin() {
               type="number"
               min={0}
               value={editing.radius_m}
-              onChange={(event) => setEditing({ ...editing, radius_m: Number(event.target.value) })}
+              onChange={(event) =>
+                updateEditing((current) => ({
+                  ...current,
+                  radius_m: Number(event.target.value),
+                }))
+              }
               className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             />
           </label>
           <div className="md:col-span-2 h-64 overflow-hidden rounded-3xl border border-white/60">
-            <MapContainer key={`${editing.id}-${editing.lat}-${editing.lng}`} center={defaultPosition} zoom={17} className="h-full w-full">
+            <MapContainer
+              key={mapKey}
+              center={defaultPosition}
+              zoom={mapZoom}
+              className="h-full w-full"
+              ref={handleMapRef}
+            >
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <Marker position={defaultPosition} />
-              <Circle center={defaultPosition} radius={editing.radius_m} />
+              <Marker
+                key={markerKey}
+                position={defaultPosition}
+                draggable={true}
+                eventHandlers={{
+                  dragend: (event: DragEndEvent) => {
+                    const pos = event.target.getLatLng();
+                    updateEditing((current) => ({
+                      ...current,
+                      lat: pos.lat,
+                      lng: pos.lng,
+                    }));
+                    console.log('[SitesAdmin] marker dragged', pos);
+                  },
+                }}
+              />
+              <Circle key={`circle-${markerKey}`} center={defaultPosition} radius={editing.radius_m} />
             </MapContainer>
           </div>
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
@@ -406,7 +524,12 @@ export function SitesAdmin() {
               <input
                 type="checkbox"
                 checked={editing.is_active}
-                onChange={(event) => setEditing({ ...editing, is_active: event.target.checked })}
+                onChange={(event) =>
+                  updateEditing((current) => ({
+                    ...current,
+                    is_active: event.target.checked,
+                  }))
+                }
                 className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
               />
               Activo
