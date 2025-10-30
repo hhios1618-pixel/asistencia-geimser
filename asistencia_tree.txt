@@ -1,0 +1,14 @@
+app/admin/asistencia
+├── components
+│   ├── AdminAttendanceClient.tsx
+│   ├── AuditLogViewer.tsx
+│   ├── DTAccessPanel.tsx
+│   ├── ModificationsInbox.tsx
+│   ├── PeopleAdmin.tsx
+│   ├── PoliciesManager.tsx
+│   ├── ReportsExporter.tsx
+│   ├── SchedulesAdmin.tsx
+│   └── SitesAdmin.tsx
+└── page.tsx
+
+2 directories, 10 files

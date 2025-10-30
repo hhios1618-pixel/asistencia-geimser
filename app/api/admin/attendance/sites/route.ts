@@ -4,9 +4,20 @@ import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
 import { runQuery } from '../../../../../lib/db/postgres';
 import type { Tables } from '../../../../../types/database';
 
+const addressSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') {
+      return value ?? null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? null : trimmed;
+  },
+  z.string().min(3).max(255).or(z.null())
+);
+
 const siteSchema = z.object({
-  name: z.string().min(3),
-  address: z.string().min(3).max(255),
+  name: z.string().trim().min(3),
+  address: addressSchema.optional(),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   radius_m: z.number().int().min(0),
@@ -47,7 +58,12 @@ export async function GET() {
   }
   await ensureAddressColumn();
   const { rows } = await runQuery<Tables['sites']['Row']>('select * from asistencia.sites order by created_at');
-  return NextResponse.json({ items: rows });
+  const parsed = rows.map((row) => ({
+    ...row,
+    lat: typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat)),
+    lng: typeof row.lng === 'number' ? row.lng : parseFloat(String(row.lng)),
+  }));
+  return NextResponse.json({ items: parsed });
 }
 
 export async function POST(request: NextRequest) {
@@ -65,13 +81,14 @@ export async function POST(request: NextRequest) {
 
   try {
     await ensureAddressColumn();
+    const address = payload.address ?? null;
     const { rows } = await runQuery<Tables['sites']['Row']>(
       `insert into asistencia.sites (name, address, lat, lng, radius_m, is_active)
        values ($1, $2, $3, $4, $5, $6)
        returning *`,
       [
         payload.name,
-        payload.address,
+        address,
         payload.lat,
         payload.lng,
         payload.radius_m,

@@ -1,0 +1,71 @@
+   480	                }))
+   481	              }
+   482	              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   483	              step={0.000001}
+   484	            />
+   485	          </label>
+   486	          <label className="flex flex-col gap-2 text-sm">
+   487	            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Longitud</span>
+   488	            <input
+   489	              type="number"
+   490	              value={editing.lng}
+   491	              onChange={(event) =>
+   492	                updateEditing((current) => ({
+   493	                  ...current,
+   494	                  lng: Number(event.target.value),
+   495	                }))
+   496	              }
+   497	              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   498	              step={0.000001}
+   499	            />
+   500	          </label>
+   501	          <label className="flex flex-col gap-2 text-sm">
+   502	            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Radio (m)</span>
+   503	            <input
+   504	              type="number"
+   505	              min={0}
+   506	              value={editing.radius_m}
+   507	              onChange={(event) =>
+   508	                updateEditing((current) => ({
+   509	                  ...current,
+   510	                  radius_m: Number(event.target.value),
+   511	                }))
+   512	              }
+   513	              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   514	            />
+   515	          </label>
+   516	          <div className="md:col-span-2 h-64 overflow-hidden rounded-3xl border border-white/60">
+   517	            <MapContainer
+   518	              key={mapKey}
+   519	              center={defaultPosition}
+   520	              zoom={mapZoom}
+   521	              className="h-full w-full"
+   522	              whenCreated={(mapInstance) => {
+   523	                mapRef.current = mapInstance;
+   524	              }}
+   525	            >
+   526	              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+   527	              <Marker key={markerKey} position={defaultPosition} />
+   528	              <Circle key={`circle-${markerKey}`} center={defaultPosition} radius={editing.radius_m} />
+   529	            </MapContainer>
+   530	          </div>
+   531	          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+   532	            <label className="flex items-center gap-2 text-sm text-slate-600">
+   533	              <input
+   534	                type="checkbox"
+   535	                checked={editing.is_active}
+   536	                onChange={(event) =>
+   537	                  updateEditing((current) => ({
+   538	                    ...current,
+   539	                    is_active: event.target.checked,
+   540	                  }))
+   541	                }
+   542	                className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+   543	              />
+   544	              Activo
+   545	            </label>
+   546	            <button
+   547	              type="submit"
+   548	              className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600"
+   549	            >
+   550	              Guardar

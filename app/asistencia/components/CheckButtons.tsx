@@ -158,18 +158,20 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
 
   return (
     <div className="rounded-3xl border border-white/60 bg-white/85 p-5 shadow-[0_22px_60px_-40px_rgba(15,23,42,0.35)]">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
+      <div className="mb-4 flex flex-col gap-2 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
         <p className="font-medium text-slate-700">Registrar asistencia</p>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">{lastMarkCopy}</span>
+        <span className="inline-flex w-full items-center justify-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500 sm:w-auto">
+          {lastMarkCopy}
+        </span>
       </div>
       <div className="flex flex-col gap-3 md:flex-row">
         <button
           type="button"
-          className="group relative flex flex-1 items-center justify-between overflow-hidden rounded-[28px] bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 p-[2px] text-left text-white shadow-[0_24px_45px_-30px_rgba(16,185,129,0.9)] transition hover:from-emerald-500 hover:via-emerald-600 hover:to-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 disabled:opacity-60"
+          className="group relative flex w-full flex-1 items-center justify-between overflow-hidden rounded-[28px] bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 p-[2px] text-left text-white shadow-[0_24px_45px_-30px_rgba(16,185,129,0.9)] transition hover:from-emerald-500 hover:via-emerald-600 hover:to-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 disabled:opacity-60"
           disabled={inDisabled}
           onClick={() => handleMark('IN')}
         >
-          <span className="flex w-full items-center justify-between rounded-[26px] bg-emerald-500/90 px-6 py-4 text-sm font-semibold backdrop-blur-sm">
+          <span className="flex w-full items-center justify-between rounded-[26px] bg-emerald-500/90 px-5 py-4 text-sm font-semibold backdrop-blur-sm md:px-6 md:py-5">
             <span className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-base">
                 <ClockIcon className="h-5 w-5" />
@@ -183,11 +185,11 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
         </button>
         <button
           type="button"
-          className="group relative flex flex-1 items-center justify-between overflow-hidden rounded-[28px] bg-gradient-to-r from-rose-400 via-rose-500 to-rose-600 p-[2px] text-left text-white shadow-[0_24px_45px_-30px_rgba(244,63,94,0.85)] transition hover:from-rose-500 hover:via-rose-600 hover:to-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-rose-300 disabled:opacity-60"
+          className="group relative flex w-full flex-1 items-center justify-between overflow-hidden rounded-[28px] bg-gradient-to-r from-rose-400 via-rose-500 to-rose-600 p-[2px] text-left text-white shadow-[0_24px_45px_-30px_rgba(244,63,94,0.85)] transition hover:from-rose-500 hover:via-rose-600 hover:to-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-rose-300 disabled:opacity-60"
           disabled={outDisabled}
           onClick={() => handleMark('OUT')}
         >
-          <span className="flex w-full items-center justify-between rounded-[26px] bg-rose-500/90 px-6 py-4 text-sm font-semibold backdrop-blur-sm">
+          <span className="flex w-full items-center justify-between rounded-[26px] bg-rose-500/90 px-5 py-4 text-sm font-semibold backdrop-blur-sm md:px-6 md:py-5">
             <span className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-base">
                 <SunsetIcon className="h-5 w-5" />

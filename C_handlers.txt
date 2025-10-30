@@ -1,0 +1,140 @@
+   321	        site.name.toLowerCase().includes(term) ||
+   322	        (site.address ?? '').toLowerCase().includes(term) ||
+   323	        site.lat.toString().includes(term) ||
+   324	        site.lng.toString().includes(term);
+   325	      const matchesStatus =
+   326	        statusFilter === 'ALL' ||
+   327	        (statusFilter === 'ACTIVE' && site.is_active) ||
+   328	        (statusFilter === 'INACTIVE' && !site.is_active);
+   329	      return matchesSearch && matchesStatus;
+   330	    });
+   331	  }, [sites, searchTerm, statusFilter]);
+   332	
+   333	  return (
+   334	    <section className="flex flex-col gap-6">
+   335	      <header className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/70 bg-white/80 p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.55)]">
+   336	        <div>
+   337	          <h2 className="text-xl font-semibold text-slate-900">Sitios</h2>
+   338	          <p className="text-sm text-slate-500">Define las ubicaciones, direcciones y radios de geocerca.</p>
+   339	        </div>
+   340	        <button
+   341	          type="button"
+   342	          className="rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(59,130,246,0.75)] transition hover:from-blue-600 hover:to-indigo-600"
+   343	          onClick={startCreation}
+   344	        >
+   345	          Nuevo sitio
+   346	        </button>
+   347	      </header>
+   348	      {loading && <p className="text-sm text-slate-500">Cargando sitios…</p>}
+   349	      {error && <p className="text-sm text-rose-500">{error}</p>}
+   350	      {success && <p className="glass-panel border border-emerald-200/70 bg-emerald-50/70 p-3 text-sm text-emerald-700">{success}</p>}
+   351	      <div className="glass-panel grid gap-3 rounded-3xl border border-white/60 bg-white/85 p-4 text-sm md:grid-cols-3">
+   352	        <label className="flex flex-col gap-2">
+   353	          <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Búsqueda</span>
+   354	          <input
+   355	            value={searchTerm}
+   356	            onChange={(event) => setSearchTerm(event.target.value)}
+   357	            placeholder="Nombre, dirección o coordenadas"
+   358	            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   359	          />
+   360	        </label>
+   361	        <label className="flex flex-col gap-2">
+   362	          <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Estado</span>
+   363	          <select
+   364	            value={statusFilter}
+   365	            onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+   366	            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   367	          >
+   368	            <option value="ALL">Todos</option>
+   369	            <option value="ACTIVE">Activos</option>
+   370	            <option value="INACTIVE">Inactivos</option>
+   371	          </select>
+   372	        </label>
+   373	        <div className="flex items-end">
+   374	          <p className="text-xs text-slate-500">
+   375	            {filteredSites.length} de {sites.length} sitios visibles
+   376	          </p>
+   377	        </div>
+   378	      </div>
+   379	      <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+   380	        {filteredSites.map((site) => (
+   381	          <li key={site.id} className="glass-panel rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.45)]">
+   382	            <h3 className="text-lg font-semibold text-slate-900">{site.name}</h3>
+   383	            <p className="mt-1 text-sm text-slate-600">{site.address ?? 'Dirección no registrada'}</p>
+   384	            <p className="mt-2 text-xs text-slate-500">
+   385	              Lat {site.lat.toFixed(5)} · Lng {site.lng.toFixed(5)} · Radio {site.radius_m}m
+   386	            </p>
+   387	            <p className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+   388	              {site.is_active ? 'Activo' : 'Inactivo'}
+   389	            </p>
+   390	            <div className="mt-3 flex gap-3 text-sm">
+   391	              <button
+   392	                type="button"
+   393	                className="rounded-full bg-blue-500/10 px-4 py-1 text-blue-600 transition hover:bg-blue-500/20"
+   394	                onClick={() => startEdit(site)}
+   395	              >
+   396	                Editar
+   397	              </button>
+   398	              <button
+   399	                type="button"
+   400	                className="rounded-full bg-rose-500/10 px-4 py-1 text-rose-600 transition hover:bg-rose-500/20"
+   401	                onClick={() => deleteSite(site)}
+   402	              >
+   403	                Eliminar
+   404	              </button>
+   405	            </div>
+   406	          </li>
+   407	        ))}
+   408	        {filteredSites.length === 0 && !loading && (
+   409	          <li className="glass-panel rounded-3xl border border-white/60 bg-white/80 p-4 text-center text-sm text-slate-400">
+   410	            No hay sitios que cumplan con los filtros.
+   411	          </li>
+   412	        )}
+   413	      </ul>
+   414	      {editing && (
+   415	        <form onSubmit={submit} className="glass-panel grid gap-4 rounded-3xl border border-white/60 bg-white/90 p-6 md:grid-cols-2">
+   416	          <label className="flex flex-col gap-2 text-sm">
+   417	            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Nombre</span>
+   418	            <input
+   419	              required
+   420	              value={editing.name}
+   421	              onChange={(event) =>
+   422	                updateEditing((current) => ({
+   423	                  ...current,
+   424	                  name: event.target.value,
+   425	                }))
+   426	              }
+   427	              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   428	            />
+   429	          </label>
+   430	          <label className="flex flex-col gap-2 text-sm">
+   431	            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Dirección</span>
+   432	            <div className="relative">
+   433	              <input
+   434	                required
+   435	                value={editing.address ?? ''}
+   436	                onChange={(event) => {
+   437	                  const value = event.target.value;
+   438	                  updateEditing((current) => ({
+   439	                    ...current,
+   440	                    address: value,
+   441	                  }));
+   442	                  setAddressQuery(value);
+   443	                  setAcceptedSuggestion(null);
+   444	                }}
+   445	                className="w-full rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+   446	              />
+   447	              {addressQuery.trim().length >= 3 &&
+   448	                (addressLoading || addressSuggestions.length > 0 || addressLookupPerformed) && (
+   449	                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-xl">
+   450	                  {addressLoading && (
+   451	                    <p className="px-4 py-2 text-xs text-slate-400">Buscando direcciones…</p>
+   452	                  )}
+   453	                  {!addressLoading && addressSuggestions.length === 0 && addressLookupPerformed && (
+   454	                    <p className="px-4 py-2 text-xs text-slate-400">No se encontraron coincidencias.</p>
+   455	                  )}
+   456	                  {addressSuggestions.map((suggestion) => (
+   457	                    <button
+   458	                      key={suggestion.id}
+   459	                      type="button"
+   460	                      onMouseDown={(event) => event.preventDefault()}

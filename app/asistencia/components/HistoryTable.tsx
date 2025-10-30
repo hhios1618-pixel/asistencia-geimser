@@ -79,8 +79,8 @@ export function HistoryTable({ onReload, refreshKey }: Props) {
   return (
     <section className="space-y-5">
       <div className="overflow-hidden rounded-3xl border border-white/60 bg-white/85 p-[1px] shadow-[0_28px_70px_-50px_rgba(15,23,42,0.5)]">
-        <div className="rounded-[26px] bg-white/95 p-6">
-          <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-[26px] bg-white/95 p-5 sm:p-6">
+          <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-[0.4em] text-slate-500">Historial personal</p>
               <h3 className="text-2xl font-semibold text-slate-900">Controla tus marcas</h3>
@@ -115,7 +115,7 @@ export function HistoryTable({ onReload, refreshKey }: Props) {
               </button>
             </div>
           </header>
-          <div className="grid gap-4 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
             <label className="flex flex-col gap-2 text-sm text-slate-600">
               <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Desde</span>
               <input
@@ -184,7 +184,49 @@ export function HistoryTable({ onReload, refreshKey }: Props) {
       )}
 
       {items.length > 0 && (
-        <div className="relative space-y-4">
+        <>
+          <div className="space-y-4 md:hidden">
+            <ul className="space-y-3">
+              {items.map((item) => (
+                <li key={`${item.id}-mobile`} className="rounded-3xl border border-white/60 bg-white/95 p-4 shadow-[0_24px_60px_-48px_rgba(15,23,42,0.45)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-900">
+                      {new Date(item.event_ts).toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        day: '2-digit',
+                        month: 'short',
+                      })}
+                    </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        item.event_type === 'IN'
+                          ? 'bg-emerald-500/10 text-emerald-600'
+                          : 'bg-rose-500/10 text-rose-600'
+                      }`}
+                    >
+                      {item.event_type === 'IN' ? 'Entrada' : 'Salida'}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {new Date(item.event_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <div className="mt-3 space-y-2 text-xs text-slate-500">
+                    <p>
+                      <span className="font-semibold text-slate-700">Sitio:</span> {item.site_id}
+                    </p>
+                    <p className="font-mono text-[11px] text-slate-500">
+                      {item.hash_self.slice(0, 18)}…
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <ProofReceiptButton receiptUrl={item.receipt_signed_url} />
+                    <JustificationModal markId={item.id} onSubmitted={() => mutate()} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="relative hidden space-y-4 md:block">
           <span className="absolute left-[18px] top-0 h-full w-[2px] bg-gradient-to-b from-blue-500/70 via-indigo-500/50 to-transparent md:left-5" />
           <ul className="space-y-4">
             {items.map((item) => (
@@ -233,6 +275,7 @@ export function HistoryTable({ onReload, refreshKey }: Props) {
             ))}
           </ul>
         </div>
+        </>
       )}
     </section>
   );

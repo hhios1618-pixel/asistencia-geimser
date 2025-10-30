@@ -1,0 +1,170 @@
+   151	        });
+   152	        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+   153	          headers: {
+   154	            'Accept-Language': 'es',
+   155	            'User-Agent': 'geimser-asistencia/1.0 (+support@geimser.com)',
+   156	          },
+   157	          signal: controller.signal,
+   158	        });
+   159	        if (!response.ok) {
+   160	          throw new Error(`status_${response.status}`);
+   161	        }
+   162	        const data = (await response.json()) as {
+   163	          place_id: string;
+   164	          display_name: string;
+   165	          lat: string;
+   166	          lon: string;
+   167	        }[];
+   168	        setAddressSuggestions(
+   169	          data.map((item) => ({
+   170	            id: item.place_id,
+   171	            displayName: item.display_name,
+   172	            lat: Number.parseFloat(item.lat),
+   173	            lng: Number.parseFloat(item.lon),
+   174	          }))
+   175	        );
+   176	        setAddressLookupPerformed(true);
+   177	      } catch (suggestError) {
+   178	        if (!(suggestError instanceof DOMException && suggestError.name === 'AbortError')) {
+   179	          console.warn('address lookup failed', suggestError);
+   180	          setAddressLookupPerformed(true);
+   181	        }
+   182	      } finally {
+   183	        setAddressLoading(false);
+   184	      }
+   185	    }, 300);
+   186	    return () => {
+   187	      controller.abort();
+   188	      clearTimeout(timeout);
+   189	    };
+   190	  }, [acceptedSuggestion, addressQuery, editingId]);
+   191	
+   192	  useEffect(() => {
+   193	    if (!editing) {
+   194	      return;
+   195	    }
+   196	    if (!mapRef.current) {
+   197	      return;
+   198	    }
+   199	    const { lat, lng } = editing;
+   200	    console.log('[SitesAdmin] effect centering map', { lat, lng });
+   201	    mapRef.current.setView([lat, lng], mapZoom, { animate: true });
+   202	  }, [editing?.lat, editing?.lng]);
+   203	
+   204	  const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
+   205	    const lat = Number(suggestion.lat);
+   206	    const lng = Number(suggestion.lng);
+   207	    const normalizedAddress = suggestion.displayName;
+   208	
+   209	    console.log('[SitesAdmin] suggestion selected', {
+   210	      displayName: normalizedAddress,
+   211	      lat,
+   212	      lng,
+   213	    });
+   214	
+   215	    updateEditing((current) => ({
+   216	      ...current,
+   217	      address: normalizedAddress,
+   218	      lat,
+   219	      lng,
+   220	    }));
+   221	
+   222	    setAddressQuery(normalizedAddress);
+   223	    setAddressSuggestions([]);
+   224	    setAcceptedSuggestion(normalizedAddress);
+   225	    setAddressLoading(false);
+   226	    setAddressLookupPerformed(true);
+   227	
+   228	    if (mapRef.current) {
+   229	      mapRef.current.setView([lat, lng], mapZoom, { animate: true });
+   230	    } else {
+   231	      console.warn('[SitesAdmin] mapRef not ready to set view', { lat, lng });
+   232	    }
+   233	  };
+   234	
+   235	  const submit = async (event: React.FormEvent) => {
+   236	    event.preventDefault();
+   237	    if (!editing) {
+   238	      return;
+   239	    }
+   240	    setSuccess(null);
+   241	    const normalizeForSubmit = (site: Site) => {
+   242	      const trimmedAddress = (site.address ?? '').trim();
+   243	      return {
+   244	        ...site,
+   245	        address: trimmedAddress.length > 0 ? trimmedAddress : null,
+   246	      };
+   247	    };
+   248	    const normalized = normalizeForSubmit(editing);
+   249	    const isExisting = sites.some((site) => site.id === editing.id);
+   250	    const method = isExisting ? 'PATCH' : 'POST';
+   251	    const { id: siteId, ...createBase } = normalized;
+   252	    void siteId;
+   253	    const response = await fetch('/api/admin/attendance/sites', {
+   254	      method,
+   255	      headers: { 'Content-Type': 'application/json' },
+   256	      body: JSON.stringify(isExisting ? normalized : createBase),
+   257	    });
+   258	    if (!response.ok) {
+   259	      const body = await response.json();
+   260	      setError(body.error ?? 'No fue posible guardar el sitio');
+   261	      return;
+   262	    }
+   263	    setEditing(null);
+   264	    await fetchSites();
+   265	    setSuccess(`Sitio ${editing.name} ${isExisting ? 'actualizado' : 'creado'} correctamente.`);
+   266	  };
+   267	
+   268	  const startCreation = () => {
+   269	    setEditing({
+   270	      id: crypto.randomUUID(),
+   271	      name: '',
+   272	      address: '',
+   273	      lat: -33.45,
+   274	      lng: -70.66,
+   275	      radius_m: 100,
+   276	      is_active: true,
+   277	    });
+   278	    console.log('Update:', -33.45, -70.66);
+   279	    setAddressQuery('');
+   280	    setAddressSuggestions([]);
+   281	    setAcceptedSuggestion(null);
+   282	  };
+   283	
+   284	  const startEdit = (site: Site) => {
+   285	    setEditing({ ...site, address: site.address ?? '' });
+   286	    console.log('Update:', site.lat, site.lng);
+   287	    setAddressQuery(site.address ?? '');
+   288	    setAddressSuggestions([]);
+   289	    setAcceptedSuggestion(site.address ?? null);
+   290	  };
+   291	
+   292	  const deleteSite = async (site: Site) => {
+   293	    const confirmed = window.confirm(
+   294	      `¿Eliminar el sitio ${site.name}? Se quitarán asignaciones y no se podrán registrar marcas en él.`
+   295	    );
+   296	    if (!confirmed) {
+   297	      return;
+   298	    }
+   299	    setError(null);
+   300	    setSuccess(null);
+   301	    const response = await fetch(`/api/admin/attendance/sites?id=${site.id}`, {
+   302	      method: 'DELETE',
+   303	    });
+   304	    if (!response.ok) {
+   305	      const body = (await response.json().catch(() => ({}))) as { error?: string };
+   306	      setError(body.error ?? 'No fue posible eliminar el sitio');
+   307	      return;
+   308	    }
+   309	    if (editing?.id === site.id) {
+   310	      setEditing(null);
+   311	    }
+   312	    await fetchSites();
+   313	    setSuccess(`Sitio ${site.name} eliminado.`);
+   314	  };
+   315	
+   316	  const filteredSites = useMemo(() => {
+   317	    const term = searchTerm.trim().toLowerCase();
+   318	    return sites.filter((site) => {
+   319	      const matchesSearch =
+   320	        term.length === 0 ||

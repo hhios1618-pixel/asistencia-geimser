@@ -40,7 +40,7 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <section className="overflow-hidden rounded-3xl border border-white/60 bg-gradient-to-r from-white/85 via-white/95 to-white/85 p-[1px] shadow-[0_40px_110px_-70px_rgba(15,23,42,0.65)]">
-        <div className="relative rounded-[26px] bg-white/95 p-6 sm:p-8">
+        <div className="relative rounded-[26px] bg-white/95 p-5 sm:p-8">
           <div className="absolute -right-24 top-1/2 hidden h-56 w-56 -translate-y-1/2 rounded-full bg-gradient-to-br from-blue-500/25 via-indigo-500/15 to-transparent blur-3xl md:block" />
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div>

@@ -1,0 +1,150 @@
+     1	'use client';
+     2	
+     3	import { useEffect, useMemo, useRef, useState } from 'react';
+     4	import dynamic from 'next/dynamic';
+     5	import type { Map as LeafletMap } from 'leaflet';
+     6	
+     7	interface Site {
+     8	  id: string;
+     9	  name: string;
+    10	  address: string | null;
+    11	  lat: number;
+    12	  lng: number;
+    13	  radius_m: number;
+    14	  is_active: boolean;
+    15	}
+    16	
+    17	interface AddressSuggestion {
+    18	  id: string;
+    19	  displayName: string;
+    20	  lat: number;
+    21	  lng: number;
+    22	}
+    23	
+    24	const MapContainer = dynamic(() => import('react-leaflet').then((mod) => mod.MapContainer), { ssr: false });
+    25	const TileLayer = dynamic(() => import('react-leaflet').then((mod) => mod.TileLayer), { ssr: false });
+    26	const Circle = dynamic(() => import('react-leaflet').then((mod) => mod.Circle), { ssr: false });
+    27	const Marker = dynamic(() => import('react-leaflet').then((mod) => mod.Marker), { ssr: false });
+    28	
+    29	export function SitesAdmin() {
+    30	  const [sites, setSites] = useState<Site[]>([]);
+    31	  const [loading, setLoading] = useState(false);
+    32	  const [error, setError] = useState<string | null>(null);
+    33	  const [success, setSuccess] = useState<string | null>(null);
+    34	  const [editing, setEditing] = useState<Site | null>(null);
+    35	  const [searchTerm, setSearchTerm] = useState('');
+    36	  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+    37	  const [addressQuery, setAddressQuery] = useState('');
+    38	  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+    39	  const [addressLoading, setAddressLoading] = useState(false);
+    40	  const [acceptedSuggestion, setAcceptedSuggestion] = useState<string | null>(null);
+    41	  const [addressLookupPerformed, setAddressLookupPerformed] = useState(false);
+    42	  const mapRef = useRef<LeafletMap | null>(null);
+    43	  const mapZoom = 16;
+    44	
+    45	  const updateEditing = (updater: (current: Site) => Site) => {
+    46	    setEditing((current) => {
+    47	      if (!current) {
+    48	        return current;
+    49	      }
+    50	      const next = updater(current);
+    51	      if (next.lat !== current.lat || next.lng !== current.lng) {
+    52	        console.log('Update:', next.lat, next.lng);
+    53	      }
+    54	      return next;
+    55	    });
+    56	  };
+    57	
+    58	  const defaultPosition: [number, number] = useMemo(
+    59	    () => [editing?.lat ?? -33.45, editing?.lng ?? -70.66],
+    60	    [editing?.lat, editing?.lng]
+    61	  );
+    62	  const mapKey = editing ? `map-${editing.id}-${editing.lat}-${editing.lng}` : 'map-default';
+    63	  const markerKey = editing ? `marker-${editing.id}-${editing.lat}-${editing.lng}` : 'marker-default';
+    64	
+    65	  const fetchSites = async () => {
+    66	    setLoading(true);
+    67	    setError(null);
+    68	    const response = await fetch('/api/admin/attendance/sites');
+    69	    if (!response.ok) {
+    70	      const body = (await response.json().catch(() => ({}))) as { error?: string };
+    71	      setError(body.error ?? 'No fue posible cargar sitios');
+    72	      setLoading(false);
+    73	      return;
+    74	    }
+    75	    const body = (await response.json()) as { items: Site[] };
+    76	    setSites(body.items);
+    77	    setLoading(false);
+    78	  };
+    79	
+    80	  useEffect(() => {
+    81	    let mounted = true;
+    82	    const setupLeaflet = async () => {
+    83	      await import('leaflet/dist/leaflet.css');
+    84	      const module = await import('leaflet');
+    85	      const L = module.default ?? module;
+    86	      if (!mounted) {
+    87	        return;
+    88	      }
+    89	      L.Icon.Default.mergeOptions({
+    90	        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    91	        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    92	        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    93	      });
+    94	    };
+    95	    void setupLeaflet();
+    96	    void fetchSites();
+    97	    return () => {
+    98	      mounted = false;
+    99	    };
+   100	  }, []);
+   101	
+   102	  useEffect(() => {
+   103	    if (editing) {
+   104	      const address = editing.address ?? '';
+   105	      setAddressQuery(address);
+   106	      setAddressSuggestions([]);
+   107	      setAcceptedSuggestion(address || null);
+   108	      setAddressLookupPerformed(false);
+   109	    } else {
+   110	      setAddressQuery('');
+   111	      setAddressSuggestions([]);
+   112	      setAcceptedSuggestion(null);
+   113	      setAddressLookupPerformed(false);
+   114	    }
+   115	  }, [editing]);
+   116	
+   117	  const editingId = editing?.id ?? null;
+   118	
+   119	  useEffect(() => {
+   120	    if (!editingId) {
+   121	      setAddressSuggestions([]);
+   122	      setAddressLoading(false);
+   123	      setAddressLookupPerformed(false);
+   124	      return;
+   125	    }
+   126	
+   127	    const query = addressQuery.trim();
+   128	    if (query.length < 3) {
+   129	      setAddressSuggestions([]);
+   130	      setAddressLoading(false);
+   131	      setAddressLookupPerformed(false);
+   132	      return;
+   133	    }
+   134	    const controller = new AbortController();
+   135	    const timeout = setTimeout(async () => {
+   136	      if (acceptedSuggestion && acceptedSuggestion.trim().toLowerCase() === query.toLowerCase()) {
+   137	        setAddressSuggestions([]);
+   138	        setAddressLoading(false);
+   139	        setAddressLookupPerformed(true);
+   140	        return;
+   141	      }
+   142	      setAddressLookupPerformed(false);
+   143	      setAddressLoading(true);
+   144	      try {
+   145	        console.log('[SitesAdmin] fetching suggestions', { query });
+   146	        const params = new URLSearchParams({
+   147	          format: 'json',
+   148	          q: query,
+   149	          addressdetails: '1',
+   150	          limit: '5',

@@ -76,18 +76,22 @@ export default async function AsistenciaPage() {
 
   const ensuredPerson = person!;
 
-  const { data: assignments } = await serviceSupabase
-    .from('people_sites')
-    .select('site_id')
-    .eq('person_id', user.id as string)
-    .eq('active', true);
+  const { rows: assignmentRows } = await runQuery<{ site_id: string }>(
+    `select site_id from asistencia.people_sites
+     where person_id = $1 and active = true`,
+    [user.id as string]
+  );
 
-  const assignmentRows = (assignments as { site_id: string }[] | null) ?? [];
   const siteIds = assignmentRows.map((item) => item.site_id);
   let sites: Tables['sites']['Row'][] = [];
   if (siteIds.length > 0) {
-    const { data: sitesData } = await serviceSupabase.from('sites').select('*').in('id', siteIds);
-    sites = (sitesData as Tables['sites']['Row'][] | null) ?? [];
+    const { rows: siteRows } = await runQuery<Tables['sites']['Row']>(
+      `select * from asistencia.sites
+       where id = any($1::uuid[])
+       order by name`,
+      [siteIds]
+    );
+    sites = siteRows;
   }
 
   const today = new Date();

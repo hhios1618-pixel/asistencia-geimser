@@ -1,0 +1,117 @@
+.
+├── README.md
+├── app
+│   ├── admin
+│   │   └── asistencia
+│   │       ├── components
+│   │       │   ├── AdminAttendanceClient.tsx
+│   │       │   ├── AuditLogViewer.tsx
+│   │       │   ├── DTAccessPanel.tsx
+│   │       │   ├── ModificationsInbox.tsx
+│   │       │   ├── PeopleAdmin.tsx
+│   │       │   ├── PoliciesManager.tsx
+│   │       │   ├── ReportsExporter.tsx
+│   │       │   ├── SchedulesAdmin.tsx
+│   │       │   └── SitesAdmin.tsx
+│   │       └── page.tsx
+│   ├── api
+│   │   ├── admin
+│   │   │   └── attendance
+│   │   │       ├── dt
+│   │   │       │   └── access
+│   │   │       ├── export
+│   │   │       │   └── route.ts
+│   │   │       ├── geocode
+│   │   │       │   └── route.ts
+│   │   │       ├── people
+│   │   │       │   └── route.ts
+│   │   │       ├── reports
+│   │   │       │   └── overview
+│   │   │       ├── schedules
+│   │   │       │   └── route.ts
+│   │   │       └── sites
+│   │   │           └── route.ts
+│   │   └── attendance
+│   │       ├── alerts
+│   │       │   └── route.ts
+│   │       ├── history
+│   │       │   └── route.ts
+│   │       ├── mark
+│   │       │   └── route.ts
+│   │       └── modifications
+│   │           └── route.ts
+│   ├── asistencia
+│   │   ├── components
+│   │   │   ├── AlertsBanner.tsx
+│   │   │   ├── AttendanceClient.tsx
+│   │   │   ├── CheckButtons.tsx
+│   │   │   ├── GeofenceBadge.tsx
+│   │   │   ├── HistoryTable.tsx
+│   │   │   ├── JustificationModal.tsx
+│   │   │   ├── LocationPermissionGuard.tsx
+│   │   │   ├── LogoutButton.tsx
+│   │   │   ├── OfflineSyncTray.tsx
+│   │   │   ├── ProofReceiptButton.tsx
+│   │   │   ├── ShiftInfoCard.tsx
+│   │   │   └── SiteSelector.tsx
+│   │   └── page.tsx
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── login
+│   │   ├── components
+│   │   │   └── LoginForm.tsx
+│   │   └── page.tsx
+│   └── page.tsx
+├── eslint.config.mjs
+├── lib
+│   ├── alerts
+│   │   └── rules.ts
+│   ├── audit
+│   │   └── log.ts
+│   ├── db
+│   │   └── postgres.ts
+│   ├── dt
+│   │   ├── access.ts
+│   │   ├── hashchain.ts
+│   │   └── receipts.ts
+│   ├── geo
+│   │   ├── geocode.ts
+│   │   └── geofence.ts
+│   ├── hooks
+│   │   └── useBrowserSupabase.ts
+│   ├── offline
+│   │   └── queue.ts
+│   ├── privacy
+│   │   └── consent.ts
+│   └── supabase
+│       ├── client.ts
+│       └── server.ts
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
+├── postcss.config.mjs
+├── project-structure.txt
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── scripts
+│   └── devcheck.md
+├── sql
+│   ├── 01_schema.sql
+│   ├── 02_rls.sql
+│   ├── 03_functions.sql
+│   └── 04_seed.sql
+├── tsconfig.json
+├── tsconfig.tsbuildinfo
+└── types
+    ├── database.ts
+    ├── global.d.ts
+    └── pg.d.ts
+
+40 directories, 75 files
