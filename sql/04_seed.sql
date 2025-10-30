@@ -1,9 +1,9 @@
 -- Seed data for Asistencia Geimser MVP
 
-insert into people (id, rut, name, role, is_active, email)
+insert into people (id, rut, name, service, role, is_active, email)
 values
-    ('00000000-0000-0000-0000-000000000001', '12.345.678-9', 'Admin Geimser', 'ADMIN', true, 'admin@geimser.cl'),
-    ('00000000-0000-0000-0000-000000000002', '98.765.432-1', 'Trabajador Demo', 'WORKER', true, 'worker@geimser.cl')
+    ('00000000-0000-0000-0000-000000000001', '12.345.678-9', 'Admin Geimser', 'Administración', 'ADMIN', true, 'admin@geimser.cl'),
+    ('00000000-0000-0000-0000-000000000002', '98.765.432-1', 'Trabajador Demo', 'Operaciones', 'WORKER', true, 'worker@geimser.cl')
 on conflict (id) do nothing;
 
 insert into sites (id, name, lat, lng, radius_m, is_active)
@@ -26,4 +26,3 @@ values
     ('official_attendance_system', jsonb_build_object('enabled', true, 'updated_by', 'sysseed')),
     ('dt_portal', jsonb_build_object('base_url', 'https://asistencia-geimser.vercel.app/admin/dt'))
 on conflict (key) do update set value = excluded.value, updated_at = now();
-

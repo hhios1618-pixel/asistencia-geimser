@@ -9,6 +9,7 @@ const personSchema = z.object({
   name: z.string().min(3),
   rut: z.string().min(7).optional(),
   email: z.string().email().optional(),
+  service: z.string().min(2).optional(),
   role: z.enum(['WORKER', 'ADMIN', 'SUPERVISOR', 'DT_VIEWER']).default('WORKER'),
   is_active: z.boolean().optional(),
   siteIds: z.array(z.string().uuid()).optional(),
@@ -57,9 +58,10 @@ export async function GET() {
      from asistencia.people p
      left join asistencia.people_sites ps on ps.person_id = p.id
      group by p.id
-     order by p.created_at`);
+     order by p.created_at`
+  );
   return NextResponse.json({
-    items: rows.map((row: DbPersonRow) => ({ ...row, people_sites: row.people_sites ?? [] })),
+    items: rows.map((row) => ({ ...row, people_sites: row.people_sites ?? [] })),
   });
 }
 
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
     user_metadata: {
       name: payload.name,
       rut: payload.rut ?? null,
+      service: payload.service ?? null,
     },
     app_metadata: {
       role: payload.role,
@@ -104,9 +107,17 @@ export async function POST(request: NextRequest) {
 
   try {
     await runQuery(
-      `insert into asistencia.people (id, name, rut, email, role, is_active)
-       values ($1, $2, $3, $4, $5, $6)`,
-      [personId, payload.name, payload.rut ?? null, payload.email ?? null, payload.role, payload.is_active ?? true]
+      `insert into asistencia.people (id, name, rut, service, email, role, is_active)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        personId,
+        payload.name,
+        payload.rut ?? null,
+        payload.service ?? null,
+        payload.email ?? null,
+        payload.role,
+        payload.is_active ?? true,
+      ]
     );
   } catch (error) {
     try {
@@ -125,11 +136,7 @@ export async function POST(request: NextRequest) {
         [personId, payload.siteIds]
       );
     } catch (error) {
-      try {
-        await service.from('people').delete().eq('id', personId);
-      } catch {
-        // ignore rollback failure
-      }
+      await service.from('people').delete().eq('id', personId);
       try {
         await service.auth.admin.deleteUser(personId);
       } catch {
@@ -202,7 +209,7 @@ export async function PATCH(request: NextRequest) {
         `update asistencia.people set ${setters} where id = $1`,
         [id, ...columns.map((column) => (updateValues as Record<string, unknown>)[column])]
       );
-      updatedPerson = { ...updatedPerson, ...updateValues };
+      updatedPerson = { ...updatedPerson, ...updateValues } as DbPersonRow;
     } catch (error) {
       return NextResponse.json({ error: 'UPDATE_FAILED', details: (error as Error).message }, { status: 500 });
     }
@@ -244,6 +251,9 @@ export async function PATCH(request: NextRequest) {
   if (typeof changes.rut === 'string') {
     userMetadata.rut = changes.rut;
   }
+  if (typeof changes.service === 'string') {
+    userMetadata.service = changes.service;
+  }
 
   if (Object.keys(userMetadata).length > 0) {
     authUpdates.user_metadata = userMetadata;
@@ -257,20 +267,34 @@ export async function PATCH(request: NextRequest) {
     const { error: authUpdateError } = await service.auth.admin.updateUserById(id, authUpdates);
     if (authUpdateError) {
       if (Object.keys(updateValues).length > 0) {
-        try {
-          await runQuery(
-            `update asistencia.people set name = $2, rut = $3, email = $4, role = $5, is_active = $6 where id = $1`,
-            [id, existingPerson.name, existingPerson.rut, existingPerson.email, existingPerson.role, existingPerson.is_active]
-          );
-        } catch {
-          // ignore rollback failure
-        }
+        await runQuery(
+          `update asistencia.people
+           set name = $2, rut = $3, service = $4, email = $5, role = $6, is_active = $7
+           where id = $1`,
+          [
+            id,
+            existingPerson.name,
+            existingPerson.rut,
+            existingPerson.service,
+            existingPerson.email,
+            existingPerson.role,
+            existingPerson.is_active,
+          ]
+        );
       }
       return NextResponse.json({ error: 'AUTH_UPDATE_FAILED', details: authUpdateError.message }, { status: 500 });
     }
   }
 
-  return NextResponse.json({ item: updatedPerson, passwordReset: Boolean(password) });
+  const { rows: refreshedRows } = await runQuery<DbPersonRow>(
+    `select p.*, coalesce(json_agg(json_build_object('site_id', ps.site_id)) filter (where ps.site_id is not null), '[]'::json) as people_sites
+     from asistencia.people p left join asistencia.people_sites ps on ps.person_id = p.id
+     where p.id = $1 group by p.id`,
+    [id]
+  );
+  const refreshed = refreshedRows[0];
+
+  return NextResponse.json({ item: refreshed ?? updatedPerson, passwordReset: Boolean(password) });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -295,12 +319,10 @@ export async function DELETE(request: NextRequest) {
 
   await runQuery('delete from asistencia.people_sites where person_id = $1', [id]);
 
-  const { error } = await service
-    .from('people')
-    .delete()
-    .eq('id', id);
-  if (error) {
-    return NextResponse.json({ error: 'DELETE_FAILED', details: error.message }, { status: 500 });
+  try {
+    await runQuery('delete from asistencia.people where id = $1', [id]);
+  } catch (error) {
+    return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

@@ -17,13 +17,18 @@ if (!supabaseAnonKey) {
   throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
 }
 
+let serviceClient: SupabaseClient<Database> | null = null;
 export const getServiceSupabase = (): SupabaseClient<Database> => {
+  if (serviceClient) {
+    return serviceClient;
+  }
+
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
   }
 
-  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+  serviceClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -37,6 +42,8 @@ export const getServiceSupabase = (): SupabaseClient<Database> => {
       schema: 'asistencia',
     },
   });
+
+  return serviceClient;
 };
 
 export const getJwtSecret = (): string => {

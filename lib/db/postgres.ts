@@ -7,9 +7,9 @@ import { Pool, PoolClient } from 'pg';
 let pool: Pool | null = null;
 
 const getConnectionString = () => {
-  const url = process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  const url = process.env.POSTGRES_URL ?? process.env.POSTGRES_URL_NON_POOLING;
   if (!url) {
-    throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL must be defined');
+    throw new Error('POSTGRES_URL or POSTGRES_URL_NON_POOLING must be defined');
   }
   return url;
 };

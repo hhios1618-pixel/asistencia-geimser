@@ -20,14 +20,24 @@ export default async function LoginPage() {
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
 
     await runQuery(
-      `insert into asistencia.people (id, name, email, role, is_active)
-       values ($1, $2, $3, $4, $5)
+      `insert into asistencia.people (id, name, email, role, is_active, service, rut)
+       values ($1, $2, $3, $4, $5, $6, $7)
        on conflict (id) do update
        set name = excluded.name,
            email = excluded.email,
            role = excluded.role,
-           is_active = excluded.is_active`,
-      [user.id as string, defaultName.trim(), user.email ?? null, defaultRole, true]
+           is_active = excluded.is_active,
+           service = excluded.service,
+           rut = excluded.rut`,
+      [
+        user.id as string,
+        defaultName.trim(),
+        user.email ?? null,
+        defaultRole,
+        true,
+        (user.user_metadata?.service as string | undefined) ?? null,
+        (user.user_metadata?.rut as string | undefined) ?? null,
+      ]
     );
 
     redirect('/asistencia');

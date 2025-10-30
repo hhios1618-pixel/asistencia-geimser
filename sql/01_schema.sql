@@ -7,6 +7,7 @@ create table if not exists people (
     id uuid primary key default gen_random_uuid(),
     rut text unique,
     name text not null,
+    service text,
     role text not null check (role in ('WORKER','ADMIN','SUPERVISOR','DT_VIEWER')),
     is_active boolean not null default true,
     email text unique,

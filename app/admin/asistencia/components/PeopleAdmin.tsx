@@ -12,6 +12,7 @@ interface Person {
   name: string;
   rut: string | null;
   email: string | null;
+  service: string | null;
   role: 'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER';
   is_active: boolean;
   people_sites?: { site_id: string }[];
@@ -22,6 +23,7 @@ const emptyPerson: Person = {
   name: '',
   rut: null,
   email: null,
+  service: null,
   role: 'WORKER',
   is_active: true,
 };
@@ -40,6 +42,7 @@ export function PeopleAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'ALL' | Person['role']>('ALL');
   const [siteFilter, setSiteFilter] = useState<'ALL' | string>('ALL');
+  const [serviceFilter, setServiceFilter] = useState<'ALL' | string>('ALL');
 
   const loadData = async () => {
     setLoading(true);
@@ -77,6 +80,16 @@ export function PeopleAdmin() {
     });
     return map;
   }, [sites]);
+
+  const serviceOptions = useMemo(() => {
+    const unique = new Set<string>();
+    people.forEach((person) => {
+      if (person.service) {
+        unique.add(person.service);
+      }
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [people]);
 
   const startNew = () => {
     setEditing({ ...emptyPerson, id: crypto.randomUUID() });
@@ -212,14 +225,18 @@ export function PeopleAdmin() {
         normalizedSearch.length === 0 ||
         person.name.toLowerCase().includes(normalizedSearch) ||
         (person.email ?? '').toLowerCase().includes(normalizedSearch) ||
-        (person.rut ?? '').toLowerCase().includes(normalizedSearch);
+        (person.rut ?? '').toLowerCase().includes(normalizedSearch) ||
+        (person.service ?? '').toLowerCase().includes(normalizedSearch);
       const matchesRole = roleFilter === 'ALL' || person.role === roleFilter;
       const matchesSite =
         siteFilter === 'ALL' ||
         person.people_sites?.some((assignment) => assignment.site_id === siteFilter);
-      return matchesSearch && matchesRole && matchesSite;
+      const matchesService =
+        serviceFilter === 'ALL' ||
+        (person.service ?? '').toLowerCase() === serviceFilter.toLowerCase();
+      return matchesSearch && matchesRole && matchesSite && matchesService;
     });
-  }, [people, searchTerm, roleFilter, siteFilter]);
+  }, [people, searchTerm, roleFilter, siteFilter, serviceFilter]);
 
   return (
     <section className="flex flex-col gap-6">
@@ -236,7 +253,7 @@ export function PeopleAdmin() {
           Nueva persona
         </button>
       </header>
-      <div className="glass-panel grid gap-3 rounded-3xl border border-white/60 bg-white/80 p-4 text-sm md:grid-cols-4">
+      <div className="glass-panel grid gap-3 rounded-3xl border border-white/60 bg-white/80 p-4 text-sm md:grid-cols-5">
         <label className="flex flex-col gap-1">
           Búsqueda
           <input
@@ -275,6 +292,21 @@ export function PeopleAdmin() {
             ))}
           </select>
         </label>
+        <label className="flex flex-col gap-1">
+          Servicio
+          <select
+            value={serviceFilter}
+            onChange={(event) => setServiceFilter(event.target.value as 'ALL' | string)}
+            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+          >
+            <option value="ALL">Todos</option>
+            {serviceOptions.map((service) => (
+              <option key={service} value={service}>
+                {service}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex items-end">
           <p className="text-xs text-slate-500">
             {filteredPeople.length} de {people.length} personas visibles
@@ -288,6 +320,7 @@ export function PeopleAdmin() {
             <tr className="bg-white/80 text-xs uppercase tracking-[0.3em] text-slate-500">
               <th className="px-4 py-3 text-left">Nombre</th>
               <th className="px-4 py-3 text-left">Rol</th>
+              <th className="px-4 py-3 text-left">Servicio</th>
               <th className="px-4 py-3 text-left">Email</th>
               <th className="px-4 py-3 text-left">Sitios</th>
               <th className="px-4 py-3" />
@@ -298,6 +331,7 @@ export function PeopleAdmin() {
               <tr key={person.id} className="transition hover:bg-blue-50/40">
                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{person.name}</td>
                 <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{person.role}</td>
+                <td className="px-4 py-3 text-sm text-slate-600">{person.service ?? '—'}</td>
                 <td className="px-4 py-3 text-sm text-slate-600">{person.email ?? '—'}</td>
                 <td className="px-4 py-3 text-xs text-slate-500">
                   {person.people_sites?.map((ps) => siteNameById.get(ps.site_id) ?? ps.site_id).join(', ') || '—'}
@@ -323,7 +357,7 @@ export function PeopleAdmin() {
             ))}
             {filteredPeople.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">
                   No se encontraron personas con los filtros actuales.
                 </td>
               </tr>
@@ -375,6 +409,16 @@ export function PeopleAdmin() {
               type="email"
               value={editing.email ?? ''}
               onChange={(event) => setEditing({ ...editing, email: event.target.value })}
+              className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Servicio</span>
+            <input
+              required
+              value={editing.service ?? ''}
+              onChange={(event) => setEditing({ ...editing, service: event.target.value })}
+              placeholder="Ej. Operaciones, Ventas…"
               className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
             />
           </label>

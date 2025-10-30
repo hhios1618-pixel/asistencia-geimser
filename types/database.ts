@@ -14,6 +14,7 @@ export interface Database {
           id: string;
           rut: string | null;
           name: string;
+          service: string | null;
           role: 'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER';
           is_active: boolean;
           email: string | null;
@@ -23,6 +24,7 @@ export interface Database {
           id?: string;
           rut?: string | null;
           name: string;
+          service?: string | null;
           role: 'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER';
           is_active?: boolean;
           email?: string | null;
@@ -31,6 +33,7 @@ export interface Database {
         Update: {
           rut?: string | null;
           name?: string;
+          service?: string | null;
           role?: 'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER';
           is_active?: boolean;
           email?: string | null;

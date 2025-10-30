@@ -1,21 +1,30 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { IconLayoutDashboard, IconUsers, IconMapPin, IconCalendarClock, IconReportAnalytics, IconAdjustmentsFilled, IconClipboardCheck, IconFileCertificate } from '@tabler/icons-react';
+import {
+  IconLayoutDashboard,
+  IconUsers,
+  IconMapPin,
+  IconReportAnalytics,
+  IconAdjustmentsFilled,
+  IconClipboardCheck,
+  IconFileCertificate,
+  IconCalendarStats,
+} from '@tabler/icons-react';
 import SitesAdmin from './SitesAdmin';
 import PeopleAdmin from './PeopleAdmin';
-import SchedulesAdmin from './SchedulesAdmin';
 import ModificationsInbox from './ModificationsInbox';
 import AuditLogViewer from './AuditLogViewer';
 import ReportsExporter from './ReportsExporter';
 import PoliciesManager from './PoliciesManager';
 import DTAccessPanel from './DTAccessPanel';
+import TurnosAdmin from './TurnosAdmin';
 
 const tabs = [
   { id: 'overview', label: 'Resumen', description: 'Indicadores globales y actividad reciente', icon: IconLayoutDashboard, component: <ReportsExporter /> },
   { id: 'sites', label: 'Sitios', description: 'Ubicaciones y geocercas', icon: IconMapPin, component: <SitesAdmin /> },
   { id: 'people', label: 'Personas', description: 'Usuarios, roles y asignaciones', icon: IconUsers, component: <PeopleAdmin /> },
-  { id: 'schedules', label: 'Jornadas', description: 'Turnos y configuraciones de horario', icon: IconCalendarClock, component: <SchedulesAdmin /> },
+  { id: 'weekly-turns', label: 'Turnos semanales', description: 'Planificación semanal y feriados', icon: IconCalendarStats, component: <TurnosAdmin /> },
   { id: 'modifications', label: 'Correcciones', description: 'Solicitudes de ajuste de marcas', icon: IconClipboardCheck, component: <ModificationsInbox /> },
   { id: 'audit', label: 'Auditoría', description: 'Registro detallado de eventos', icon: IconFileCertificate, component: <AuditLogViewer /> },
   { id: 'policies', label: 'Políticas', description: 'Reglas de asistencia y tolerancias', icon: IconAdjustmentsFilled, component: <PoliciesManager /> },
