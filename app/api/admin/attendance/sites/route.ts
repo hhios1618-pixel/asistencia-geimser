@@ -30,8 +30,51 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 
 export const runtime = 'nodejs';
 
+let addressColumnEnsured = false;
 const ensureAddressColumn = async () => {
-  await runQuery("alter table if exists public.sites add column if not exists address text");
+  if (addressColumnEnsured) {
+    return;
+  }
+
+  const columnExists = async (schema: string) => {
+    const { rows } = await runQuery<{ exists: boolean }>(
+      `select exists (
+         select 1
+         from information_schema.columns
+         where table_schema = $1
+           and table_name = 'sites'
+           and column_name = 'address'
+       ) as exists`,
+      [schema]
+    );
+    return Boolean(rows[0]?.exists);
+  };
+
+  if ((await columnExists('public')) || (await columnExists('asistencia'))) {
+    addressColumnEnsured = true;
+    return;
+  }
+
+  const statements = [
+    "alter table if exists asistencia.sites add column if not exists address text",
+    "alter table if exists public.sites add column if not exists address text",
+  ];
+
+  for (const statement of statements) {
+    try {
+      await runQuery(statement);
+      addressColumnEnsured = true;
+      return;
+    } catch (error) {
+      const pgError = error as { code?: string };
+      if (pgError?.code && ['42809', '3F000', '42P01'].includes(pgError.code)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  addressColumnEnsured = true;
 };
 
 const authorize = async () => {

@@ -28,6 +28,28 @@ const emptyPerson: Person = {
   is_active: true,
 };
 
+const ROLE_LABELS: Record<Person['role'], string> = {
+  WORKER: 'Trabajador',
+  SUPERVISOR: 'Supervisor',
+  ADMIN: 'Administrador',
+  DT_VIEWER: 'DT Viewer',
+};
+
+const roleAccent: Record<Person['role'], string> = {
+  WORKER: 'from-emerald-500 to-teal-500 text-emerald-900',
+  SUPERVISOR: 'from-orange-400 to-amber-500 text-amber-900',
+  ADMIN: 'from-indigo-500 to-blue-500 text-indigo-900',
+  DT_VIEWER: 'from-slate-400 to-slate-500 text-slate-900',
+};
+
+const getInitials = (name: string) =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'PG';
+
 export function PeopleAdmin() {
   const [people, setPeople] = useState<Person[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -313,57 +335,119 @@ export function PeopleAdmin() {
           </p>
         </div>
       </div>
-      {loading && <p className="text-sm text-slate-500">Cargando información…</p>}
-      <div className="glass-panel overflow-hidden rounded-3xl border border-white/60 bg-white/85">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="bg-white/80 text-xs uppercase tracking-[0.3em] text-slate-500">
-              <th className="px-4 py-3 text-left">Nombre</th>
-              <th className="px-4 py-3 text-left">Rol</th>
-              <th className="px-4 py-3 text-left">Servicio</th>
-              <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">Sitios</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPeople.map((person) => (
-              <tr key={person.id} className="transition hover:bg-blue-50/40">
-                <td className="px-4 py-3 text-sm font-medium text-slate-900">{person.name}</td>
-                <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{person.role}</td>
-                <td className="px-4 py-3 text-sm text-slate-600">{person.service ?? '—'}</td>
-                <td className="px-4 py-3 text-sm text-slate-600">{person.email ?? '—'}</td>
-                <td className="px-4 py-3 text-xs text-slate-500">
-                  {person.people_sites?.map((ps) => siteNameById.get(ps.site_id) ?? ps.site_id).join(', ') || '—'}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-3">
-                    <button
-                      className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-500/20"
-                      onClick={() => startEdit(person)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      className="rounded-full bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-40"
-                      onClick={() => handleDelete(person)}
-                      disabled={isSubmitting}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filteredPeople.length === 0 && !loading && (
+      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90">
+        <div className="flex items-center justify-between border-b border-white/70 px-6 pb-4 pt-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Listado</p>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {filteredPeople.length} persona{filteredPeople.length === 1 ? '' : 's'} visibles
+            </h3>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+            {people.length} totales
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <thead className="bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">
-                  No se encontraron personas con los filtros actuales.
-                </td>
+                <th className="sticky left-0 z-10 bg-white/95 px-6 py-4 text-left">Nombre</th>
+                <th className="px-4 py-4 text-left">Rol</th>
+                <th className="px-4 py-4 text-left">Servicio</th>
+                <th className="px-4 py-4 text-left">RUT</th>
+                <th className="px-4 py-4 text-left">Sitios asignados</th>
+                <th className="px-4 py-4 text-left">Estado</th>
+                <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredPeople.map((person) => {
+                const assigned = person.people_sites?.map((ps) => siteNameById.get(ps.site_id) ?? ps.site_id) ?? [];
+                const roleLabel = ROLE_LABELS[person.role];
+                const gradient = roleAccent[person.role];
+                const isInactive = !person.is_active;
+                return (
+                  <tr key={person.id} className="transition hover:bg-blue-50/30">
+                    <td className="sticky left-0 z-0 bg-white/95 px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-blue-200 text-sm font-semibold text-blue-700">
+                          {getInitials(person.name)}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-slate-900">{person.name}</p>
+                          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+                            {person.email ?? 'Sin correo'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`inline-flex items-center rounded-full bg-gradient-to-r ${gradient} px-3 py-1 text-[11px] font-semibold uppercase tracking-wider`}
+                      >
+                        {roleLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-slate-600">{person.service ?? 'No registrado'}</td>
+                    <td className="px-4 py-4 text-slate-600">{person.rut ?? '—'}</td>
+                    <td className="px-4 py-4 text-slate-600">
+                      {assigned.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {assigned.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1 text-[11px] font-semibold text-blue-700"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">Sin asignaciones</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+                          isInactive
+                            ? 'border border-rose-200 bg-rose-50 text-rose-600'
+                            : 'border border-emerald-200 bg-emerald-50 text-emerald-600'
+                        }`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${isInactive ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                        {isInactive ? 'Inactivo' : 'Activo'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          className="rounded-full border border-blue-200 bg-blue-50/80 px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-100"
+                          onClick={() => startEdit(person)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="rounded-full border border-rose-200 bg-rose-50/80 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 disabled:opacity-40"
+                          onClick={() => handleDelete(person)}
+                          disabled={isSubmitting}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && filteredPeople.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-400">
+                    No se encontraron personas con los filtros actuales. Ajusta la búsqueda o crea un nuevo registro.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       {successMessage && (
         <div className="glass-panel border border-emerald-200/70 bg-emerald-50/70 p-4 text-sm text-emerald-800">
