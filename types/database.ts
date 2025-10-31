@@ -92,6 +92,31 @@ export interface Database {
         };
         Relationships: never[];
       };
+      team_assignments: {
+        Row: {
+          supervisor_id: string;
+          member_id: string;
+          active: boolean;
+          assigned_at: string;
+          assigned_by: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          supervisor_id: string;
+          member_id: string;
+          active?: boolean;
+          assigned_at?: string;
+          assigned_by?: string | null;
+          notes?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          assigned_at?: string;
+          assigned_by?: string | null;
+          notes?: string | null;
+        };
+        Relationships: never[];
+      };
       schedules: {
         Row: {
           id: string;
@@ -192,6 +217,46 @@ export interface Database {
           resolver_id?: string | null;
           resolved_at?: string | null;
           notes?: string | null;
+        };
+        Relationships: never[];
+      };
+      attendance_requests: {
+        Row: {
+          id: string;
+          requester_id: string;
+          supervisor_id: string;
+          request_type: 'TIME_OFF' | 'SHIFT_CHANGE' | 'PERMISSION';
+          status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+          requested_start: string | null;
+          requested_end: string | null;
+          payload: Json;
+          reason: string;
+          supervisor_note: string | null;
+          decided_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          supervisor_id: string;
+          request_type: 'TIME_OFF' | 'SHIFT_CHANGE' | 'PERMISSION';
+          status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+          requested_start?: string | null;
+          requested_end?: string | null;
+          payload?: Json;
+          reason: string;
+          supervisor_note?: string | null;
+          decided_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+          requested_start?: string | null;
+          requested_end?: string | null;
+          payload?: Json;
+          reason?: string;
+          supervisor_note?: string | null;
+          decided_at?: string | null;
         };
         Relationships: never[];
       };

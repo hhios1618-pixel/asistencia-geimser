@@ -8,9 +8,26 @@ export const dynamic = 'force-dynamic';
 
 export default async function LoginPage() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+
+  try {
+    const {
+      data: { user: fetchedUser },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      if (error.code === 'refresh_token_not_found' || error.code === 'invalid_refresh_token') {
+        await supabase.auth.signOut();
+      } else {
+        throw error;
+      }
+    } else {
+      user = fetchedUser;
+    }
+  } catch (authError) {
+    console.error('[login] unexpected auth error', authError);
+  }
 
   if (user) {
     const defaultName =

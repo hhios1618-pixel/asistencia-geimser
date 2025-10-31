@@ -1,24 +1,41 @@
 'use client';
 
+import { Suspense } from 'react';
+import DashboardLayout from '../../../components/layout/DashboardLayout';
 import AdminAttendanceClient from './components/AdminAttendanceClient';
 import LogoutButton from '../../asistencia/components/LogoutButton';
 
 export default function AdminAsistenciaPage() {
   return (
-    <main className="glass-panel mx-auto max-w-6xl p-8">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Administración de Asistencia</h1>
+    <DashboardLayout
+      title="Administración de asistencia"
+      description="Control centralizado de colaboradores, sitios y marcajes corporativos."
+      breadcrumb={[
+        { label: 'Administración', href: '/admin' },
+        { label: 'Asistencia' },
+      ]}
+      actions={
+        <div className="flex gap-2">
           <a
             href="/asistencia"
-            className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 transition hover:bg-gray-100"
+            className="rounded-full border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
           >
-            Volver a asistencia
+            Ir a mi jornada
           </a>
+          <LogoutButton />
         </div>
-        <LogoutButton />
-      </div>
-      <AdminAttendanceClient />
-    </main>
+      }
+    >
+      <Suspense
+        fallback={
+          <div className="glass-panel flex flex-col gap-3 rounded-[30px] border border-white/70 bg-white/85 p-6 text-sm text-slate-500">
+            <span className="font-semibold text-slate-700">Cargando panel administrativo…</span>
+            <span>Preparando métricas en tiempo real.</span>
+          </div>
+        }
+      >
+        <AdminAttendanceClient />
+      </Suspense>
+    </DashboardLayout>
   );
 }

@@ -65,6 +65,11 @@ export async function GET(request: NextRequest) {
       .limit(query.limit);
 
     if (error) {
+      const code = (error as PostgrestError | null)?.code;
+      if (code === 'PGRST106' || code === 'PGRST205') {
+        console.warn('[alerts] alerts table not accessible', error.message);
+        return NextResponse.json({ items: [] });
+      }
       console.error('[alerts] fetch failed', error);
       return NextResponse.json({ items: [] });
     }

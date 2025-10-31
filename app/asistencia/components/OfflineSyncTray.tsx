@@ -2,17 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { offlineQueue, type PendingMark } from '../../../lib/offline/queue';
-
-interface SyncResult {
-  id: string;
-  event_ts: string;
-  receipt_url: string;
-  hash: string;
-  event_type: 'IN' | 'OUT';
-}
+import type { SuccessfulMark } from './CheckButtons';
 
 interface Props {
-  onSynced?: (result: SyncResult) => void;
+  onSynced?: (result: SuccessfulMark) => void;
   refreshKey?: number;
 }
 
@@ -58,9 +51,14 @@ export function OfflineSyncTray({ onSynced, refreshKey }: Props) {
         if (!response.ok) {
           throw new Error('Error al sincronizar marca');
         }
-        const data = (await response.json()) as SyncResult;
+        const data = (await response.json()) as SuccessfulMark;
+        const normalized: SuccessfulMark = {
+          ...data,
+          site_id: data.site_id ?? item.siteId,
+          event_type: data.event_type ?? item.eventType,
+        };
         await offlineQueue.remove(item.id);
-        onSynced?.(data);
+        onSynced?.(normalized);
       } catch (err) {
         setError((err as Error).message);
         break;

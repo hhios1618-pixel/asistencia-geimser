@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { getGeofenceStatus, type GeofenceStatus } from '../../../lib/geo/geofence';
+import { insecureGeolocationMessage, isSecureForGeolocation } from '../../../lib/utils/geoSecurity';
 
 interface Props {
   site: {
@@ -47,6 +48,9 @@ export function GeofenceBadge({ site }: Props) {
     setLoading(true);
     setError(null);
     try {
+      if (!isSecureForGeolocation()) {
+        throw new Error(insecureGeolocationMessage);
+      }
       if (!navigator.geolocation) {
         throw new Error('Geolocalización no disponible');
       }

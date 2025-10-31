@@ -16,6 +16,7 @@ interface Person {
   role: 'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER';
   is_active: boolean;
   people_sites?: { site_id: string }[];
+  supervisors?: { supervisor_id: string; name: string | null; email: string | null }[];
 }
 
 const emptyPerson: Person = {
@@ -55,6 +56,7 @@ export function PeopleAdmin() {
   const [sites, setSites] = useState<Site[]>([]);
   const [editing, setEditing] = useState<Person>(emptyPerson);
   const [assignedSites, setAssignedSites] = useState<string[]>([]);
+  const [assignedSupervisors, setAssignedSupervisors] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
@@ -113,9 +115,43 @@ export function PeopleAdmin() {
     return Array.from(unique).sort((a, b) => a.localeCompare(b, 'es'));
   }, [people]);
 
+  const supervisorsById = useMemo(() => {
+    const map = new Map<string, Person>();
+    people.forEach((person) => {
+      if (person.role === 'SUPERVISOR') {
+        map.set(person.id, person);
+      }
+    });
+    return map;
+  }, [people]);
+
+  const availableSupervisors = useMemo(() => {
+    const service = editing.service?.trim().toLowerCase();
+    if (!service) {
+      return [] as Array<{ id: string; name: string; email: string | null }>;
+    }
+    return people
+      .filter(
+        (person) =>
+          person.id !== editing.id &&
+          person.role === 'SUPERVISOR' &&
+          person.is_active &&
+          (person.service ?? '').trim().toLowerCase() === service
+      )
+      .map((person) => ({ id: person.id, name: person.name, email: person.email ?? null }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [people, editing.id, editing.service]);
+
+  useEffect(() => {
+    setAssignedSupervisors((current) =>
+      current.filter((id) => availableSupervisors.some((supervisor) => supervisor.id === id))
+    );
+  }, [availableSupervisors]);
+
   const startNew = () => {
     setEditing({ ...emptyPerson, id: crypto.randomUUID() });
     setAssignedSites([]);
+    setAssignedSupervisors([]);
     setError(null);
     setSuccessMessage(null);
     setCredentials(null);
@@ -125,6 +161,7 @@ export function PeopleAdmin() {
   const startEdit = (person: Person) => {
     setEditing(person);
     setAssignedSites(person.people_sites?.map((ps) => ps.site_id) ?? []);
+    setAssignedSupervisors(person.supervisors?.map((record) => record.supervisor_id) ?? []);
     setError(null);
     setSuccessMessage(null);
     setCredentials(null);
@@ -134,6 +171,14 @@ export function PeopleAdmin() {
   const toggleAssignment = (siteId: string) => {
     setAssignedSites((current) =>
       current.includes(siteId) ? current.filter((id) => id !== siteId) : [...current, siteId]
+    );
+  };
+
+  const toggleSupervisor = (supervisorId: string) => {
+    setAssignedSupervisors((current) =>
+      current.includes(supervisorId)
+        ? current.filter((id) => id !== supervisorId)
+        : [...current, supervisorId]
     );
   };
 
@@ -166,6 +211,7 @@ export function PeopleAdmin() {
       if (editing.id === person.id) {
         setEditing(emptyPerson);
         setAssignedSites([]);
+        setAssignedSupervisors([]);
         setPassword('');
       }
       setCredentials(null);
@@ -184,14 +230,45 @@ export function PeopleAdmin() {
     setCredentials(null);
     const isExisting = people.some((person) => person.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const { id: _ignore, ...createBase } = editing;
-    void _ignore;
-    const createPayload = { ...createBase, siteIds: assignedSites };
-    const basePayload: Record<string, unknown> = isExisting
-      ? { ...editing, siteIds: assignedSites }
-      : createPayload;
+    const trimmedName = editing.name.trim();
+    const trimmedEmail = editing.email?.trim() ?? '';
+    const trimmedService = editing.service?.trim() ?? '';
+    const trimmedRut = editing.rut?.trim() ?? '';
+
+    if (!trimmedName) {
+      setError('El nombre es obligatorio.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!trimmedEmail && !isExisting) {
+      setError('El correo es obligatorio para nuevos usuarios.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const basePayload: Record<string, unknown> = {
+      name: trimmedName,
+      role: editing.role,
+      is_active: editing.is_active,
+      siteIds: assignedSites,
+      supervisorIds: assignedSupervisors,
+    };
+
+    if (trimmedRut.length > 0) {
+      basePayload.rut = trimmedRut;
+    }
+    if (trimmedEmail.length > 0) {
+      basePayload.email = trimmedEmail;
+    }
+    if (trimmedService.length > 0) {
+      basePayload.service = trimmedService;
+    }
     if (password.trim().length > 0) {
       basePayload.password = password.trim();
+    }
+    if (isExisting) {
+      basePayload.id = editing.id;
     }
 
     try {
@@ -216,6 +293,7 @@ export function PeopleAdmin() {
       await loadData();
       setEditing(emptyPerson);
       setAssignedSites([]);
+      setAssignedSupervisors([]);
       setPassword('');
       setError(null);
 
@@ -356,6 +434,7 @@ export function PeopleAdmin() {
                 <th className="px-4 py-4 text-left">Servicio</th>
                 <th className="px-4 py-4 text-left">RUT</th>
                 <th className="px-4 py-4 text-left">Sitios asignados</th>
+                <th className="px-4 py-4 text-left">Supervisores</th>
                 <th className="px-4 py-4 text-left">Estado</th>
                 <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
@@ -363,6 +442,14 @@ export function PeopleAdmin() {
             <tbody className="divide-y divide-slate-100">
               {filteredPeople.map((person) => {
                 const assigned = person.people_sites?.map((ps) => siteNameById.get(ps.site_id) ?? ps.site_id) ?? [];
+                const supervisorLabels =
+                  person.supervisors?.map((record) => {
+                    if (record.name) {
+                      return record.name;
+                    }
+                    const fallback = supervisorsById.get(record.supervisor_id);
+                    return fallback?.name ?? record.supervisor_id;
+                  }) ?? [];
                 const roleLabel = ROLE_LABELS[person.role];
                 const gradient = roleAccent[person.role];
                 const isInactive = !person.is_active;
@@ -406,6 +493,22 @@ export function PeopleAdmin() {
                         <span className="text-xs text-slate-400">Sin asignaciones</span>
                       )}
                     </td>
+                    <td className="px-4 py-4 text-slate-600">
+                      {supervisorLabels.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {supervisorLabels.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded-full border border-amber-100 bg-amber-50/80 px-3 py-1 text-[11px] font-semibold text-amber-700"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">Sin supervisor asignado</span>
+                      )}
+                    </td>
                     <td className="px-4 py-4">
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
@@ -440,7 +543,7 @@ export function PeopleAdmin() {
               })}
               {!loading && filteredPeople.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="px-6 py-10 text-center text-sm text-slate-400">
                     No se encontraron personas con los filtros actuales. Ajusta la búsqueda o crea un nuevo registro.
                   </td>
                 </tr>
@@ -557,6 +660,40 @@ export function PeopleAdmin() {
                 </label>
               ))}
             </div>
+          </div>
+          <div className="md:col-span-2">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Supervisores asignados</p>
+            {editing.service ? (
+              availableSupervisors.length > 0 ? (
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                  {availableSupervisors.map((supervisor) => (
+                    <label
+                      key={supervisor.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 px-3 py-2 shadow-inner"
+                    >
+                      <span className="flex flex-col">
+                        <span className="text-sm text-slate-600">{supervisor.name}</span>
+                        <span className="text-xs text-slate-400">{supervisor.email ?? 'Sin correo'}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={assignedSupervisors.includes(supervisor.id)}
+                        onChange={() => toggleSupervisor(supervisor.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-700">
+                  No hay supervisores activos para este servicio.
+                </p>
+              )
+            ) : (
+              <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
+                Indica un servicio para habilitar la selección de supervisores.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
             <label className="flex items-center gap-2 text-sm text-slate-600">

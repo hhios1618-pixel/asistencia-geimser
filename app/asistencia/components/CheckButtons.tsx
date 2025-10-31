@@ -3,14 +3,24 @@
 import { useState, useCallback, type SVGProps } from 'react';
 import { offlineQueue, type PendingMark } from '../../../lib/offline/queue';
 import type { Tables } from '../../../types/database';
+import { insecureGeolocationMessage, isSecureForGeolocation } from '../../../lib/utils/geoSecurity';
 
 interface Props {
   siteId: string | null;
   lastEventType: Tables['attendance_marks']['Row']['event_type'] | null;
-  onSuccess?: (mark: { id: string; event_ts: string; receipt_url: string; hash: string; event_type: 'IN' | 'OUT' }) => void;
+  onSuccess?: (mark: SuccessfulMark) => void;
   onQueued?: (mark: PendingMark) => void;
   disabled?: boolean;
 }
+
+export type SuccessfulMark = {
+  id: string;
+  event_ts: string;
+  receipt_url: string;
+  hash: string;
+  event_type: 'IN' | 'OUT';
+  site_id: string;
+};
 
 const DEVICE_KEY = 'asistencia_device_id';
 
@@ -29,6 +39,10 @@ const getDeviceId = () => {
 
 const requestPosition = (): Promise<GeolocationPosition> =>
   new Promise((resolve, reject) => {
+    if (!isSecureForGeolocation()) {
+      reject(new Error(insecureGeolocationMessage));
+      return;
+    }
     if (!navigator.geolocation) {
       reject(new Error('Geolocalización no disponible'));
       return;
@@ -40,12 +54,7 @@ const requestPosition = (): Promise<GeolocationPosition> =>
     });
   });
 
-type MarkResponse = {
-  id: string;
-  event_ts: string;
-  receipt_url: string;
-  hash: string;
-};
+type MarkResponse = SuccessfulMark;
 
 const ClockIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} {...props}>
@@ -136,10 +145,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
         }
 
         const data = (await response.json()) as MarkResponse;
-        onSuccess?.({
-          ...data,
-          event_type: eventType,
-        });
+        onSuccess?.(data);
         setError(null);
       } catch (err) {
         setError((err as Error).message);

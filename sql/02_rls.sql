@@ -109,3 +109,35 @@ alter table attendance_mark_hash_log enable row level security;
 drop policy if exists attendance_mark_hash_admin on attendance_mark_hash_log;
 create policy attendance_mark_hash_admin on attendance_mark_hash_log
     for all using (is_admin()) with check (is_admin());
+
+alter table team_assignments enable row level security;
+drop policy if exists team_assignments_view on team_assignments;
+drop policy if exists team_assignments_admin on team_assignments;
+create policy team_assignments_view on team_assignments
+    for select using (
+        supervisor_id = auth.uid()
+        or member_id = auth.uid()
+        or is_admin()
+    );
+create policy team_assignments_admin on team_assignments
+    for all using (is_admin()) with check (is_admin());
+
+alter table attendance_requests enable row level security;
+drop policy if exists attendance_requests_access on attendance_requests;
+drop policy if exists attendance_requests_insert on attendance_requests;
+drop policy if exists attendance_requests_supervisor_update on attendance_requests;
+drop policy if exists attendance_requests_requester_update on attendance_requests;
+create policy attendance_requests_access on attendance_requests
+    for select using (
+        requester_id = auth.uid()
+        or supervisor_id = auth.uid()
+        or is_admin()
+    );
+create policy attendance_requests_insert on attendance_requests
+    for insert with check (requester_id = auth.uid());
+create policy attendance_requests_supervisor_update on attendance_requests
+    for update using (supervisor_id = auth.uid() or is_admin())
+    with check (true);
+create policy attendance_requests_requester_update on attendance_requests
+    for update using (requester_id = auth.uid())
+    with check (requester_id = auth.uid());

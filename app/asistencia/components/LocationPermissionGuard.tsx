@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { insecureGeolocationMessage, isSecureForGeolocation } from '../../../lib/utils/geoSecurity';
 
 type PermissionStatus = 'unknown' | 'granted' | 'prompt' | 'denied';
 
@@ -27,6 +28,14 @@ export function LocationPermissionGuard({ children }: Props) {
 
   useEffect(() => {
     let mounted = true;
+    if (!isSecureForGeolocation()) {
+      setError(insecureGeolocationMessage);
+      setStatus('denied');
+      setChecking(false);
+      return () => {
+        mounted = false;
+      };
+    }
     void checkPermission().then((value) => {
       if (mounted) {
         setStatus(value);
@@ -42,6 +51,9 @@ export function LocationPermissionGuard({ children }: Props) {
     setChecking(true);
     setError(null);
     try {
+      if (!isSecureForGeolocation()) {
+        throw new Error(insecureGeolocationMessage);
+      }
       await new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
           reject(new Error('Geolocalización no disponible'));

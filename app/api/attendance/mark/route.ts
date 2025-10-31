@@ -243,6 +243,8 @@ export async function POST(request: NextRequest) {
   return respond(201, {
     id: markId,
     event_ts: eventTs,
+    event_type: body.eventType,
+    site_id: site.id,
     receipt_url: receiptUrl,
     hash: hashSelf,
   });

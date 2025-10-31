@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import DashboardLayout, { WORKER_NAV } from '../../components/layout/DashboardLayout';
 import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
 import type { PostgrestError } from '@supabase/supabase-js';
 import AttendanceClient from './components/AttendanceClient';
@@ -114,27 +115,34 @@ export default async function AsistenciaPage() {
     .maybeSingle<Tables['schedules']['Row']>();
 
   return (
-    <main className="glass-panel mx-auto max-w-4xl p-8">
-      <LocationPermissionGuard>
-        {(ensuredPerson.role === 'ADMIN' || ensuredPerson.role === 'SUPERVISOR') && (
-          <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-            <p className="font-medium">¿Necesitas configurar usuarios, sitios o reportes?</p>
-            <Link
-              href="/admin/asistencia"
-              className="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_35px_-18px_rgba(59,130,246,0.65)] transition hover:from-blue-600 hover:via-indigo-600 hover:to-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs font-medium text-white">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
-                  <path d="M5 10h10" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="m11 6 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-              <span className="text-white drop-shadow-[0_10px_18px_rgba(15,23,42,0.35)]">Ir al panel administrativo</span>
-            </Link>
-          </div>
-        )}
-        <AttendanceClient person={ensuredPerson} sites={sites} schedule={schedule ?? null} />
-      </LocationPermissionGuard>
-    </main>
+    <DashboardLayout
+      title="Mi jornada"
+      description="Marca tu asistencia, revisa tu historial y gestiona tareas pendientes."
+      breadcrumb={[{ label: 'Asistencia' }, { label: 'Mi jornada' }]}
+      navItems={WORKER_NAV}
+    >
+      <div className="glass-panel w-full rounded-[32px] border border-white/70 bg-white/95 p-8 shadow-[0_36px_110px_-68px_rgba(30,64,175,0.55)]">
+        <LocationPermissionGuard>
+          {(ensuredPerson.role === 'ADMIN' || ensuredPerson.role === 'SUPERVISOR') && (
+            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900">
+              <p className="font-semibold">¿Necesitas configurar usuarios, sitios o reportes?</p>
+              <Link
+                href="/admin/asistencia"
+                className="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(37,99,235,0.55)] transition hover:from-blue-600 hover:via-indigo-600 hover:to-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs font-medium text-white">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+                    <path d="M5 10h10" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="m11 6 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span className="text-white drop-shadow-[0_10px_18px_rgba(15,23,42,0.35)]">Ir al panel administrativo</span>
+              </Link>
+            </div>
+          )}
+          <AttendanceClient person={ensuredPerson} sites={sites} schedule={schedule ?? null} />
+        </LocationPermissionGuard>
+      </div>
+    </DashboardLayout>
   );
 }

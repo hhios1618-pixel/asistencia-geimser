@@ -144,3 +144,34 @@ create table attendance_mark_hash_log (
     hash_self text not null,
     hash_prev text
 );
+
+create table if not exists team_assignments (
+    supervisor_id uuid not null references people(id) on delete cascade,
+    member_id uuid not null references people(id) on delete cascade,
+    active boolean not null default true,
+    assigned_at timestamptz not null default now(),
+    assigned_by uuid references people(id) on delete set null,
+    notes text,
+    primary key (supervisor_id, member_id)
+);
+
+create index if not exists idx_team_assignments_member on team_assignments(member_id) where active = true;
+create index if not exists idx_team_assignments_supervisor on team_assignments(supervisor_id) where active = true;
+
+create table if not exists attendance_requests (
+    id uuid primary key default gen_random_uuid(),
+    requester_id uuid not null references people(id) on delete cascade,
+    supervisor_id uuid not null references people(id) on delete cascade,
+    request_type text not null check (request_type in ('TIME_OFF','SHIFT_CHANGE','PERMISSION')),
+    status text not null default 'PENDING' check (status in ('PENDING','APPROVED','REJECTED','CANCELLED')),
+    requested_start timestamptz,
+    requested_end timestamptz,
+    payload jsonb not null default '{}'::jsonb,
+    reason text not null,
+    supervisor_note text,
+    decided_at timestamptz,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists idx_attendance_requests_requester on attendance_requests(requester_id, created_at desc);
+create index if not exists idx_attendance_requests_supervisor on attendance_requests(supervisor_id, status, created_at desc);

@@ -14,6 +14,7 @@ const personSchema = z.object({
   is_active: z.boolean().optional(),
   siteIds: z.array(z.string().uuid()).optional(),
   password: z.string().min(8).max(72).optional(),
+  supervisorIds: z.array(z.string().uuid()).optional(),
 });
 
 const updateSchema = personSchema.partial().extend({ id: z.string().uuid() });
@@ -48,27 +49,194 @@ const authorize = async () => {
   return { supabase, user, role } as const;
 };
 
+const normalizeService = (service?: string | null) => {
+  if (!service) {
+    return null;
+  }
+  const trimmed = service.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const ensureSupervisorsEligible = async (
+  supervisorIds: string[],
+  service: string | null
+): Promise<Array<Pick<Tables['people']['Row'], 'id' | 'name' | 'email' | 'service' | 'role' | 'is_active'>>> => {
+  if (supervisorIds.length === 0) {
+    return [];
+  }
+
+  let rows: Pick<Tables['people']['Row'], 'id' | 'name' | 'email' | 'role' | 'service' | 'is_active'>[] = [];
+  try {
+    const result = await runQuery<Pick<Tables['people']['Row'], 'id' | 'name' | 'email' | 'role' | 'service' | 'is_active'>>(
+      `select id, name, email, role, service, is_active
+       from public.people
+       where id = any($1::uuid[])`,
+      [supervisorIds]
+    );
+    rows = result.rows;
+  } catch (error) {
+    if (isMissingTeamAssignments(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  if (rows.length !== supervisorIds.length) {
+    throw new Error('SUPERVISOR_NOT_FOUND');
+  }
+
+  const invalidRole = rows.find((row) => row.role !== 'SUPERVISOR');
+  if (invalidRole) {
+    throw new Error('INVALID_SUPERVISOR_ROLE');
+  }
+
+  const inactive = rows.find((row) => !row.is_active);
+  if (inactive) {
+    throw new Error('INACTIVE_SUPERVISOR');
+  }
+
+  if (service === null) {
+    const mismatch = rows.find((row) => normalizeService(row.service) !== null);
+    if (mismatch) {
+      throw new Error('SERVICE_REQUIRED_FOR_ASSIGNMENT');
+    }
+  } else {
+    const mismatch = rows.find((row) => normalizeService(row.service) !== service);
+    if (mismatch) {
+      throw new Error('SERVICE_MISMATCH');
+    }
+  }
+
+  return rows;
+};
+
+const syncTeamAssignments = async (memberId: string, supervisorIds: string[]) => {
+  try {
+    await runQuery('delete from public.team_assignments where member_id = $1', [memberId]);
+  } catch (error) {
+    if (isMissingTeamAssignments(error)) {
+      return;
+    }
+    throw error;
+  }
+
+  if (supervisorIds.length === 0) {
+    return;
+  }
+
+  try {
+    await runQuery(
+      `insert into public.team_assignments (supervisor_id, member_id, active, assigned_at)
+       select value, $1, true, now()
+       from unnest($2::uuid[]) as value`,
+      [memberId, supervisorIds]
+    );
+  } catch (error) {
+    if (isMissingTeamAssignments(error)) {
+      return;
+    }
+    throw error;
+  }
+};
+
+const mapSupervisorError = (code: string) => {
+  switch (code) {
+    case 'SUPERVISOR_NOT_FOUND':
+      return 'Alguno de los supervisores indicados no existe.';
+    case 'INVALID_SUPERVISOR_ROLE':
+      return 'Solo puedes asignar usuarios con rol de supervisor.';
+    case 'INACTIVE_SUPERVISOR':
+      return 'Alguno de los supervisores está inactivo.';
+    case 'SERVICE_REQUIRED_FOR_ASSIGNMENT':
+      return 'Debes asignar un servicio a la persona antes de asociar supervisores.';
+    case 'SERVICE_MISMATCH':
+      return 'Los supervisores deben pertenecer al mismo servicio que la persona.';
+    default:
+      return 'No fue posible validar los supervisores seleccionados.';
+  }
+};
+
+const isMissingTeamAssignments = (error: unknown): error is { code: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: string }).code === '42P01';
+
+const PEOPLE_WITH_SUPERVISORS_SELECT = `
+select p.*,
+        coalesce(
+          (
+            select json_agg(json_build_object('site_id', ps.site_id))
+            from public.people_sites ps
+            where ps.person_id = p.id
+          ),
+          '[]'::json
+        ) as people_sites,
+        coalesce(
+          (
+            select json_agg(
+              json_build_object(
+                'supervisor_id', ta.supervisor_id,
+                'name', sup.name,
+                'email', sup.email
+              )
+            )
+            from public.team_assignments ta
+            join public.people sup on sup.id = ta.supervisor_id
+            where ta.member_id = p.id
+              and ta.active = true
+          ),
+          '[]'::json
+        ) as supervisors
+ from public.people p
+`;
+
+const PEOPLE_LEGACY_SELECT = `
+select p.*,
+        coalesce(
+          (
+            select json_agg(json_build_object('site_id', ps.site_id))
+            from public.people_sites ps
+            where ps.person_id = p.id
+          ),
+          '[]'::json
+        ) as people_sites
+ from public.people p
+`;
+
+const selectPeopleRows = async (suffix: string, params: unknown[]): Promise<DbPersonRow[]> => {
+  try {
+    const { rows } = await runQuery<DbPersonRow>(PEOPLE_WITH_SUPERVISORS_SELECT + suffix, params);
+    return rows.map((row) => ({
+      ...row,
+      people_sites: row.people_sites ?? [],
+      supervisors: row.supervisors ?? [],
+    }));
+  } catch (error) {
+    if (!isMissingTeamAssignments(error)) {
+      throw error;
+    }
+    const { rows } = await runQuery<DbPersonRowLegacy>(PEOPLE_LEGACY_SELECT + suffix, params);
+    return rows.map((row) => ({
+      ...row,
+      people_sites: row.people_sites ?? [],
+      supervisors: [],
+    }));
+  }
+};
+
 export async function GET() {
   const { user } = await authorize();
   if (!user) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
-  const { rows } = await runQuery<DbPersonRow>(
-    `select p.*,
-            coalesce(
-              (
-                select json_agg(json_build_object('site_id', ps.site_id))
-                from public.people_sites ps
-                where ps.person_id = p.id
-              ),
-              '[]'::json
-            ) as people_sites
-     from public.people p
-     order by p.created_at`
-  );
-  return NextResponse.json({
-    items: rows.map((row) => ({ ...row, people_sites: row.people_sites ?? [] })),
-  });
+  try {
+    const rows = await selectPeopleRows(' order by p.created_at', []);
+    return NextResponse.json({ items: rows });
+  } catch (error) {
+    console.error('[admin_people] fetch failed', error);
+    return NextResponse.json({ error: 'PEOPLE_FETCH_FAILED' }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -88,6 +256,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'EMAIL_REQUIRED' }, { status: 400 });
   }
 
+  const supervisorIds = Array.from(new Set(payload.supervisorIds ?? []));
+  const serviceValue = normalizeService(payload.service ?? null);
+
+  try {
+    await ensureSupervisorsEligible(supervisorIds, serviceValue);
+  } catch (validationError) {
+    return NextResponse.json(
+      { error: 'SUPERVISOR_INVALID', message: mapSupervisorError((validationError as Error).message) },
+      { status: 400 }
+    );
+  }
+
   const service = getServiceSupabase();
   const password = payload.password?.trim() || generateTemporaryPassword();
 
@@ -98,7 +278,7 @@ export async function POST(request: NextRequest) {
     user_metadata: {
       name: payload.name,
       rut: payload.rut ?? null,
-      service: payload.service ?? null,
+      service: serviceValue,
     },
     app_metadata: {
       role: payload.role,
@@ -119,7 +299,7 @@ export async function POST(request: NextRequest) {
         personId,
         payload.name,
         payload.rut ?? null,
-        payload.service ?? null,
+        serviceValue,
         payload.email ?? null,
         payload.role,
         payload.is_active ?? true,
@@ -152,20 +332,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { rows } = await runQuery<DbPersonRow>(
-    `select p.*,
-            coalesce(
-              (
-                select json_agg(json_build_object('site_id', ps.site_id))
-                from public.people_sites ps
-                where ps.person_id = p.id
-              ),
-              '[]'::json
-            ) as people_sites
-     from public.people p
-     where p.id = $1`,
-    [personId]
-  );
+  try {
+    await syncTeamAssignments(personId, supervisorIds);
+  } catch (error) {
+    await service.from('people').delete().eq('id', personId);
+    try {
+      await service.auth.admin.deleteUser(personId);
+    } catch {
+      // ignore rollback failure
+    }
+    return NextResponse.json({ error: 'SUPERVISOR_ASSIGN_FAILED', details: (error as Error).message }, { status: 500 });
+  }
+
+  const rows = await selectPeopleRows(' where p.id = $1', [personId]);
   const inserted = rows[0];
 
   return NextResponse.json(
@@ -196,27 +375,36 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
   }
 
-  const { id, siteIds, password, ...changes } = payload;
+  const { id, siteIds, password, supervisorIds: rawSupervisorIds, ...changes } = payload;
   const service = getServiceSupabase();
 
-  const { rows: existingRows } = await runQuery<DbPersonRow>(
-    `select p.*,
-            coalesce(
-              (
-                select json_agg(json_build_object('site_id', ps.site_id))
-                from public.people_sites ps
-                where ps.person_id = p.id
-              ),
-              '[]'::json
-            ) as people_sites
-     from public.people p
-     where p.id = $1`,
-    [id]
-  );
+  const existingRows = await selectPeopleRows(' where p.id = $1', [id]);
   const existingPerson = existingRows[0];
 
   if (!existingPerson) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
+
+  const hasServiceChange = Object.prototype.hasOwnProperty.call(changes, 'service');
+  const targetService = normalizeService(
+    hasServiceChange ? ((changes as { service?: string | null }).service ?? null) : existingPerson.service
+  );
+  if (hasServiceChange) {
+    (changes as Tables['people']['Update']).service = targetService;
+  }
+
+  const supervisorIdsDefined = Object.prototype.hasOwnProperty.call(payload, 'supervisorIds');
+  const supervisorIds = supervisorIdsDefined ? Array.from(new Set(rawSupervisorIds ?? [])) : [];
+  let supervisorValidationRows: Awaited<ReturnType<typeof ensureSupervisorsEligible>> = [];
+  if (supervisorIdsDefined) {
+    try {
+      supervisorValidationRows = await ensureSupervisorsEligible(supervisorIds, targetService);
+    } catch (validationError) {
+      return NextResponse.json(
+        { error: 'SUPERVISOR_INVALID', message: mapSupervisorError((validationError as Error).message) },
+        { status: 400 }
+      );
+    }
   }
 
   const updateValues = changes as Tables['people']['Update'];
@@ -256,6 +444,25 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  if (supervisorIdsDefined) {
+    try {
+      await syncTeamAssignments(id, supervisorIds);
+      updatedPerson = {
+        ...updatedPerson,
+        supervisors: supervisorValidationRows.map((row) => ({
+          supervisor_id: row.id,
+          name: row.name ?? null,
+          email: row.email ?? null,
+        })),
+      } as DbPersonRow;
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'SUPERVISOR_ASSIGN_FAILED', details: (error as Error).message },
+        { status: 500 }
+      );
+    }
+  }
+
   const authUpdates: Record<string, unknown> = {};
 
   if (typeof changes.email === 'string') {
@@ -273,8 +480,8 @@ export async function PATCH(request: NextRequest) {
   if (typeof changes.rut === 'string') {
     userMetadata.rut = changes.rut;
   }
-  if (typeof changes.service === 'string') {
-    userMetadata.service = changes.service;
+  if (hasServiceChange) {
+    userMetadata.service = targetService;
   }
 
   if (Object.keys(userMetadata).length > 0) {
@@ -308,20 +515,7 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  const { rows: refreshedRows } = await runQuery<DbPersonRow>(
-    `select p.*,
-            coalesce(
-              (
-                select json_agg(json_build_object('site_id', ps.site_id))
-                from public.people_sites ps
-                where ps.person_id = p.id
-              ),
-              '[]'::json
-            ) as people_sites
-     from public.people p
-     where p.id = $1`,
-    [id]
-  );
+  const refreshedRows = await selectPeopleRows(' where p.id = $1', [id]);
   const refreshed = refreshedRows[0];
 
   return NextResponse.json({ item: refreshed ?? updatedPerson, passwordReset: Boolean(password) });
@@ -356,4 +550,8 @@ export async function DELETE(request: NextRequest) {
   }
   return NextResponse.json({ ok: true });
 }
-type DbPersonRow = Tables['people']['Row'] & { people_sites: { site_id: string }[] | null };
+type DbPersonRow = Tables['people']['Row'] & {
+  people_sites: { site_id: string }[] | null;
+  supervisors: { supervisor_id: string; name: string | null; email: string | null }[] | null;
+};
+type DbPersonRowLegacy = Tables['people']['Row'] & { people_sites: { site_id: string }[] | null };
