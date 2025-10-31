@@ -23,7 +23,7 @@ const fetchPersonAccess = async (userId: string) => {
   let record: Pick<Tables['people']['Row'], 'role' | 'is_active'> | null = null;
   try {
     const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role' | 'is_active'>>(
-      'select role, is_active from asistencia.people where id = $1',
+      'select role, is_active from public.people where id = $1',
       [userId]
     );
     record = rows[0] ?? null;
@@ -128,7 +128,7 @@ const datasetFromScope = async (scope: z.infer<typeof postSchema>['scope']) => {
   }
 
   const { rows } = await runQuery<Tables['attendance_marks']['Row']>(
-    `select * from asistencia.attendance_marks
+    `select * from public.attendance_marks
      where ${conditions.join(' and ')}
      order by event_ts`,
     params

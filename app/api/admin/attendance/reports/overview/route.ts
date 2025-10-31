@@ -35,10 +35,10 @@ export async function GET() {
     marks_last_30: number;
   }>(
     `select
-       (select count(*) from asistencia.people where is_active = true) as active_people,
-       (select count(*) from asistencia.people where is_active = false) as inactive_people,
-       (select count(*) from asistencia.sites) as total_sites,
-       (select count(*) from asistencia.attendance_marks where event_ts >= now() - interval '30 days') as marks_last_30`
+       (select count(*) from public.people where is_active = true) as active_people,
+       (select count(*) from public.people where is_active = false) as inactive_people,
+       (select count(*) from public.sites) as total_sites,
+       (select count(*) from public.attendance_marks where event_ts >= now() - interval '30 days') as marks_last_30`
   );
 
   const marksResult = await runQuery<{ day: string; total: number; in_total: number; out_total: number }>(
@@ -50,7 +50,7 @@ export async function GET() {
               count(*) as total,
               count(*) filter (where event_type = 'IN') as in_total,
               count(*) filter (where event_type = 'OUT') as out_total
-       from asistencia.attendance_marks
+       from public.attendance_marks
        where event_ts >= current_date - interval '6 days'
        group by event_ts::date
      )
@@ -65,14 +65,14 @@ export async function GET() {
 
   const distributionResult = await runQuery<{ event_type: 'IN' | 'OUT'; total: number }>(
     `select event_type, count(*) as total
-     from asistencia.attendance_marks
+     from public.attendance_marks
      group by event_type`
   );
 
   const topSitesResult = await runQuery<{ site: string; total: number }>(
     `select coalesce(s.name, 'Sin sitio') as site, count(*) as total
-     from asistencia.attendance_marks m
-     left join asistencia.sites s on s.id = m.site_id
+     from public.attendance_marks m
+     left join public.sites s on s.id = m.site_id
      group by s.name
      order by total desc
      limit 5`
@@ -80,7 +80,7 @@ export async function GET() {
 
   const recentPeopleResult = await runQuery<{ name: string; role: Tables['people']['Row']['role']; created_at: string }>(
     `select name, role, created_at
-     from asistencia.people
+     from public.people
      order by created_at desc
      limit 5`
   );

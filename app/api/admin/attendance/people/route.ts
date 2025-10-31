@@ -54,10 +54,16 @@ export async function GET() {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
   const { rows } = await runQuery<DbPersonRow>(
-    `select p.*, coalesce(json_agg(json_build_object('site_id', ps.site_id)) filter (where ps.site_id is not null), '[]'::json) as people_sites
-     from asistencia.people p
-     left join asistencia.people_sites ps on ps.person_id = p.id
-     group by p.id
+    `select p.*,
+            coalesce(
+              (
+                select json_agg(json_build_object('site_id', ps.site_id))
+                from public.people_sites ps
+                where ps.person_id = p.id
+              ),
+              '[]'::json
+            ) as people_sites
+     from public.people p
      order by p.created_at`
   );
   return NextResponse.json({
@@ -107,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await runQuery(
-      `insert into asistencia.people (id, name, rut, service, email, role, is_active)
+      `insert into public.people (id, name, rut, service, email, role, is_active)
        values ($1, $2, $3, $4, $5, $6, $7)`,
       [
         personId,
@@ -131,7 +137,7 @@ export async function POST(request: NextRequest) {
   if (payload.siteIds && payload.siteIds.length > 0) {
     try {
       await runQuery(
-        `insert into asistencia.people_sites (person_id, site_id, active)
+        `insert into public.people_sites (person_id, site_id, active)
          select $1, value, true from unnest($2::uuid[]) as value`,
         [personId, payload.siteIds]
       );
@@ -147,9 +153,17 @@ export async function POST(request: NextRequest) {
   }
 
   const { rows } = await runQuery<DbPersonRow>(
-    `select p.*, coalesce(json_agg(json_build_object('site_id', ps.site_id)) filter (where ps.site_id is not null), '[]'::json) as people_sites
-     from asistencia.people p left join asistencia.people_sites ps on ps.person_id = p.id
-     where p.id = $1 group by p.id`,
+    `select p.*,
+            coalesce(
+              (
+                select json_agg(json_build_object('site_id', ps.site_id))
+                from public.people_sites ps
+                where ps.person_id = p.id
+              ),
+              '[]'::json
+            ) as people_sites
+     from public.people p
+     where p.id = $1`,
     [personId]
   );
   const inserted = rows[0];
@@ -186,9 +200,17 @@ export async function PATCH(request: NextRequest) {
   const service = getServiceSupabase();
 
   const { rows: existingRows } = await runQuery<DbPersonRow>(
-    `select p.*, coalesce(json_agg(json_build_object('site_id', ps.site_id)) filter (where ps.site_id is not null), '[]'::json) as people_sites
-     from asistencia.people p left join asistencia.people_sites ps on ps.person_id = p.id
-     where p.id = $1 group by p.id`,
+    `select p.*,
+            coalesce(
+              (
+                select json_agg(json_build_object('site_id', ps.site_id))
+                from public.people_sites ps
+                where ps.person_id = p.id
+              ),
+              '[]'::json
+            ) as people_sites
+     from public.people p
+     where p.id = $1`,
     [id]
   );
   const existingPerson = existingRows[0];
@@ -206,7 +228,7 @@ export async function PATCH(request: NextRequest) {
       const columns = Object.keys(updateValues);
       const setters = columns.map((column, index) => `${column} = $${index + 2}`).join(', ');
       await runQuery(
-        `update asistencia.people set ${setters} where id = $1`,
+        `update public.people set ${setters} where id = $1`,
         [id, ...columns.map((column) => (updateValues as Record<string, unknown>)[column])]
       );
       updatedPerson = { ...updatedPerson, ...updateValues } as DbPersonRow;
@@ -217,10 +239,10 @@ export async function PATCH(request: NextRequest) {
 
   if (siteIds) {
     try {
-      await runQuery('delete from asistencia.people_sites where person_id = $1', [id]);
+      await runQuery('delete from public.people_sites where person_id = $1', [id]);
       if (siteIds.length > 0) {
         await runQuery(
-          `insert into asistencia.people_sites (person_id, site_id, active)
+          `insert into public.people_sites (person_id, site_id, active)
            select $1, value, true from unnest($2::uuid[]) as value`,
           [id, siteIds]
         );
@@ -268,7 +290,7 @@ export async function PATCH(request: NextRequest) {
     if (authUpdateError) {
       if (Object.keys(updateValues).length > 0) {
         await runQuery(
-          `update asistencia.people
+          `update public.people
            set name = $2, rut = $3, service = $4, email = $5, role = $6, is_active = $7
            where id = $1`,
           [
@@ -287,9 +309,17 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { rows: refreshedRows } = await runQuery<DbPersonRow>(
-    `select p.*, coalesce(json_agg(json_build_object('site_id', ps.site_id)) filter (where ps.site_id is not null), '[]'::json) as people_sites
-     from asistencia.people p left join asistencia.people_sites ps on ps.person_id = p.id
-     where p.id = $1 group by p.id`,
+    `select p.*,
+            coalesce(
+              (
+                select json_agg(json_build_object('site_id', ps.site_id))
+                from public.people_sites ps
+                where ps.person_id = p.id
+              ),
+              '[]'::json
+            ) as people_sites
+     from public.people p
+     where p.id = $1`,
     [id]
   );
   const refreshed = refreshedRows[0];
@@ -317,10 +347,10 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  await runQuery('delete from asistencia.people_sites where person_id = $1', [id]);
+  await runQuery('delete from public.people_sites where person_id = $1', [id]);
 
   try {
-    await runQuery('delete from asistencia.people where id = $1', [id]);
+    await runQuery('delete from public.people where id = $1', [id]);
   } catch (error) {
     return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }

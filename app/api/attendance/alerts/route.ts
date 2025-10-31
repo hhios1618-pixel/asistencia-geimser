@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     const service = getServiceSupabase();
-    const db = service.schema('asistencia');
+    const db = service;
     const { data: personRow, error: personError } = await db
       .from('people')
       .select('id, role')

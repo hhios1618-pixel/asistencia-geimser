@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient } from '../../lib/supabase/server';
+import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
 import LoginForm from './components/LoginForm';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
@@ -19,26 +19,49 @@ export default async function LoginPage() {
       'Colaborador';
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
 
-    await runQuery(
-      `insert into asistencia.people (id, name, email, role, is_active, service, rut)
-       values ($1, $2, $3, $4, $5, $6, $7)
-       on conflict (id) do update
-       set name = excluded.name,
-           email = excluded.email,
-           role = excluded.role,
-           is_active = excluded.is_active,
-           service = excluded.service,
-           rut = excluded.rut`,
-      [
-        user.id as string,
-        defaultName.trim(),
-        user.email ?? null,
-        defaultRole,
-        true,
-        (user.user_metadata?.service as string | undefined) ?? null,
-        (user.user_metadata?.rut as string | undefined) ?? null,
-      ]
-    );
+    const serviceSupabase = getServiceSupabase();
+    const upsertPayload: Tables['people']['Insert'] = {
+      id: user.id as string,
+      name: defaultName.trim(),
+      email: user.email ?? null,
+      role: defaultRole,
+      is_active: true,
+      service: (user.user_metadata?.service as string | undefined) ?? null,
+      rut: (user.user_metadata?.rut as string | undefined) ?? null,
+    };
+
+    const attemptUpsert = async () =>
+      serviceSupabase.from('people').upsert<Tables['people']['Insert']>(upsertPayload, { onConflict: 'id' });
+
+    const { error: upsertError } = await attemptUpsert();
+
+    if (upsertError) {
+      console.error('[login] upsert person failed', upsertError);
+      try {
+        await runQuery(
+          `insert into public.people (id, name, email, role, is_active, service, rut)
+           values ($1, $2, $3, $4, $5, $6, $7)
+           on conflict (id) do update
+           set name = excluded.name,
+               email = excluded.email,
+               role = excluded.role,
+               is_active = excluded.is_active,
+               service = excluded.service,
+               rut = excluded.rut`,
+          [
+            user.id as string,
+            upsertPayload.name,
+            upsertPayload.email ?? null,
+            upsertPayload.role,
+            upsertPayload.is_active ?? true,
+            upsertPayload.service ?? null,
+            upsertPayload.rut ?? null,
+          ]
+        );
+      } catch (fallbackError) {
+        console.error('[login] fallback upsert failed', fallbackError);
+      }
+    }
 
     redirect('/asistencia');
   }

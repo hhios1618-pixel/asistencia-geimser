@@ -17,8 +17,8 @@ if (!supabaseAnonKey) {
   throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
 }
 
-let serviceClient: SupabaseClient<Database> | null = null;
-export const getServiceSupabase = (): SupabaseClient<Database> => {
+let serviceClient: SupabaseClient<Database, 'public'> | null = null;
+export const getServiceSupabase = (): SupabaseClient<Database, 'public'> => {
   if (serviceClient) {
     return serviceClient;
   }
@@ -28,7 +28,7 @@ export const getServiceSupabase = (): SupabaseClient<Database> => {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
   }
 
-  serviceClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
+  serviceClient = createClient<Database, 'public'>(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -39,7 +39,7 @@ export const getServiceSupabase = (): SupabaseClient<Database> => {
       },
     },
     db: {
-      schema: 'asistencia',
+      schema: 'public',
     },
   });
 
@@ -74,10 +74,10 @@ export const createServerSupabaseClient = async () => {
   }, {
     options: {
       db: {
-        schema: 'asistencia',
+        schema: 'public',
       },
     },
-  }) as unknown as SupabaseClient<Database>;
+  }) as unknown as SupabaseClient<Database, 'public'>;
 };
 
 export const createRouteSupabaseClient = async () => {
@@ -87,8 +87,8 @@ export const createRouteSupabaseClient = async () => {
   }, {
     options: {
       db: {
-        schema: 'asistencia',
+        schema: 'public',
       },
     },
-  }) as unknown as SupabaseClient<Database>;
+  }) as unknown as SupabaseClient<Database, 'public'>;
 };

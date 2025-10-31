@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const service = getServiceSupabase();
-    const db = service.schema('asistencia');
+    const db = service;
     const { data: personRow, error: personError } = await db
       .from('people')
       .select('*')
@@ -52,18 +52,17 @@ export async function GET(request: NextRequest) {
       const defaultRole =
         (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'WORKER';
 
+      const provisionPayload: Tables['people']['Insert'] = {
+        id: authData.user.id as string,
+        name: fallbackName.trim(),
+        email: authData.user.email,
+        role: defaultRole,
+        is_active: true,
+      };
+
       const { data: provisioned, error: provisionError } = await db
         .from('people')
-        .upsert(
-          {
-            id: authData.user.id as string,
-            name: fallbackName.trim(),
-            email: authData.user.email,
-            role: defaultRole,
-            is_active: true,
-          },
-          { onConflict: 'id' }
-        )
+        .upsert<Tables['people']['Insert']>(provisionPayload, { onConflict: 'id' })
         .select('*')
         .maybeSingle<Tables['people']['Row']>();
 

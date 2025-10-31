@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     return respond(401, { error: 'UNAUTHENTICATED' });
   }
 
+
   let body: z.infer<typeof bodySchema>;
   try {
     body = bodySchema.parse(await request.json());

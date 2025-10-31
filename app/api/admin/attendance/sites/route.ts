@@ -31,7 +31,7 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 export const runtime = 'nodejs';
 
 const ensureAddressColumn = async () => {
-  await runQuery("alter table if exists asistencia.sites add column if not exists address text");
+  await runQuery("alter table if exists public.sites add column if not exists address text");
 };
 
 const authorize = async () => {
@@ -57,7 +57,7 @@ export async function GET() {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
   await ensureAddressColumn();
-  const { rows } = await runQuery<Tables['sites']['Row']>('select * from asistencia.sites order by created_at');
+  const { rows } = await runQuery<Tables['sites']['Row']>('select * from public.sites order by created_at');
   const parsed = rows.map((row) => ({
     ...row,
     lat: typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat)),
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     await ensureAddressColumn();
     const address = payload.address ?? null;
     const { rows } = await runQuery<Tables['sites']['Row']>(
-      `insert into asistencia.sites (name, address, lat, lng, radius_m, is_active)
+      `insert into public.sites (name, address, lat, lng, radius_m, is_active)
        values ($1, $2, $3, $4, $5, $6)
        returning *`,
       [
@@ -121,7 +121,7 @@ export async function PATCH(request: NextRequest) {
   try {
     await ensureAddressColumn();
     if (entries.length === 0) {
-      const { rows } = await runQuery<Tables['sites']['Row']>('select * from asistencia.sites where id = $1', [id]);
+      const { rows } = await runQuery<Tables['sites']['Row']>('select * from public.sites where id = $1', [id]);
       return NextResponse.json({ item: rows[0] ?? null });
     }
 
@@ -129,7 +129,7 @@ export async function PATCH(request: NextRequest) {
     const params = [id, ...entries.map(([, value]) => value)];
 
     const { rows } = await runQuery<Tables['sites']['Row']>(
-      `update asistencia.sites set ${setters} where id = $1 returning *`,
+      `update public.sites set ${setters} where id = $1 returning *`,
       params
     );
 
@@ -155,8 +155,8 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await runQuery('delete from asistencia.people_sites where site_id = $1', [id]);
-    await runQuery('delete from asistencia.sites where id = $1', [id]);
+    await runQuery('delete from public.people_sites where site_id = $1', [id]);
+    await runQuery('delete from public.sites where id = $1', [id]);
   } catch (error) {
     return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }

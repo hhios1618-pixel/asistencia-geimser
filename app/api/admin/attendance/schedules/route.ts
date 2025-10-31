@@ -35,7 +35,7 @@ const authorize = async () => {
   let role = fallbackRole;
   try {
     const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role'>>(
-      'select role from asistencia.people where id = $1',
+      'select role from public.people where id = $1',
       [authData.user.id as string]
     );
     if (rows[0]?.role) {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
   }
   const whereClause = filters.length > 0 ? ` where ${filters.join(' and ')}` : '';
   const { rows } = await runQuery<Tables['schedules']['Row']>(
-    `select * from asistencia.schedules${whereClause} order by day_of_week, start_time`,
+    `select * from public.schedules${whereClause} order by day_of_week, start_time`,
     params
   );
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { rows } = await runQuery<Tables['schedules']['Row']>(
-    `insert into asistencia.schedules (person_id, group_id, day_of_week, start_time, end_time, break_minutes)
+    `insert into public.schedules (person_id, group_id, day_of_week, start_time, end_time, break_minutes)
      values ($1, $2, $3, $4, $5, $6)
      returning *`,
     [
@@ -121,7 +121,7 @@ export async function PATCH(request: NextRequest) {
 
   if (Object.keys(changes).length === 0) {
     const { rows } = await runQuery<Tables['schedules']['Row']>(
-      'select * from asistencia.schedules where id = $1',
+      'select * from public.schedules where id = $1',
       [id]
     );
     return NextResponse.json({ item: rows[0] ?? null });
@@ -132,7 +132,7 @@ export async function PATCH(request: NextRequest) {
   const params = [id, ...columns.map((column) => (changes as Record<string, unknown>)[column])];
 
   const { rows } = await runQuery<Tables['schedules']['Row']>(
-    `update asistencia.schedules set ${setters} where id = $1 returning *`,
+    `update public.schedules set ${setters} where id = $1 returning *`,
     params
   );
 
@@ -155,7 +155,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await runQuery('delete from asistencia.schedules where id = $1', [id]);
+    await runQuery('delete from public.schedules where id = $1', [id]);
   } catch (error) {
     return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }

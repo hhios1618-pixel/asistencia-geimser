@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
   let role = fallbackRole;
   try {
     const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role'>>(
-      'select role from asistencia.people where id = $1',
+      'select role from public.people where id = $1',
       [userId]
     );
     if (rows[0]?.role) {
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { rows: marks } = await runQuery<Tables['attendance_marks']['Row']>(
-    `select * from asistencia.attendance_marks
+    `select * from public.attendance_marks
      where ${conditions.join(' and ')}
      order by event_ts`,
     values
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="asistencia.csv"',
+        'Content-Disposition': 'attachment; filename="public.csv"',
       },
     });
   }
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': 'attachment; filename="asistencia.pdf"',
+      'Content-Disposition': 'attachment; filename="public.pdf"',
     },
   });
 }

@@ -1,6 +1,22 @@
 import 'server-only';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = process.env.NODE_TLS_REJECT_UNAUTHORIZED ?? '0';
+const TLS_WARNING_PATCHED = Symbol.for('asistencia.patchTlsWarning');
+if (!(process as unknown as Record<symbol, boolean>)[TLS_WARNING_PATCHED]) {
+  (process as unknown as Record<symbol, boolean>)[TLS_WARNING_PATCHED] = true;
+  if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  }
+  const originalEmitWarning = process.emitWarning.bind(process) as (...emitArgs: unknown[]) => void;
+  process.emitWarning = ((warning: unknown, ...args: unknown[]) => {
+    if (
+      (typeof warning === 'string' && warning.includes('NODE_TLS_REJECT_UNAUTHORIZED')) ||
+      (warning instanceof Error && warning.message.includes('NODE_TLS_REJECT_UNAUTHORIZED'))
+    ) {
+      return;
+    }
+    return originalEmitWarning(warning, ...args);
+  }) as typeof process.emitWarning;
+}
 
 import { Pool, PoolClient } from 'pg';
 

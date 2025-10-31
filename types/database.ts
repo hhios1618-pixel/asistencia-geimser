@@ -7,7 +7,7 @@ export type Json =
   | Json[];
 
 export interface Database {
-  asistencia: {
+  public: {
     Tables: {
       people: {
         Row: {
@@ -39,6 +39,7 @@ export interface Database {
           email?: string | null;
           created_at?: string;
         };
+        Relationships: never[];
       };
       sites: {
         Row: {
@@ -70,6 +71,7 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
         };
+        Relationships: never[];
       };
       people_sites: {
         Row: {
@@ -88,6 +90,7 @@ export interface Database {
           active?: boolean;
           assigned_at?: string;
         };
+        Relationships: never[];
       };
       schedules: {
         Row: {
@@ -119,6 +122,7 @@ export interface Database {
           break_minutes?: number;
           created_at?: string;
         };
+        Relationships: never[];
       };
       attendance_marks: {
         Row: {
@@ -156,6 +160,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Record<string, never>;
+        Relationships: never[];
       };
       attendance_modifications: {
         Row: {
@@ -188,6 +193,7 @@ export interface Database {
           resolved_at?: string | null;
           notes?: string | null;
         };
+        Relationships: never[];
       };
       audit_events: {
         Row: {
@@ -217,6 +223,7 @@ export interface Database {
           hash_chain?: string | null;
         };
         Update: never;
+        Relationships: never[];
       };
       consent_logs: {
         Row: {
@@ -238,6 +245,7 @@ export interface Database {
           user_agent?: string | null;
         };
         Update: never;
+        Relationships: never[];
       };
       dt_access_tokens: {
         Row: {
@@ -257,6 +265,7 @@ export interface Database {
           created_at?: string;
         };
         Update: never;
+        Relationships: never[];
       };
       alerts: {
         Row: {
@@ -282,6 +291,7 @@ export interface Database {
           resolved_at?: string | null;
           metadata?: Json | null;
         };
+        Relationships: never[];
       };
       settings: {
         Row: {
@@ -298,6 +308,7 @@ export interface Database {
           value?: Json;
           updated_at?: string;
         };
+        Relationships: never[];
       };
       attendance_mark_hash_log: {
         Row: {
@@ -313,6 +324,7 @@ export interface Database {
           hash_prev?: string | null;
         };
         Update: never;
+        Relationships: never[];
       };
     };
     Views: Record<string, never>;
@@ -347,7 +359,7 @@ export interface Database {
   };
 }
 
-export type Tables = Database['asistencia']['Tables'];
+export type Tables = Database['public']['Tables'];
 export type TableRow<K extends keyof Tables> = Tables[K]['Row'];
 export type TableInsert<K extends keyof Tables> = Tables[K]['Insert'];
 export type TableUpdate<K extends keyof Tables> = Tables[K]['Update'];

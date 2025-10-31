@@ -34,8 +34,8 @@ export const runtime = 'nodejs';
 const selectModificationWithMarkById = async (id: string) => {
   const { rows } = await runQuery<ModificationWithMark>(
     `select m.*, row_to_json(am) as attendance_marks
-     from asistencia.attendance_modifications m
-     left join asistencia.attendance_marks am on am.id = m.mark_id
+     from public.attendance_modifications m
+     left join public.attendance_marks am on am.id = m.mark_id
      where m.id = $1`,
     [id]
   );
@@ -63,7 +63,7 @@ const getActor = async () => {
   let person: Tables['people']['Row'] | null = null;
   try {
     const { rows } = await runQuery<Tables['people']['Row']>(
-      'select * from asistencia.people where id = $1',
+      'select * from public.people where id = $1',
       [userId]
     );
     person = rows[0] ?? null;
@@ -114,8 +114,8 @@ export async function GET(request: NextRequest) {
 
   const { rows } = await runQuery<ModificationWithMark>(
     `select m.*, row_to_json(am) as attendance_marks
-     from asistencia.attendance_modifications m
-     left join asistencia.attendance_marks am on am.id = m.mark_id
+     from public.attendance_modifications m
+     left join public.attendance_marks am on am.id = m.mark_id
      ${whereClause}
      order by m.created_at desc
      limit $${limitIndex}`,
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { rows: markRows } = await runQuery<Tables['attendance_marks']['Row']>(
-    'select * from asistencia.attendance_marks where id = $1',
+    'select * from public.attendance_marks where id = $1',
     [payload.markId]
   );
   const mark = markRows[0] ?? null;
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { rows: insertRows } = await runQuery<Tables['attendance_modifications']['Row']>(
-    `insert into asistencia.attendance_modifications (mark_id, requester_id, reason, requested_delta, status)
+    `insert into public.attendance_modifications (mark_id, requester_id, reason, requested_delta, status)
      values ($1, $2, $3, $4, 'PENDING')
      returning *`,
     [payload.markId, userId, payload.reason, payload.requestedDelta]
@@ -210,7 +210,7 @@ export async function PATCH(request: NextRequest) {
   const resolvedAt = new Date().toISOString();
 
   const { rows: updateRows } = await runQuery<Tables['attendance_modifications']['Row']>(
-    `update asistencia.attendance_modifications
+    `update public.attendance_modifications
      set status = $2, notes = $3, resolver_id = $4, resolved_at = $5
      where id = $1
      returning *`,
@@ -238,4 +238,3 @@ export async function PATCH(request: NextRequest) {
 
   return NextResponse.json({ item: updated });
 }
-

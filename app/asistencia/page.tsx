@@ -46,7 +46,7 @@ export default async function AsistenciaPage() {
       'Colaborador';
 
     await runQuery(
-      `insert into asistencia.people (id, name, email, role, is_active, service, rut)
+      `insert into public.people (id, name, email, role, is_active, service, rut)
        values ($1, $2, $3, $4, $5, $6, $7)
        on conflict (id) do update
        set name = excluded.name,
@@ -67,7 +67,7 @@ export default async function AsistenciaPage() {
     );
 
     const { rows: provisioned } = await runQuery<Tables['people']['Row']>(
-      'select * from asistencia.people where id = $1',
+      'select * from public.people where id = $1',
       [user.id as string]
     );
 
@@ -88,7 +88,7 @@ export default async function AsistenciaPage() {
   const ensuredPerson = person!;
 
   const { rows: assignmentRows } = await runQuery<{ site_id: string }>(
-    `select site_id from asistencia.people_sites
+    `select site_id from public.people_sites
      where person_id = $1 and active = true`,
     [user.id as string]
   );
@@ -97,7 +97,7 @@ export default async function AsistenciaPage() {
   let sites: Tables['sites']['Row'][] = [];
   if (siteIds.length > 0) {
     const { rows: siteRows } = await runQuery<Tables['sites']['Row']>(
-      `select * from asistencia.sites
+      `select * from public.sites
        where id = any($1::uuid[])
        order by name`,
       [siteIds]

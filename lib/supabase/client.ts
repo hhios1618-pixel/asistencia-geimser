@@ -15,11 +15,11 @@ if (!supabaseAnonKey) {
   throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
 }
 
-export const createBrowserSupabaseClient = (): SupabaseClient<Database> =>
+export const createBrowserSupabaseClient = (): SupabaseClient<Database, 'public'> =>
   createClientComponentClient<Database>({
     options: {
       db: {
-        schema: 'asistencia',
+        schema: 'public',
       },
     },
-  }) as unknown as SupabaseClient<Database>;
+  }) as unknown as SupabaseClient<Database, 'public'>;
