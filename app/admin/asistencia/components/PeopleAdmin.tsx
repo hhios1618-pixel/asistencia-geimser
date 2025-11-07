@@ -19,6 +19,14 @@ interface Person {
   supervisors?: { supervisor_id: string; name: string | null; email: string | null }[];
 }
 
+type AvailableSupervisor = {
+  id: string;
+  name: string;
+  email: string | null;
+  service: string | null;
+  hasService: boolean;
+};
+
 const emptyPerson: Person = {
   id: '',
   name: '',
@@ -125,21 +133,40 @@ export function PeopleAdmin() {
     return map;
   }, [people]);
 
-  const availableSupervisors = useMemo(() => {
-    const service = editing.service?.trim().toLowerCase();
-    if (!service) {
-      return [] as Array<{ id: string; name: string; email: string | null }>;
+  const availableSupervisors = useMemo<AvailableSupervisor[]>(() => {
+    const normalizedService = editing.service?.trim().toLowerCase();
+    if (!normalizedService) {
+      return [] as AvailableSupervisor[];
     }
-    return people
-      .filter(
-        (person) =>
-          person.id !== editing.id &&
-          person.role === 'SUPERVISOR' &&
-          person.is_active &&
-          (person.service ?? '').trim().toLowerCase() === service
-      )
-      .map((person) => ({ id: person.id, name: person.name, email: person.email ?? null }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+    const matching: AvailableSupervisor[] = [];
+    const withoutService: AvailableSupervisor[] = [];
+
+    people.forEach((person) => {
+      if (person.id === editing.id || person.role !== 'SUPERVISOR' || !person.is_active) {
+        return;
+      }
+      const supervisorService = (person.service ?? '').trim().toLowerCase();
+      const bucket =
+        supervisorService === normalizedService
+          ? matching
+          : supervisorService.length === 0
+            ? withoutService
+            : null;
+      if (!bucket) {
+        return;
+      }
+      bucket.push({
+        id: person.id,
+        name: person.name,
+        email: person.email ?? null,
+        service: person.service ?? null,
+        hasService: supervisorService.length > 0,
+      });
+    });
+
+    const sorter = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'es');
+    return [...matching.sort(sorter), ...withoutService.sort(sorter)];
   }, [people, editing.id, editing.service]);
 
   useEffect(() => {
@@ -283,10 +310,11 @@ export function PeopleAdmin() {
         item?: Person;
         credentials?: { email: string; password: string };
         passwordReset?: boolean;
+        message?: string;
       };
 
       if (!response.ok) {
-        setError(body.error ?? 'No fue posible guardar el trabajador');
+        setError(body.message ?? body.error ?? 'No fue posible guardar el trabajador');
         return;
       }
 
@@ -674,6 +702,13 @@ export function PeopleAdmin() {
                       <span className="flex flex-col">
                         <span className="text-sm text-slate-600">{supervisor.name}</span>
                         <span className="text-xs text-slate-400">{supervisor.email ?? 'Sin correo'}</span>
+                        <span
+                          className={`text-[11px] ${
+                            supervisor.hasService ? 'text-slate-400' : 'text-amber-500'
+                          }`}
+                        >
+                          {supervisor.hasService ? supervisor.service : 'Sin servicio configurado'}
+                        </span>
                       </span>
                       <input
                         type="checkbox"

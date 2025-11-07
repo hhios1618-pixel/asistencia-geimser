@@ -57,6 +57,11 @@ const normalizeService = (service?: string | null) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const normalizeComparableService = (service?: string | null) => {
+  const normalized = normalizeService(service);
+  return normalized ? normalized.toLocaleLowerCase('es-CL') : null;
+};
+
 const ensureSupervisorsEligible = async (
   supervisorIds: string[],
   service: string | null
@@ -95,13 +100,18 @@ const ensureSupervisorsEligible = async (
     throw new Error('INACTIVE_SUPERVISOR');
   }
 
+  const comparableService = normalizeComparableService(service);
+
   if (service === null) {
     const mismatch = rows.find((row) => normalizeService(row.service) !== null);
     if (mismatch) {
       throw new Error('SERVICE_REQUIRED_FOR_ASSIGNMENT');
     }
   } else {
-    const mismatch = rows.find((row) => normalizeService(row.service) !== service);
+    const mismatch = rows.find((row) => {
+      const supervisorService = normalizeComparableService(row.service);
+      return supervisorService !== null && supervisorService !== comparableService;
+    });
     if (mismatch) {
       throw new Error('SERVICE_MISMATCH');
     }
@@ -154,6 +164,33 @@ const mapSupervisorError = (code: string) => {
     default:
       return 'No fue posible validar los supervisores seleccionados.';
   }
+};
+
+const UNIQUE_CONSTRAINT_ERRORS: Record<string, { error: string; message: string }> = {
+  people_email_key: {
+    error: 'EMAIL_ALREADY_EXISTS',
+    message: 'Ya existe una persona registrada con este correo.',
+  },
+  people_rut_key: {
+    error: 'RUT_ALREADY_EXISTS',
+    message: 'Ya existe una persona registrada con este RUT.',
+  },
+};
+
+const mapUniqueViolation = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const pgError = error as { code?: string; constraint?: string };
+  if (pgError.code !== '23505') {
+    return null;
+  }
+  return (
+    UNIQUE_CONSTRAINT_ERRORS[pgError.constraint ?? ''] ?? {
+      error: 'DUPLICATE_VALUE',
+      message: 'Ya existe un registro con los mismos datos.',
+    }
+  );
 };
 
 const isMissingTeamAssignments = (error: unknown): error is { code: string } =>
@@ -311,6 +348,10 @@ export async function POST(request: NextRequest) {
     } catch {
       // ignore auth deletion errors in rollback
     }
+    const duplicate = mapUniqueViolation(error);
+    if (duplicate) {
+      return NextResponse.json(duplicate, { status: 409 });
+    }
     return NextResponse.json({ error: 'CREATE_FAILED', details: (error as Error).message }, { status: 500 });
   }
 
@@ -421,6 +462,10 @@ export async function PATCH(request: NextRequest) {
       );
       updatedPerson = { ...updatedPerson, ...updateValues } as DbPersonRow;
     } catch (error) {
+      const duplicate = mapUniqueViolation(error);
+      if (duplicate) {
+        return NextResponse.json(duplicate, { status: 409 });
+      }
       return NextResponse.json({ error: 'UPDATE_FAILED', details: (error as Error).message }, { status: 500 });
     }
   }
