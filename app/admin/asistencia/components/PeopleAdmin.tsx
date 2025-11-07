@@ -301,7 +301,7 @@ export function PeopleAdmin() {
       };
 
       if (!response.ok) {
-        setError(body.message ?? body.error ?? 'No fue posible guardar el trabajador');
+        setError(body.message ?? body.details ?? body.error ?? 'No fue posible guardar el trabajador');
         return;
       }
 

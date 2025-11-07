@@ -57,6 +57,22 @@ const normalizeService = (service?: string | null) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const normalizeEmail = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeRutValue = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 const ensureSupervisorsEligible = async (
   supervisorIds: string[]
 ): Promise<Array<Pick<Tables['people']['Row'], 'id' | 'name' | 'email' | 'service' | 'role' | 'is_active'>>> => {
@@ -170,6 +186,38 @@ const mapUniqueViolation = (error: unknown) => {
   );
 };
 
+const detectDuplicatePerson = async ({
+  email,
+  rut,
+  excludeId,
+}: {
+  email?: string | null;
+  rut?: string | null;
+  excludeId?: string;
+}) => {
+  if (email) {
+    const { rows } = await runQuery<{ id: string }>(
+      'select id from public.people where lower(email) = $1 limit 1',
+      [email]
+    );
+    if (rows.length > 0 && (!excludeId || rows[0].id !== excludeId)) {
+      return UNIQUE_CONSTRAINT_ERRORS.people_email_key;
+    }
+  }
+
+  if (rut) {
+    const { rows } = await runQuery<{ id: string }>(
+      'select id from public.people where rut = $1 limit 1',
+      [rut]
+    );
+    if (rows.length > 0 && (!excludeId || rows[0].id !== excludeId)) {
+      return UNIQUE_CONSTRAINT_ERRORS.people_rut_key;
+    }
+  }
+
+  return null;
+};
+
 const isMissingTeamAssignments = (error: unknown): error is { code: string } =>
   typeof error === 'object' &&
   error !== null &&
@@ -266,12 +314,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
   }
 
-  if (!payload.email) {
+  const normalizedEmail = normalizeEmail(payload.email ?? null);
+  if (!normalizedEmail) {
     return NextResponse.json({ error: 'EMAIL_REQUIRED' }, { status: 400 });
   }
+  const normalizedRut = normalizeRutValue(payload.rut ?? null);
 
   const supervisorIds = Array.from(new Set(payload.supervisorIds ?? []));
   const serviceValue = normalizeService(payload.service ?? null);
+
+  const duplicateError = await detectDuplicatePerson({ email: normalizedEmail, rut: normalizedRut });
+  if (duplicateError) {
+    return NextResponse.json(duplicateError, { status: 409 });
+  }
 
   try {
     await ensureSupervisorsEligible(supervisorIds);
@@ -286,12 +341,12 @@ export async function POST(request: NextRequest) {
   const password = payload.password?.trim() || generateTemporaryPassword();
 
   const { data: createdAuth, error: authError } = await service.auth.admin.createUser({
-    email: payload.email,
+    email: normalizedEmail,
     password,
     email_confirm: true,
     user_metadata: {
       name: payload.name,
-      rut: payload.rut ?? null,
+      rut: normalizedRut ?? null,
       service: serviceValue,
     },
     app_metadata: {
@@ -309,15 +364,7 @@ export async function POST(request: NextRequest) {
     await runQuery(
       `insert into public.people (id, name, rut, service, email, role, is_active)
        values ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        personId,
-        payload.name,
-        payload.rut ?? null,
-        serviceValue,
-        payload.email ?? null,
-        payload.role,
-        payload.is_active ?? true,
-      ]
+      [personId, payload.name, normalizedRut, serviceValue, normalizedEmail, payload.role, payload.is_active ?? true]
     );
   } catch (error) {
     try {
@@ -372,7 +419,7 @@ export async function POST(request: NextRequest) {
         people_sites: inserted?.people_sites ?? [],
       },
       credentials: {
-        email: payload.email,
+        email: normalizedEmail,
         password,
       },
     },
@@ -426,6 +473,32 @@ export async function PATCH(request: NextRequest) {
   }
 
   const updateValues = changes as Tables['people']['Update'];
+  const emailDefined = Object.prototype.hasOwnProperty.call(changes, 'email');
+  const rutDefined = Object.prototype.hasOwnProperty.call(changes, 'rut');
+  let normalizedEmailUpdate: string | null = null;
+  if (emailDefined) {
+    normalizedEmailUpdate = normalizeEmail((changes as { email?: string | null }).email ?? null);
+    if (!normalizedEmailUpdate) {
+      return NextResponse.json({ error: 'EMAIL_REQUIRED' }, { status: 400 });
+    }
+    updateValues.email = normalizedEmailUpdate;
+  }
+  let normalizedRutUpdate: string | null = null;
+  if (rutDefined) {
+    normalizedRutUpdate = normalizeRutValue((changes as { rut?: string | null }).rut ?? null);
+    updateValues.rut = normalizedRutUpdate;
+  }
+
+  if (emailDefined || rutDefined) {
+    const duplicateUpdateError = await detectDuplicatePerson({
+      email: emailDefined ? normalizedEmailUpdate : undefined,
+      rut: rutDefined ? normalizedRutUpdate : undefined,
+      excludeId: id,
+    });
+    if (duplicateUpdateError) {
+      return NextResponse.json(duplicateUpdateError, { status: 409 });
+    }
+  }
 
   let updatedPerson = existingPerson;
 
@@ -487,8 +560,8 @@ export async function PATCH(request: NextRequest) {
 
   const authUpdates: Record<string, unknown> = {};
 
-  if (typeof changes.email === 'string') {
-    authUpdates.email = changes.email;
+  if (emailDefined && normalizedEmailUpdate) {
+    authUpdates.email = normalizedEmailUpdate;
   }
 
   if (password && password.trim().length >= 8) {
@@ -499,8 +572,8 @@ export async function PATCH(request: NextRequest) {
   if (typeof changes.name === 'string') {
     userMetadata.name = changes.name;
   }
-  if (typeof changes.rut === 'string') {
-    userMetadata.rut = changes.rut;
+  if (rutDefined) {
+    userMetadata.rut = normalizedRutUpdate;
   }
   if (hasServiceChange) {
     userMetadata.service = targetService;
