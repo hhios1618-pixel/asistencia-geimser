@@ -134,40 +134,25 @@ export function PeopleAdmin() {
   }, [people]);
 
   const availableSupervisors = useMemo<AvailableSupervisor[]>(() => {
-    const normalizedService = editing.service?.trim().toLowerCase();
-    if (!normalizedService) {
-      return [] as AvailableSupervisor[];
-    }
-
-    const matching: AvailableSupervisor[] = [];
-    const withoutService: AvailableSupervisor[] = [];
-
-    people.forEach((person) => {
-      if (person.id === editing.id || person.role !== 'SUPERVISOR' || !person.is_active) {
-        return;
-      }
-      const supervisorService = (person.service ?? '').trim().toLowerCase();
-      const bucket =
-        supervisorService === normalizedService
-          ? matching
-          : supervisorService.length === 0
-            ? withoutService
-            : null;
-      if (!bucket) {
-        return;
-      }
-      bucket.push({
+    return people
+      .filter((person) => person.id !== editing.id && person.role === 'SUPERVISOR' && person.is_active)
+      .map((person) => ({
         id: person.id,
         name: person.name,
         email: person.email ?? null,
         service: person.service ?? null,
-        hasService: supervisorService.length > 0,
-      });
-    });
+        hasService: Boolean(person.service && person.service.trim().length > 0),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [people, editing.id]);
 
-    const sorter = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'es');
-    return [...matching.sort(sorter), ...withoutService.sort(sorter)];
-  }, [people, editing.id, editing.service]);
+  const canAssignSupervisors = editing.role === 'WORKER';
+
+  useEffect(() => {
+    if (!canAssignSupervisors && assignedSupervisors.length > 0) {
+      setAssignedSupervisors([]);
+    }
+  }, [canAssignSupervisors, assignedSupervisors.length]);
 
   useEffect(() => {
     setAssignedSupervisors((current) =>
@@ -279,8 +264,10 @@ export function PeopleAdmin() {
       role: editing.role,
       is_active: editing.is_active,
       siteIds: assignedSites,
-      supervisorIds: assignedSupervisors,
     };
+    if (canAssignSupervisors) {
+      basePayload.supervisorIds = assignedSupervisors;
+    }
 
     if (trimmedRut.length > 0) {
       basePayload.rut = trimmedRut;
@@ -689,10 +676,10 @@ export function PeopleAdmin() {
               ))}
             </div>
           </div>
-          <div className="md:col-span-2">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Supervisores asignados</p>
-            {editing.service ? (
-              availableSupervisors.length > 0 ? (
+          {canAssignSupervisors && (
+            <div className="md:col-span-2">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Supervisores asignados</p>
+              {availableSupervisors.length > 0 ? (
                 <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                   {availableSupervisors.map((supervisor) => (
                     <label
@@ -721,15 +708,11 @@ export function PeopleAdmin() {
                 </div>
               ) : (
                 <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-700">
-                  No hay supervisores activos para este servicio.
+                  No hay supervisores activos registrados.
                 </p>
-              )
-            ) : (
-              <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
-                Indica un servicio para habilitar la selección de supervisores.
-              </p>
-            )}
-          </div>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input

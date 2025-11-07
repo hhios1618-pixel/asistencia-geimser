@@ -57,14 +57,8 @@ const normalizeService = (service?: string | null) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const normalizeComparableService = (service?: string | null) => {
-  const normalized = normalizeService(service);
-  return normalized ? normalized.toLocaleLowerCase('es-CL') : null;
-};
-
 const ensureSupervisorsEligible = async (
-  supervisorIds: string[],
-  service: string | null
+  supervisorIds: string[]
 ): Promise<Array<Pick<Tables['people']['Row'], 'id' | 'name' | 'email' | 'service' | 'role' | 'is_active'>>> => {
   if (supervisorIds.length === 0) {
     return [];
@@ -98,23 +92,6 @@ const ensureSupervisorsEligible = async (
   const inactive = rows.find((row) => !row.is_active);
   if (inactive) {
     throw new Error('INACTIVE_SUPERVISOR');
-  }
-
-  const comparableService = normalizeComparableService(service);
-
-  if (service === null) {
-    const mismatch = rows.find((row) => normalizeService(row.service) !== null);
-    if (mismatch) {
-      throw new Error('SERVICE_REQUIRED_FOR_ASSIGNMENT');
-    }
-  } else {
-    const mismatch = rows.find((row) => {
-      const supervisorService = normalizeComparableService(row.service);
-      return supervisorService !== null && supervisorService !== comparableService;
-    });
-    if (mismatch) {
-      throw new Error('SERVICE_MISMATCH');
-    }
   }
 
   return rows;
@@ -297,7 +274,7 @@ export async function POST(request: NextRequest) {
   const serviceValue = normalizeService(payload.service ?? null);
 
   try {
-    await ensureSupervisorsEligible(supervisorIds, serviceValue);
+    await ensureSupervisorsEligible(supervisorIds);
   } catch (validationError) {
     return NextResponse.json(
       { error: 'SUPERVISOR_INVALID', message: mapSupervisorError((validationError as Error).message) },
@@ -439,7 +416,7 @@ export async function PATCH(request: NextRequest) {
   let supervisorValidationRows: Awaited<ReturnType<typeof ensureSupervisorsEligible>> = [];
   if (supervisorIdsDefined) {
     try {
-      supervisorValidationRows = await ensureSupervisorsEligible(supervisorIds, targetService);
+      supervisorValidationRows = await ensureSupervisorsEligible(supervisorIds);
     } catch (validationError) {
       return NextResponse.json(
         { error: 'SUPERVISOR_INVALID', message: mapSupervisorError((validationError as Error).message) },
