@@ -6,9 +6,20 @@ import type { Tables } from '../../../../../types/database';
 import { runQuery } from '../../../../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../../../../lib/db/ensurePeopleServiceColumn';
 
+const rutSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    const cleaned = value.replace(/[^0-9kK]/g, '').toUpperCase();
+    return cleaned.length > 0 ? cleaned : undefined;
+  },
+  z.string().min(7).optional()
+);
+
 const personSchema = z.object({
   name: z.string().min(3),
-  rut: z.string().min(7).optional(),
+  rut: rutSchema,
   email: z.string().email().optional(),
   service: z.string().min(2).optional(),
   role: z.enum(['WORKER', 'ADMIN', 'SUPERVISOR', 'DT_VIEWER']).default('WORKER'),
@@ -70,8 +81,8 @@ const normalizeRutValue = (value?: string | null) => {
   if (!value) {
     return null;
   }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  const cleaned = value.replace(/[^0-9kK]/g, '').toUpperCase();
+  return cleaned.length > 0 ? cleaned : null;
 };
 
 const ensureSupervisorsEligible = async (
