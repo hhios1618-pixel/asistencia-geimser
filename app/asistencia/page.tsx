@@ -7,6 +7,7 @@ import AttendanceClient from './components/AttendanceClient';
 import LocationPermissionGuard from './components/LocationPermissionGuard';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
+import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColumn';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,7 @@ export default async function AsistenciaPage() {
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';
 
+    await ensurePeopleServiceColumn();
     await runQuery(
       `insert into public.people (id, name, email, role, is_active, service, rut)
        values ($1, $2, $3, $4, $5, $6, $7)

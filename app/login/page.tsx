@@ -3,6 +3,7 @@ import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supaba
 import LoginForm from './components/LoginForm';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
+import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColumn';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,8 @@ export default async function LoginPage() {
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+
+    await ensurePeopleServiceColumn();
 
     const serviceSupabase = getServiceSupabase();
     const upsertPayload: Tables['people']['Insert'] = {

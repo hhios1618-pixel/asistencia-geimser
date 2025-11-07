@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
 import { runQuery } from '../../../../../lib/db/postgres';
+import { ensurePeopleServiceColumn } from '../../../../../lib/db/ensurePeopleServiceColumn';
 
 const personSchema = z.object({
   name: z.string().min(3),
@@ -323,6 +324,20 @@ export async function POST(request: NextRequest) {
   const supervisorIds = Array.from(new Set(payload.supervisorIds ?? []));
   const serviceValue = normalizeService(payload.service ?? null);
 
+  try {
+    await ensurePeopleServiceColumn();
+  } catch (ensureError) {
+    console.error('[admin_people] ensure service column failed', ensureError);
+    return NextResponse.json(
+      {
+        error: 'SERVICE_COLUMN_MISSING',
+        message: 'No fue posible preparar la columna "service" en la tabla de personas. Ejecuta la última migración e inténtalo nuevamente.',
+        details: (ensureError as Error).message,
+      },
+      { status: 500 }
+    );
+  }
+
   const duplicateError = await detectDuplicatePerson({ email: normalizedEmail, rut: normalizedRut });
   if (duplicateError) {
     return NextResponse.json(duplicateError, { status: 409 });
@@ -438,6 +453,20 @@ export async function PATCH(request: NextRequest) {
     payload = updateSchema.parse(await request.json());
   } catch (error) {
     return NextResponse.json({ error: 'INVALID_BODY', details: (error as Error).message }, { status: 400 });
+  }
+
+  try {
+    await ensurePeopleServiceColumn();
+  } catch (ensureError) {
+    console.error('[admin_people] ensure service column failed', ensureError);
+    return NextResponse.json(
+      {
+        error: 'SERVICE_COLUMN_MISSING',
+        message: 'No fue posible preparar la columna \"service\" en la tabla de personas. Ejecuta la última migración e inténtalo nuevamente.',
+        details: (ensureError as Error).message,
+      },
+      { status: 500 }
+    );
   }
 
   const { id, siteIds, password, supervisorIds: rawSupervisorIds, ...changes } = payload;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import type { Tables, TableInsert, TableUpdate } from '../../../../types/database';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { ensurePeopleServiceColumn } from '../../../../lib/db/ensurePeopleServiceColumn';
 
 const REQUEST_TYPES = ['TIME_OFF', 'SHIFT_CHANGE', 'PERMISSION'] as const;
 const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const;
@@ -147,6 +148,16 @@ const querySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    try {
+      await ensurePeopleServiceColumn();
+    } catch (ensureError) {
+      console.error('[attendance_requests] ensure service column failed', ensureError);
+      return respond(500, {
+        error: 'SERVICE_COLUMN_MISSING',
+        message: 'No fue posible preparar la columna "service" en la tabla de personas. Ejecuta la última migración e inténtalo nuevamente.',
+      });
+    }
+
     const supabase = await createRouteSupabaseClient();
     const {
       data: { user },
@@ -233,6 +244,16 @@ const createSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    try {
+      await ensurePeopleServiceColumn();
+    } catch (ensureError) {
+      console.error('[attendance_requests] ensure service column failed', ensureError);
+      return respond(500, {
+        error: 'SERVICE_COLUMN_MISSING',
+        message: 'No fue posible preparar la columna "service" en la tabla de personas. Ejecuta la última migración e inténtalo nuevamente.',
+      });
+    }
+
     const supabase = await createRouteSupabaseClient();
     const {
       data: { user },
@@ -315,6 +336,16 @@ const updateSchema = z.object({
 
 export async function PATCH(request: NextRequest) {
   try {
+    try {
+      await ensurePeopleServiceColumn();
+    } catch (ensureError) {
+      console.error('[attendance_requests] ensure service column failed', ensureError);
+      return respond(500, {
+        error: 'SERVICE_COLUMN_MISSING',
+        message: 'No fue posible preparar la columna "service" en la tabla de personas. Ejecuta la última migración e inténtalo nuevamente.',
+      });
+    }
+
     const supabase = await createRouteSupabaseClient();
     const {
       data: { user },
