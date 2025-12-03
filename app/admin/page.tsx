@@ -92,7 +92,7 @@ export default async function AdminHomePage() {
         <div className="flex gap-2">
           <a
             href="/asistencia"
-            className="rounded-full border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+            className="rounded-full border border-[rgba(255,255,255,0.12)] bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-[rgba(255,255,255,0.2)] hover:bg-white/16"
           >
             Ir a mi jornada
           </a>

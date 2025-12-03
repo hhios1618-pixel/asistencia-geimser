@@ -227,7 +227,7 @@ export function RequestsClient() {
       {notifications.length > 0 && (
         <aside
           aria-live="polite"
-          className="glass-panel rounded-[26px] border border-indigo-200/70 bg-indigo-50/80 p-4 text-sm text-indigo-900 shadow-[0_18px_50px_-32px_rgba(79,70,229,0.35)]"
+          className="glass-panel rounded-[26px] border border-[rgba(124,200,255,0.22)] bg-white/5 p-4 text-sm text-slate-100 shadow-[0_18px_50px_-32px_rgba(0,0,0,0.6)]"
         >
           <ul className="space-y-2">
             {notifications.map((note) => (
@@ -236,7 +236,7 @@ export function RequestsClient() {
                 <button
                   type="button"
                   onClick={() => dismissNotification(note.id)}
-                  className="rounded-full border border-indigo-200 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                  className="rounded-full border border-[rgba(255,255,255,0.12)] px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
                   aria-label="Descartar notificación"
                 >
                   Cerrar

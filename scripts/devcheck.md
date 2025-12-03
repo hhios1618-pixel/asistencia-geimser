@@ -1,4 +1,4 @@
-# Verificaciones Manuales MVP Asistencia Geimser
+# Verificaciones Manuales MVP Atlas Trace
 
 1. **Marca IN/OUT con recibo y hash**
    - Inicia sesión como trabajador demo.
@@ -26,4 +26,3 @@
 6. **RLS estrictas**
    - Desde el panel trabajador intenta consultar `fetch('/api/attendance/history?personId=...')` con otro `personId`; debe devolver 403.
    - Como admin, realiza la misma consulta y verifica que responde con datos.
-

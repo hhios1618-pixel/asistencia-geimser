@@ -44,10 +44,10 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="flex w-full flex-col gap-6">
       <div className="space-y-4">
-        <label className="group relative block text-sm font-medium text-slate-600">
+        <label className="group relative block text-sm font-medium text-slate-300">
           Correo corporativo
-          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 shadow-sm shadow-slate-200/40 transition focus-within:border-slate-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-slate-900/10">
-            <span className="text-slate-400 transition group-focus-within:text-slate-600">
+          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.65)] transition focus-within:border-[rgba(124,200,255,0.45)] focus-within:bg-white/10 focus-within:ring-2 focus-within:ring-[rgba(124,200,255,0.25)]">
+            <span className="text-slate-400 transition group-focus-within:text-white">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
                 <path d="M2.003 5.884 10 10.882l7.997-4.998A2 2 0 0 0 16.999 4H3.001a2 2 0 0 0-.998 1.884z" />
                 <path d="m18 8.118-8 5-8-5V14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8.118z" />
@@ -57,18 +57,18 @@ export function LoginForm() {
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="h-12 w-full bg-transparent text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
-              placeholder="nombre@geimser.com"
+              className="h-12 w-full bg-transparent text-base text-white placeholder:text-slate-500 focus:outline-none"
+              placeholder="persona@atlastrace.com"
               required
               autoComplete="email"
             />
           </div>
         </label>
 
-        <label className="group relative block text-sm font-medium text-slate-600">
+        <label className="group relative block text-sm font-medium text-slate-300">
           Contraseña
-          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 shadow-sm shadow-slate-200/40 transition focus-within:border-slate-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-slate-900/10">
-            <span className="text-slate-400 transition group-focus-within:text-slate-600">
+          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 shadow-[0_18px_48px_-30px_rgba(0,0,0,0.65)] transition focus-within:border-[rgba(124,200,255,0.45)] focus-within:bg-white/10 focus-within:ring-2 focus-within:ring-[rgba(124,200,255,0.25)]">
+            <span className="text-slate-400 transition group-focus-within:text-white">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
                 <path
                   fillRule="evenodd"
@@ -81,7 +81,7 @@ export function LoginForm() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="h-12 w-full bg-transparent text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
+              className="h-12 w-full bg-transparent text-base text-white placeholder:text-slate-500 focus:outline-none"
               placeholder="••••••••"
               required
               autoComplete="current-password"
@@ -91,7 +91,7 @@ export function LoginForm() {
       </div>
       {error && (
         <p
-          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600"
+          className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100 shadow-[0_18px_48px_-32px_rgba(0,0,0,0.6)]"
           role="alert"
         >
           {error}
@@ -99,11 +99,11 @@ export function LoginForm() {
       )}
       <button
         type="submit"
-        className="group relative flex h-12 items-center justify-center overflow-hidden rounded-2xl bg-slate-900 text-sm font-semibold uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,0.6)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+        className="group relative flex h-12 items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#7cc8ff,#5aa7f5)] text-sm font-semibold uppercase tracking-[0.2em] text-[#05060c] shadow-[0_20px_50px_-24px_rgba(124,200,255,0.55)] transition hover:shadow-[0_26px_70px_-26px_rgba(124,200,255,0.65)] disabled:cursor-not-allowed disabled:bg-slate-500 disabled:text-slate-200"
         disabled={loading}
       >
         <span className="relative z-10">{loading ? 'Ingresando…' : 'Ingresar'}</span>
-        <div className="absolute inset-0 -translate-x-full bg-white/20 transition group-hover:translate-x-0" />
+        <div className="absolute inset-0 -translate-x-full bg-white/30 transition group-hover:translate-x-0" />
       </button>
     </form>
   );

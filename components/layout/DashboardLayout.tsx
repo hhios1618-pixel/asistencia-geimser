@@ -56,7 +56,7 @@ type DashboardLayoutProps = {
 };
 
 const baseNavStyles =
-  'group relative flex items-center gap-3 rounded-[18px] border border-transparent px-4 py-3 text-sm font-medium text-slate-600 transition-all duration-200 ease-out will-change-transform focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
+  'group relative flex items-center gap-3 rounded-[18px] border border-transparent px-4 py-3 text-sm font-medium text-slate-200 transition-all duration-200 ease-out will-change-transform focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]/60';
 
 export function DashboardLayout({
   title,
@@ -79,16 +79,16 @@ export function DashboardLayout({
         href={item.href}
         className={`${baseNavStyles} ${
           active
-            ? 'border-white/80 bg-white text-[var(--accent)] shadow-[0_24px_60px_-35px_rgba(10,132,255,0.48)] ring-1 ring-inset ring-white/50'
-            : 'border-transparent text-slate-500 hover:-translate-y-[1px] hover:border-white/40 hover:bg-white/75 hover:text-slate-900 hover:shadow-[0_20px_48px_-36px_rgba(15,23,42,0.28)]'
+            ? 'border-[rgba(255,255,255,0.14)] bg-white/10 text-white shadow-[0_20px_60px_-30px_rgba(124,200,255,0.55)] ring-1 ring-inset ring-[rgba(255,255,255,0.12)]'
+            : 'border-transparent text-slate-400 hover:-translate-y-[1px] hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white hover:shadow-[0_18px_48px_-36px_rgba(0,0,0,0.45)]'
         }`}
         onClick={() => setSidebarOpen(false)}
       >
         <span
           className={`flex h-9 w-9 items-center justify-center rounded-[14px] transition-all duration-200 ease-out ${
             active
-              ? 'bg-[linear-gradient(135deg,rgba(10,132,255,0.32),rgba(101,206,255,0.22))] text-[var(--accent)] shadow-[0_14px_34px_-22px_rgba(10,132,255,0.55)]'
-              : 'bg-white/55 text-slate-500 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)] group-hover:bg-white group-hover:text-slate-900 group-hover:shadow-[0_12px_32px_-22px_rgba(15,23,42,0.35)]'
+              ? 'border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(135deg,rgba(124,200,255,0.35),rgba(94,234,212,0.25))] text-white shadow-[0_14px_34px_-18px_rgba(124,200,255,0.65)]'
+              : 'border border-[rgba(255,255,255,0.1)] bg-white/5 text-slate-400 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] group-hover:border-[rgba(255,255,255,0.16)] group-hover:bg-white/10 group-hover:text-white group-hover:shadow-[0_12px_32px_-22px_rgba(0,0,0,0.55)]'
           }`}
         >
           <Icon size={20} className="transition-transform duration-200 ease-out group-hover:-translate-y-[2px]" />
@@ -105,7 +105,7 @@ export function DashboardLayout({
       {sidebarOpen && (
         <div
           role="presentation"
-          className="fixed inset-0 z-30 bg-slate-900/30 backdrop-blur-[2px] transition-opacity md:hidden"
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] transition-opacity md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -114,28 +114,28 @@ export function DashboardLayout({
         <button
           type="button"
           onClick={() => setSidebarOpen((open) => !open)}
-          className="fixed right-5 top-5 z-40 flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/70 bg-white/85 text-slate-600 shadow-[0_22px_48px_-28px_rgba(15,23,42,0.32)] backdrop-blur transition-transform duration-200 ease-out active:scale-[0.97] md:hidden"
+          className="fixed right-5 top-5 z-40 flex h-11 w-11 items-center justify-center rounded-[18px] border border-[rgba(255,255,255,0.14)] bg-white/10 text-white shadow-[0_22px_48px_-28px_rgba(0,0,0,0.55)] backdrop-blur transition-transform duration-200 ease-out active:scale-[0.97] md:hidden"
           aria-label="Abrir menú"
         >
-          <IconMenu2 className="text-slate-500" />
+          <IconMenu2 className="text-white" />
         </button>
 
         <div className="flex flex-1 flex-col gap-6 md:grid md:grid-cols-[280px_minmax(0,1fr)] md:items-start md:gap-10 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-14">
           <aside
-            className={`glass-panel before:pointer-events-none before:absolute before:left-6 before:right-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(10,132,255,0.45),rgba(94,234,212,0.2),transparent)] before:opacity-90 before:content-[''] md:before:left-5 md:before:right-5 fixed left-4 right-4 top-4 z-40 flex max-h-[calc(100vh-2rem)] min-h-[calc(100vh-2rem)] w-[min(92vw,320px)] flex-col gap-8 overflow-hidden px-6 py-6 transition-[opacity,transform] duration-300 md:sticky md:left-auto md:right-auto md:top-6 md:max-h-[calc(100vh-3rem)] md:min-h-0 md:w-full md:max-w-none md:translate-x-0 md:self-start md:opacity-100 md:px-5 md:py-6 md:shadow-[0_32px_120px_-70px_rgba(10,132,255,0.28)] md:flex-shrink-0 lg:px-6 lg:py-7 ${
+            className={`glass-panel before:pointer-events-none before:absolute before:left-6 before:right-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(124,200,255,0.6),rgba(94,234,212,0.28),transparent)] before:opacity-90 before:content-[''] md:before:left-5 md:before:right-5 fixed left-4 right-4 top-4 z-40 flex max-h-[calc(100vh-2rem)] min-h-[calc(100vh-2rem)] w-[min(92vw,320px)] flex-col gap-8 overflow-hidden px-6 py-6 transition-[opacity,transform] duration-300 md:sticky md:left-auto md:right-auto md:top-6 md:max-h-[calc(100vh-3rem)] md:min-h-0 md:w-full md:max-w-none md:translate-x-0 md:self-start md:opacity-100 md:px-5 md:py-6 md:shadow-[0_32px_120px_-70px_rgba(0,0,0,0.65)] md:flex-shrink-0 lg:px-6 lg:py-7 ${
               sidebarOpen
                 ? 'translate-x-0 opacity-100 pointer-events-auto md:translate-x-0 md:pointer-events-auto'
                 : '-translate-x-[calc(100%+2.75rem)] opacity-0 pointer-events-none md:opacity-100 md:translate-x-0 md:pointer-events-auto'
             }`}
           >
-            <div className="flex items-center justify-between gap-4 border-b border-white/40 pb-4">
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
               <Link href="/admin" className="flex items-center gap-3 text-left transition-transform duration-200 hover:-translate-y-[1px]">
-                <span className="flex h-11 w-11 items-center justify-center rounded-[20px] bg-[linear-gradient(140deg,#0a84ff,#74c0ff)] text-lg font-semibold text-white shadow-[0_20px_50px_-28px_rgba(10,132,255,0.6)]">
-                  AG
+                <span className="flex h-11 w-11 items-center justify-center rounded-[20px] bg-[linear-gradient(140deg,#7cc8ff,#9dd8ff)] text-lg font-semibold text-[#05060c] shadow-[0_20px_50px_-28px_rgba(124,200,255,0.7)]">
+                  AT
                 </span>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-400">Geimser</p>
-                  <p className="text-base font-semibold text-slate-900">Control Corporativo</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-300">Atlas Trace</p>
+                  <p className="text-base font-semibold text-white">Trazabilidad en vivo</p>
                 </div>
               </Link>
               <button
@@ -144,7 +144,7 @@ export function DashboardLayout({
                 onClick={() => setSidebarOpen(false)}
                 aria-label="Cerrar menú"
               >
-                <IconX className="text-slate-400" />
+                <IconX className="text-slate-300" />
               </button>
             </div>
             <nav
@@ -154,17 +154,17 @@ export function DashboardLayout({
               {navItems.map(renderNavItem)}
             </nav>
             {sidebarFooter ?? (
-              <div className="rounded-[18px] border border-white/60 bg-[linear-gradient(150deg,rgba(10,132,255,0.08),rgba(125,211,252,0.08),rgba(255,255,255,0.9))] p-4 text-sm text-indigo-900 shadow-[0_24px_55px_-32px_rgba(10,132,255,0.28)]">
-                <p className="text-xs uppercase tracking-[0.28em] text-[var(--accent)]/80">Estado</p>
-                <p className="mt-2 font-semibold text-slate-900">Operación estable</p>
-                <p className="text-xs text-slate-500">Sin incidentes críticos reportados.</p>
+              <div className="rounded-[18px] border border-[rgba(255,255,255,0.14)] bg-[linear-gradient(150deg,rgba(124,200,255,0.12),rgba(94,234,212,0.08),rgba(255,255,255,0.04))] p-4 text-sm text-slate-100 shadow-[0_24px_55px_-32px_rgba(0,0,0,0.55)]">
+                <p className="text-xs uppercase tracking-[0.28em] text-[var(--accent)]/90">Estado</p>
+                <p className="mt-2 font-semibold text-white">Operación estable</p>
+                <p className="text-xs text-slate-400">Sin incidentes críticos reportados.</p>
               </div>
             )}
           </aside>
 
           <div className="flex flex-1 flex-col gap-6 md:pt-2">
-            <header className="glass-panel relative mx-auto w-full max-w-[1180px] rounded-[34px] px-6 py-7 shadow-[0_32px_90px_-65px_rgba(15,23,42,0.35)] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(10,132,255,0.45),rgba(139,92,246,0.28),transparent)] before:content-[''] sm:px-9 md:py-8 lg:px-12">
-              <div className="flex flex-wrap items-start justify-between gap-6 text-slate-700">
+            <header className="glass-panel relative mx-auto w-full max-w-[1180px] rounded-[34px] px-6 py-7 shadow-[0_32px_100px_-65px_rgba(0,0,0,0.6)] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(124,200,255,0.6),rgba(139,92,246,0.32),transparent)] before:content-[''] sm:px-9 md:py-8 lg:px-12">
+              <div className="flex flex-wrap items-start justify-between gap-6 text-slate-200">
                 <div className="min-w-[240px] flex-1">
                   {breadcrumb && breadcrumb.length > 0 && (
                     <nav className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
@@ -182,8 +182,8 @@ export function DashboardLayout({
                       ))}
                     </nav>
                   )}
-                  <h1 className="text-[28px] font-semibold leading-tight text-slate-900 md:text-[32px]">{title}</h1>
-                  {description && <p className="mt-2 text-sm text-slate-500">{description}</p>}
+                  <h1 className="text-[28px] font-semibold leading-tight text-white md:text-[32px]">{title}</h1>
+                  {description && <p className="mt-2 text-sm text-slate-400">{description}</p>}
                 </div>
                 {actions && <div className="flex flex-wrap gap-3">{actions}</div>}
               </div>

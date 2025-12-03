@@ -1,4 +1,4 @@
--- Utility functions for Asistencia Geimser
+-- Utility functions for Asistencia Atlas Trace
 
 create or replace function fn_compute_mark_hash(prev_hash text, payload jsonb)
 returns text
@@ -130,4 +130,3 @@ begin
     return new_id;
 end;
 $$;
-

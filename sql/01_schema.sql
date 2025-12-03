@@ -1,4 +1,4 @@
--- Asistencia Geimser core schema
+-- Asistencia Atlas Trace core schema
 -- Ensure required extensions
 create extension if not exists pgcrypto;
 

@@ -3,11 +3,11 @@
 type Variant = 'default' | 'success' | 'warning' | 'danger' | 'info';
 
 const variantClasses: Record<Variant, string> = {
-  default: 'border-slate-200 bg-slate-50 text-slate-600',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-600',
-  warning: 'border-amber-200 bg-amber-50 text-amber-600',
-  danger: 'border-rose-200 bg-rose-50 text-rose-600',
-  info: 'border-blue-200 bg-blue-50 text-blue-600',
+  default: 'border-[rgba(255,255,255,0.2)] bg-white/10 text-slate-100',
+  success: 'border-emerald-400/50 bg-emerald-400/10 text-emerald-100',
+  warning: 'border-amber-400/60 bg-amber-400/10 text-amber-100',
+  danger: 'border-rose-400/50 bg-rose-400/10 text-rose-100',
+  info: 'border-sky-400/60 bg-sky-400/10 text-sky-100',
 };
 
 type StatusBadgeProps = {

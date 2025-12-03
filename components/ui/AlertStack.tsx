@@ -31,12 +31,12 @@ type AlertStackProps = {
 
 export function AlertStack({ title, description, items, emptyMessage = 'Sin alertas recientes.' }: AlertStackProps) {
   return (
-    <section className="glass-panel flex h-full flex-col rounded-3xl border border-white/70 bg-white/95 p-6 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.55)]">
+    <section className="glass-panel flex h-full flex-col rounded-3xl border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_24px_80px_-52px_rgba(0,0,0,0.65)]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Alertas</p>
-          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-          {description && <p className="text-xs text-slate-500">{description}</p>}
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          {description && <p className="text-xs text-slate-400">{description}</p>}
         </div>
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto">
@@ -44,16 +44,16 @@ export function AlertStack({ title, description, items, emptyMessage = 'Sin aler
         {items.map((item) => (
           <article
             key={item.id}
-            className="rounded-2xl border border-slate-100 bg-white/90 px-4 py-3 text-sm text-slate-600 shadow-[0_16px_40px_-32px_rgba(15,23,42,0.25)]"
+            className="rounded-2xl border border-[rgba(255,255,255,0.1)] bg-white/5 px-4 py-3 text-sm text-slate-200 shadow-[0_16px_40px_-32px_rgba(0,0,0,0.5)]"
           >
             <div className="flex items-center justify-between gap-3">
-              <p className="font-semibold text-slate-800">{item.title}</p>
+              <p className="font-semibold text-white">{item.title}</p>
               {item.severity && (
                 <StatusBadge label={severityLabel[item.severity]} variant={severityVariant[item.severity]} />
               )}
             </div>
-            {item.detail && <p className="mt-1 text-xs text-slate-500">{item.detail}</p>}
-            <p className="mt-2 text-[11px] uppercase tracking-[0.3em] text-slate-400">
+            {item.detail && <p className="mt-1 text-xs text-slate-400">{item.detail}</p>}
+            <p className="mt-2 text-[11px] uppercase tracking-[0.3em] text-slate-500">
               {new Intl.DateTimeFormat('es-CL', {
                 hour: '2-digit',
                 minute: '2-digit',
