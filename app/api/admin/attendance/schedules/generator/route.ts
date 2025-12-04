@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
-import type { Tables } from '../../../../../types/database';
+import { createRouteSupabaseClient } from '../../../../../../lib/supabase/server';
+import type { Tables } from '../../../../../../types/database';
 
 export const runtime = 'nodejs';
 

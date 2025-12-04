@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
-import { runQuery } from '../../../../../lib/db/postgres';
-import type { Tables } from '../../../../../types/database';
+import { createRouteSupabaseClient } from '../../../../../../lib/supabase/server';
+import { runQuery } from '../../../../../../lib/db/postgres';
+import type { Tables } from '../../../../../../types/database';
 
 export const runtime = 'nodejs';
 
