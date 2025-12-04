@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Manual de uso · Asistencia Geimser</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 32px 18px 60px;
+    }
+    header.page-head {
+      max-width: 1080px;
+      margin: 0 auto 22px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px 26px;
+      box-shadow: 0 18px 48px -28px rgba(15, 23, 42, 0.22);
+    }
+    h1 { margin: 0 0 10px; font-size: 28px; }
+    h2 { margin-top: 32px; margin-bottom: 12px; font-size: 22px; }
+    h3 { margin-top: 20px; margin-bottom: 10px; font-size: 18px; }
+    p { margin: 8px 0; color: var(--muted); }
+    code {
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 0.95em;
+    }
+    ul { padding-left: 20px; color: var(--muted); }
+    li { margin: 6px 0; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #075985;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+    .toc {
+      max-width: 1080px;
+      margin: 0 auto 28px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 22px;
+    }
+    .toc ol { margin: 0; padding-left: 22px; }
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .card {
+      max-width: 1080px;
+      margin: 0 auto 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 14px 42px -26px rgba(15, 23, 42, 0.2);
+    }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .highlight {
+      border-left: 4px solid var(--accent);
+      padding-left: 12px;
+      color: var(--muted);
+      background: #f8fafc;
+      border-radius: 10px;
+    }
+    @media (max-width: 640px) {
+      body { padding: 22px 14px 48px; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-head">
+    <h1>Manual de uso · Asistencia Geimser</h1>
+    <p>Guía rápida para operar el sistema de marcaje, sitios, turnos y solicitudes.</p>
+    <div class="highlight">
+      <strong>Roles soportados:</strong> <span class="badge">Trabajador</span> · <span class="badge">Supervisor</span> · <span class="badge">Administrador</span> · <span class="badge">DT Viewer</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <strong>Contenido</strong>
+    <ol>
+      <li><a href="#que-es">¿Qué es Asistencia Geimser?</a></li>
+      <li><a href="#acceso">Acceso y requisitos</a></li>
+      <li><a href="#roles">Navegación por rol</a></li>
+      <li><a href="#trabajador">Guía rápida para trabajadores</a></li>
+      <li><a href="#supervisor">Guía rápida para supervisores</a></li>
+      <li><a href="#admin">Guía rápida para administradores</a></li>
+      <li><a href="#turnos">Turnos y carga de horarios</a></li>
+      <li><a href="#modulos">Módulos clave</a></li>
+      <li><a href="#buenas-practicas">Buenas prácticas y ayuda</a></li>
+    </ol>
+  </nav>
+
+  <section id="que-es" class="card">
+    <h2>¿Qué es Asistencia Geimser?</h2>
+    <p>Plataforma web para controlar asistencia con geocerca, reportes en tiempo real, solicitudes y auditoría. Incluye paneles diferenciados por rol y generación de recibos firmados por cada marcaje.</p>
+  </section>
+
+  <section id="acceso" class="card">
+    <h2>Acceso y requisitos</h2>
+    <ul>
+      <li>URL de inicio de sesión: <code>/login</code>. Solo personal autorizado; utiliza tus credenciales corporativas.</li>
+      <li>Requiere permitir geolocalización segura (https). En contextos inseguros verás el mensaje “La geolocalización requiere un origen seguro”.</li>
+      <li>Se puede trabajar sin conexión: las marcas se encolan en la bandeja de sincronización y se reenvían cuando vuelva la red.</li>
+      <li>Soporta cierre de sesión directo desde cualquier panel (botón “Cerrar sesión”).</li>
+    </ul>
+  </section>
+
+  <section id="roles" class="card">
+    <h2>Navegación por rol</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Trabajador</h3>
+        <ul>
+          <li>Entrada principal: <code>/asistencia</code>.</li>
+          <li>Menú: Mi jornada, Historial, Solicitudes, Alertas.</li>
+          <li>Puede marcar IN/OUT, ver geocerca, historial y enviar solicitudes a su supervisor.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Supervisor</h3>
+        <ul>
+          <li>Entrada: <code>/supervisor</code>.</li>
+          <li>Menú: Resumen, Equipo, Solicitudes, Sitios asignados, Alertas.</li>
+          <li>Ve métricas de sus sitios, aprueba/rechaza solicitudes y monitorea alertas.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Administrador</h3>
+        <ul>
+          <li>Entrada: <code>/admin</code> y <code>/admin/asistencia</code>.</li>
+          <li>Menú: Resumen, Asistencia, Personas, Sitios, Turnos, Alertas, Auditoría, Políticas, Acceso DT.</li>
+          <li>Gestiona usuarios, sitios con geocerca, turnos, alertas, reportes y políticas.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>DT Viewer</h3>
+        <ul>
+          <li>Acceso de solo lectura para reportes/documentación en el panel administrativo.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="trabajador" class="card">
+    <h2>Guía rápida para trabajadores</h2>
+    <h3>1) Marcar entrada o salida</h3>
+    <ul>
+      <li>Ingresa a <code>/asistencia</code> y permite el uso de ubicación.</li>
+      <li>Selecciona un sitio asignado en “Sitio seleccionado”. Verás el estado de geocerca (distancia y radio permitido).</li>
+      <li>Presiona “Marcar entrada” o “Marcar salida”. Si no hay conexión, la marca se encola automáticamente y aparecerá en la bandeja “Sincronización offline”.</li>
+      <li>Cada marca genera un recibo digital descargable para auditoría.</li>
+    </ul>
+    <h3>2) Historial y recibos</h3>
+    <ul>
+      <li>Abre “Historial” o desplázate al final de la página de jornada.</li>
+      <li>Filtra por fecha y tipo de evento; exporta CSV con el botón “Exportar CSV”.</li>
+      <li>Descarga recibos individuales con “Ver recibo”.</li>
+    </ul>
+    <h3>3) Solicitudes</h3>
+    <ul>
+      <li>En <code>/asistencia/solicitudes</code> crea solicitudes de <strong>Permiso/Día libre</strong>, <strong>Cambio de turno</strong> o <strong>Permiso puntual</strong>.</li>
+      <li>Define rango de fechas/horas, supervisor a cargo (si hay más de uno) y motivo. Estados: Pendiente, Aprobada, Rechazada o Cancelada.</li>
+      <li>Las actualizaciones llegan en tiempo real si la pestaña está abierta.</li>
+    </ul>
+    <h3>4) Alertas personales</h3>
+    <ul>
+      <li>En <code>/asistencia/alertas</code> ves notificaciones agrupadas por tipo (se actualizan cada minuto).</li>
+      <li>Puedes refrescar manualmente con el botón “Actualizar”.</li>
+    </ul>
+  </section>
+
+  <section id="supervisor" class="card">
+    <h2>Guía rápida para supervisores</h2>
+    <h3>Panel de resumen (<code>/supervisor</code>)</h3>
+    <ul>
+      <li>KPIs: colaboradores activos, sitios asignados, alertas pendientes, marcas de hoy.</li>
+      <li>Actividad reciente: últimas marcas y alertas de tus sitios.</li>
+      <li>Acciones rápidas hacia alertas, control de asistencia y sitios asignados.</li>
+    </ul>
+    <h3>Equipo</h3>
+    <ul>
+      <li><code>/supervisor/equipo</code>: listado de personas bajo tu supervisión con sus sitios asignados.</li>
+    </ul>
+    <h3>Solicitudes del equipo</h3>
+    <ul>
+      <li><code>/supervisor/solicitudes</code>: bandeja de permisos/cambios. Filtra por estado, tipo y servicio.</li>
+      <li>Aprobar o rechazar agrega una nota opcional; las novedades llegan en tiempo real.</li>
+    </ul>
+    <h3>Control y alertas</h3>
+    <ul>
+      <li>Monitorea <code>/supervisor/alertas</code> para incidentes y márcalas como resueltas una vez atendidas.</li>
+      <li>En <code>/supervisor</code> revisa “Marcas de hoy” y “Actividad reciente” para confirmar que el equipo marcó en sus sitios.</li>
+    </ul>
+    <h3>Sitios asignados</h3>
+    <ul>
+      <li><code>/supervisor/sitios</code>: resumen por locación (dotación, marcas del día).</li>
+    </ul>
+    <h3>Alertas</h3>
+    <ul>
+      <li><code>/supervisor/alertas</code>: incidencias registradas en tus sitios, con estado Pendiente/Resuelta.</li>
+    </ul>
+  </section>
+
+  <section id="admin" class="card">
+    <h2>Guía rápida para administradores</h2>
+    <h3>Resumen ejecutivo (<code>/admin</code>)</h3>
+    <ul>
+      <li>Métricas globales: personas activas/inactivas, sitios operativos, marcas 30 días.</li>
+      <li>Actividad semanal, top de sitios y últimas incorporaciones.</li>
+      <li>Acciones rápidas hacia asistencia, personas, sitios y reportes DT.</li>
+    </ul>
+    <h3>Panel de asistencia (<code>/admin/asistencia</code>)</h3>
+    <p class="highlight">Las secciones se eligen desde la grilla de tarjetas (“Resumen”, “Personas”, “Sitios”, “Turnos”, “Alertas”, “Correcciones”, “Auditoría”, “Políticas”, “Acceso DT”).</p>
+    <ul>
+      <li><strong>Resumen:</strong> KPIs corporativos, distribución IN/OUT, top sitios y últimas personas creadas.</li>
+      <li><strong>Personas:</strong> crear/editar usuarios con rol (Trabajador, Supervisor, Admin, DT Viewer), servicio, RUT y estado. Asigna sitios y supervisores, genera contraseñas temporales o restablece credenciales. Filtros por rol, sitio, servicio y texto libre.</li>
+      <li><strong>Sitios:</strong> administra nombre, dirección, lat/lng, radio de geocerca y estado. Búsqueda de direcciones con sugerencias y mapa para mover el marcador. Permite activar/inactivar o eliminar sitios.</li>
+      <li><strong>Turnos semanales:</strong> selecciona un colaborador y aplica plantillas (Turno 1–6) o configura horarios personalizados por día (lun–sáb) con minutos de colación. Puedes borrar un día para marcarlo como libre y revisar feriados chilenos de la semana antes de guardar.</li>
+      <li><strong>Alertas:</strong> consola central de incidencias (lectura) para seguimiento corporativo.</li>
+      <li><strong>Correcciones:</strong> bandeja de solicitudes de ajuste de marcajes.</li>
+      <li><strong>Auditoría:</strong> registro de eventos y cambios para trazabilidad.</li>
+      <li><strong>Políticas:</strong> definición de reglas de tolerancia y configuraciones generales de asistencia.</li>
+      <li><strong>Acceso DT:</strong> exportes y reportes para Dirección del Trabajo o clientes externos.</li>
+    </ul>
+  </section>
+
+  <section id="turnos" class="card">
+    <h2>Turnos y carga de horarios</h2>
+    <p class="highlight">Solo los administradores ven y editan la sección “Turnos”. Supervisores y trabajadores no pueden modificar horarios; solo los usan como referencia.</p>
+    <h3>Cómo crear o editar turnos (administrador)</h3>
+    <ul>
+      <li>Entra a <code>/admin/asistencia</code> y elige la tarjeta “Turnos”.</li>
+      <li>Selecciona el colaborador a configurar.</li>
+      <li>Usa una plantilla (Turno 1–6) o activa “Horario personalizado” y ajusta hora de inicio, fin y colación por día.</li>
+      <li>Desactiva el día para dejarlo libre si no trabaja. Puedes moverte de semana con “Semana anterior/Siguiente”.</li>
+      <li>Revisa feriados de la semana (se muestran en línea) y luego presiona “Guardar”.</li>
+      <li>Si no ves cambios, recarga la página o vuelve a seleccionar al colaborador.</li>
+    </ul>
+    <h3>Supervisores y control diario</h3>
+    <ul>
+      <li>Verifica en <code>/supervisor</code> que las “Marcas de hoy” coincidan con los turnos asignados.</li>
+      <li>Si un colaborador no marcó, revisa <code>/supervisor/alertas</code> y comunícate con él o registra la incidencia.</li>
+    </ul>
+  </section>
+
+  <section id="modulos" class="card">
+    <h2>Módulos clave y rutas rápidas</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Marcaje y geocerca</h3>
+        <ul>
+          <li>Ruta: <code>/asistencia</code>.</li>
+          <li>Validación por GPS; muestra distancia al centro y radio permitido.</li>
+          <li>Soporta modo offline y reintentos automáticos.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Historial y recibos</h3>
+        <ul>
+          <li>Ruta: <code>/asistencia/historial</code> o sección “Historial”.</li>
+          <li>Filtros por rango de fecha y tipo de evento; exporta CSV.</li>
+          <li>Descarga de recibo por marca con comprobante digital visible.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Solicitudes</h3>
+        <ul>
+          <li>Trabajador: <code>/asistencia/solicitudes</code>.</li>
+          <li>Supervisor (equipo): <code>/supervisor/solicitudes</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Sitios y geocercas</h3>
+        <ul>
+          <li>Administrador: <code>/admin/asistencia?panel=sites</code>.</li>
+          <li>Supervisor (solo lectura de asignados): <code>/supervisor/sitios</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Personas y credenciales</h3>
+        <ul>
+          <li>Ruta admin: <code>/admin/asistencia?panel=people</code>.</li>
+          <li>Permite alta/baja, asignar sitios, rol y supervisores; generar contraseña temporal.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Turnos</h3>
+        <ul>
+          <li>Ruta admin: <code>/admin/asistencia?panel=schedules</code>.</li>
+          <li>Plantillas predefinidas y edición manual por día; elimina días no laborables.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Alertas</h3>
+        <ul>
+          <li>Trabajador: <code>/asistencia/alertas</code>.</li>
+          <li>Supervisor: <code>/supervisor/alertas</code>.</li>
+          <li>Administrador: <code>/admin/asistencia?panel=alerts</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Reportes y DT</h3>
+        <ul>
+          <li>Rutas admin: <code>/admin</code> (overview) y <code>/admin/asistencia?panel=dt</code> para exportes PDF/CSV.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="buenas-practicas" class="card">
+    <h2>Buenas prácticas y ayuda</h2>
+    <ul>
+      <li><strong>Ubicación precisa:</strong> activa GPS/Ubicación alta precisión y verifica estar dentro del radio mostrado antes de marcar.</li>
+      <li><strong>Red:</strong> si marcas sin conexión, deja abierta la pestaña hasta que la bandeja “Sincronización offline” indique éxito.</li>
+      <li><strong>Datos de personas:</strong> mantén el servicio y RUT actualizados para reportes correctos y asigna al menos un sitio activo.</li>
+      <li><strong>Supervisores:</strong> siempre asigna supervisores a trabajadores para que puedan enviar solicitudes.</li>
+      <li><strong>Auditoría:</strong> descarga recibos cuando requieras evidencia externa.</li>
+      <li><strong>Soporte:</strong> contacto sugerido: <a href="mailto:soporte@geimser.com">soporte@geimser.com</a>.</li>
+    </ul>
+  </section>
+</body>
+</html>

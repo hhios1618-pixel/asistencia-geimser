@@ -43,6 +43,18 @@ create table if not exists schedules (
     created_at timestamptz not null default now()
 );
 
+create table if not exists schedule_batches (
+    id uuid primary key default gen_random_uuid(),
+    label text,
+    week_label text,
+    source text,
+    created_by uuid references people(id) on delete set null,
+    total_rows integer not null default 0,
+    imported_rows integer not null default 0,
+    dry_run boolean not null default false,
+    created_at timestamptz not null default now()
+);
+
 create table if not exists attendance_marks (
     id uuid primary key default gen_random_uuid(),
     person_id uuid not null references people(id) on delete restrict,
