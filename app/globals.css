@@ -30,6 +30,18 @@ body {
   min-height: 100%;
 }
 
+html {
+  font-size: 90%;
+}
+
+@supports (zoom: 1) {
+  @media (min-width: 1024px) {
+    body {
+      zoom: 0.78;
+    }
+  }
+}
+
 body {
   margin: 0;
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
