@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, addWeeks, endOfWeek, format, getYear, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { IconCloudUpload, IconWand, IconFileSpreadsheet } from '@tabler/icons-react';
+import SectionHeader from '../../../../components/ui/SectionHeader';
 
 type PersonOption = {
   id: string;
@@ -810,8 +811,8 @@ export function TurnosAdmin() {
               onClick={() => setActiveTurnTab(tab.id as typeof activeTurnTab)}
               className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
                 active
-                  ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-[0_12px_30px_-18px_rgba(59,130,246,0.6)]'
-                  : 'border-white/70 bg-white/80 text-slate-600 hover:border-blue-200 hover:bg-white'
+                  ? 'border-[rgba(124,200,255,0.45)] bg-[rgba(124,200,255,0.14)] text-white shadow-[0_18px_55px_-40px_rgba(124,200,255,0.55)]'
+                  : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10'
               }`}
             >
               {tab.icon}
@@ -823,30 +824,29 @@ export function TurnosAdmin() {
 
       {activeTurnTab === 'manual' && (
         <>
-          <header className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/70 bg-white/80 p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.55)]">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Gestión de turnos semanales</h2>
-              <p className="text-sm text-slate-500">
-                Define jornadas de lunes a sábado alineadas con la jornada laboral chilena de 44 horas.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-                onClick={() => handleWeekChange('prev')}
-              >
-                Semana anterior
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-                onClick={() => handleWeekChange('next')}
-              >
-                Semana siguiente
-              </button>
-            </div>
-          </header>
+          <SectionHeader
+            overline="Planificación"
+            title="Gestión de turnos semanales"
+            description="Define jornadas de lunes a sábado alineadas con la jornada laboral chilena de 44 horas."
+            actions={
+              <>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15 hover:text-white"
+                  onClick={() => handleWeekChange('prev')}
+                >
+                  Semana anterior
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15 hover:text-white"
+                  onClick={() => handleWeekChange('next')}
+                >
+                  Semana siguiente
+                </button>
+              </>
+            }
+          />
 
       <div className="glass-panel grid gap-4 rounded-3xl border border-white/60 bg-white/85 p-5 md:grid-cols-3">
         <label className="flex flex-col gap-2 text-sm">

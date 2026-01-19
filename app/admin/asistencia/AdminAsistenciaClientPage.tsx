@@ -18,7 +18,7 @@ export default function AdminAsistenciaClientPage() {
         <div className="flex gap-2">
           <a
             href="/asistencia"
-            className="rounded-full border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-sm font-semibold text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-100"
+            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-[0_18px_55px_-40px_rgba(0,0,0,0.75)] transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15 hover:text-white"
           >
             Ir a mi jornada
           </a>
@@ -39,4 +39,3 @@ export default function AdminAsistenciaClientPage() {
     </DashboardLayout>
   );
 }
-

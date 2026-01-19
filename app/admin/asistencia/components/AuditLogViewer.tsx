@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBrowserSupabase } from '../../../../lib/hooks/useBrowserSupabase';
 import type { Tables } from '../../../../types/database';
+import SectionHeader from '../../../../components/ui/SectionHeader';
 
 export function AuditLogViewer() {
   const supabase = useBrowserSupabase();
@@ -43,13 +44,11 @@ export function AuditLogViewer() {
 
   return (
     <section className="flex flex-col gap-6">
-      <header className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/70 bg-white/80 p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.55)]">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Auditoría</p>
-          <h2 className="text-xl font-semibold text-slate-900">Registro de eventos</h2>
-          <p className="text-sm text-slate-500">Consulta los últimos movimientos realizados por los distintos actores.</p>
-        </div>
-      </header>
+      <SectionHeader
+        overline="Auditoría"
+        title="Registro de eventos"
+        description="Consulta los últimos movimientos realizados por los distintos actores."
+      />
       {error && <p className="text-sm text-rose-500">{error}</p>}
       <div className="glass-panel max-h-[420px] overflow-auto rounded-3xl border border-white/60 bg-white/90">
         <table className="w-full border-collapse text-xs">

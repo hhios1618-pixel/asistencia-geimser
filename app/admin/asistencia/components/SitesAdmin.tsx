@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { DragEndEvent, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import SectionHeader from '../../../../components/ui/SectionHeader';
 
 interface Site {
   id: string;
@@ -314,19 +315,20 @@ export function SitesAdmin() {
 
   return (
     <section className="flex flex-col gap-6">
-      <header className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/70 bg-white/80 p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.55)]">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">Sitios</h2>
-          <p className="text-sm text-slate-500">Define las ubicaciones, direcciones y radios de geocerca.</p>
-        </div>
-        <button
-          type="button"
-          className="rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(59,130,246,0.75)] transition hover:from-blue-600 hover:to-indigo-600"
-          onClick={startCreation}
-        >
-          Nuevo sitio
-        </button>
-      </header>
+      <SectionHeader
+        overline="Geocercas"
+        title="Sitios"
+        description="Define las ubicaciones, direcciones y radios de geocerca."
+        actions={
+          <button
+            type="button"
+            className="rounded-full bg-[linear-gradient(135deg,rgba(124,200,255,0.9),rgba(90,156,255,0.85))] px-5 py-2 text-sm font-semibold text-[#05060c] shadow-[0_18px_55px_-40px_rgba(124,200,255,0.65)] transition hover:shadow-[0_24px_70px_-44px_rgba(124,200,255,0.75)]"
+            onClick={startCreation}
+          >
+            Nuevo sitio
+          </button>
+        }
+      />
       {loading && <p className="text-sm text-slate-500">Cargando sitios…</p>}
       {error && <p className="text-sm text-rose-500">{error}</p>}
       {success && <p className="glass-panel border border-emerald-200/70 bg-emerald-50/70 p-3 text-sm text-emerald-700">{success}</p>}
