@@ -39,59 +39,60 @@ const respond = (status: number, payload: unknown) =>
   });
 
 export async function POST(request: NextRequest) {
-  const supabase = await createRouteSupabaseClient();
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !authData?.user) {
-    return respond(401, { error: 'UNAUTHENTICATED' });
-  }
-
-
-  let body: z.infer<typeof bodySchema>;
-  try {
-    body = bodySchema.parse(await request.json());
-  } catch (parseError) {
-    return respond(400, { error: 'INVALID_BODY', details: (parseError as Error).message });
-  }
-
-  const { data: person, error: personError } = await supabase
-    .from('people')
-    .select('*')
-    .eq('id', authData.user.id as string)
-    .maybeSingle<Tables['people']['Row']>();
-
-  if (personError || !person) {
-    return respond(403, { error: 'PERSON_NOT_FOUND' });
-  }
-
-  if (!person.is_active) {
-    return respond(403, { error: 'PERSON_INACTIVE' });
-  }
-
-  const isManager = person.role === 'ADMIN' || person.role === 'SUPERVISOR';
-
-  let serviceSupabase: ReturnType<typeof getServiceSupabase>;
-  try {
-    serviceSupabase = getServiceSupabase();
-  } catch (error) {
-    return respond(503, { error: 'SERVICE_NOT_CONFIGURED', details: (error as Error).message });
-  }
+  const requestId = randomUUID();
 
   try {
-    await ensureConsentVersion(supabase, person.id, 'GEO', GEO_CONSENT_VERSION);
-  } catch (consentError) {
-    const message = (consentError as Error).message;
-    if (message !== 'CONSENT_GEO_MISSING') {
-      return respond(409, { error: message });
+    const supabase = await createRouteSupabaseClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authData?.user) {
+      return respond(401, { error: 'UNAUTHENTICATED' });
     }
 
-    const acceptedVersion = body.consent?.geoAcceptedVersion;
-    if (acceptedVersion !== GEO_CONSENT_VERSION) {
-      return respond(409, { error: message, requiredVersion: GEO_CONSENT_VERSION });
+    let body: z.infer<typeof bodySchema>;
+    try {
+      body = bodySchema.parse(await request.json());
+    } catch (parseError) {
+      return respond(400, { error: 'INVALID_BODY', details: (parseError as Error).message });
+    }
+
+    const { data: person, error: personError } = await supabase
+      .from('people')
+      .select('*')
+      .eq('id', authData.user.id as string)
+      .maybeSingle<Tables['people']['Row']>();
+
+    if (personError || !person) {
+      return respond(403, { error: 'PERSON_NOT_FOUND' });
+    }
+
+    if (!person.is_active) {
+      return respond(403, { error: 'PERSON_INACTIVE' });
+    }
+
+    const isManager = person.role === 'ADMIN' || person.role === 'SUPERVISOR';
+
+    let serviceSupabase: ReturnType<typeof getServiceSupabase>;
+    try {
+      serviceSupabase = getServiceSupabase();
+    } catch (error) {
+      return respond(503, { error: 'SERVICE_NOT_CONFIGURED', details: (error as Error).message });
     }
 
     try {
-      await serviceSupabase
+      await ensureConsentVersion(supabase, person.id, 'GEO', GEO_CONSENT_VERSION);
+    } catch (consentError) {
+      const message = (consentError as Error).message;
+      if (message !== 'CONSENT_GEO_MISSING') {
+        return respond(409, { error: message });
+      }
+
+      const acceptedVersion = body.consent?.geoAcceptedVersion;
+      if (acceptedVersion !== GEO_CONSENT_VERSION) {
+        return respond(409, { error: message, requiredVersion: GEO_CONSENT_VERSION });
+      }
+
+      const { error: upsertError } = await serviceSupabase
         .from('consent_logs')
         .upsert(
           {
@@ -103,203 +104,210 @@ export async function POST(request: NextRequest) {
           } as never,
           { onConflict: 'person_id,consent_type,version', ignoreDuplicates: true }
         );
-    } catch (recordError) {
-      return respond(500, { error: 'CONSENT_RECORD_FAILED', details: (recordError as Error).message });
-    }
-  }
-
-  const { data: site, error: siteError } = await serviceSupabase
-    .from('sites')
-    .select('*')
-    .eq('id', body.siteId)
-    .maybeSingle<Tables['sites']['Row']>();
-
-  if (siteError || !site) {
-    return respond(404, { error: 'SITE_NOT_ACCESSIBLE' });
-  }
-
-  if (!isManager) {
-    const { data: assignment, error: assignmentError } = await serviceSupabase
-      .from('people_sites')
-      .select('active')
-      .eq('person_id', person.id)
-      .eq('site_id', body.siteId)
-      .maybeSingle<{ active: boolean }>();
-
-    if (assignmentError && assignmentError.code !== 'PGRST116') {
-      return respond(500, { error: 'ASSIGNMENT_LOOKUP_FAILED', details: assignmentError.message });
+      if (upsertError) {
+        return respond(500, { error: 'CONSENT_RECORD_FAILED', details: upsertError.message });
+      }
     }
 
-    if (!assignment?.active) {
+    const { data: site, error: siteError } = await serviceSupabase
+      .from('sites')
+      .select('*')
+      .eq('id', body.siteId)
+      .maybeSingle<Tables['sites']['Row']>();
+
+    if (siteError || !site) {
       return respond(404, { error: 'SITE_NOT_ACCESSIBLE' });
     }
-  }
 
-  if (site.is_active === false) {
-    return respond(403, { error: 'SITE_INACTIVE' });
-  }
+    if (!isManager) {
+      const { data: assignment, error: assignmentError } = await serviceSupabase
+        .from('people_sites')
+        .select('active')
+        .eq('person_id', person.id)
+        .eq('site_id', body.siteId)
+        .maybeSingle<{ active: boolean }>();
 
-  if (site.radius_m > 0) {
-    if (!body.geo) {
-      return respond(422, { error: 'GEO_REQUIRED' });
+      if (assignmentError && assignmentError.code !== 'PGRST116') {
+        return respond(500, { error: 'ASSIGNMENT_LOOKUP_FAILED', details: assignmentError.message });
+      }
+
+      if (!assignment?.active) {
+        return respond(404, { error: 'SITE_NOT_ACCESSIBLE' });
+      }
     }
-    const geofence = getGeofenceStatus({
-      site: { lat: site.lat, lng: site.lng },
-      point: { lat: body.geo.lat, lng: body.geo.lng },
-      radius: site.radius_m,
-    });
 
-    if (geofence.status === 'fail') {
-      return respond(422, { error: 'OUTSIDE_GEOFENCE', details: geofence });
+    if (site.is_active === false) {
+      return respond(403, { error: 'SITE_INACTIVE' });
     }
-  }
 
-  const { data: prevMark } = await supabase
-    .from('attendance_marks')
-    .select('*')
-    .eq('person_id', person.id)
-    .order('event_ts', { ascending: false })
-    .limit(1)
-    .maybeSingle<Tables['attendance_marks']['Row']>();
+    if (site.radius_m > 0) {
+      if (!body.geo) {
+        return respond(422, { error: 'GEO_REQUIRED' });
+      }
+      const geofence = getGeofenceStatus({
+        site: { lat: site.lat, lng: site.lng },
+        point: { lat: body.geo.lat, lng: body.geo.lng },
+        radius: site.radius_m,
+      });
 
-  const prevHash = prevMark?.hash_self ?? null;
-  const markId = randomUUID();
-  const eventTs = new Date().toISOString();
+      if (geofence.status === 'fail') {
+        return respond(422, { error: 'OUTSIDE_GEOFENCE', details: geofence });
+      }
+    }
 
-  const payload = {
-    personId: person.id,
-    siteId: site.id,
-    eventType: body.eventType,
-    eventTs,
-    clientTs: body.clientTs,
-    geo: body.geo
-      ? {
-          lat: body.geo.lat,
-          lng: body.geo.lng,
-          acc: body.geo.acc,
-        }
-      : undefined,
-    deviceId: body.deviceId,
-    note: body.note,
-  } as const;
+    const { data: prevMark } = await supabase
+      .from('attendance_marks')
+      .select('*')
+      .eq('person_id', person.id)
+      .order('event_ts', { ascending: false })
+      .limit(1)
+      .maybeSingle<Tables['attendance_marks']['Row']>();
 
-  const hashSelf = computeHash(payload, prevHash);
-  const storagePath = `marks/${person.id}/${markId}.pdf`;
+    const prevHash = prevMark?.hash_self ?? null;
+    const markId = randomUUID();
+    const eventTs = new Date().toISOString();
 
-  const markInsert: TableInsert<'attendance_marks'> = {
-    id: markId,
-    person_id: person.id,
-    site_id: site.id,
-    event_type: body.eventType,
-    event_ts: eventTs,
-    geo_lat: body.geo?.lat ?? null,
-    geo_lng: body.geo?.lng ?? null,
-    geo_acc: body.geo?.acc ?? null,
-    device_id: body.deviceId,
-    client_ts: body.clientTs ?? null,
-    note: body.note ?? null,
-    hash_prev: prevHash,
-    hash_self: hashSelf,
-    receipt_url: storagePath,
-  };
+    const payload = {
+      personId: person.id,
+      siteId: site.id,
+      eventType: body.eventType,
+      eventTs,
+      clientTs: body.clientTs,
+      geo: body.geo
+        ? {
+            lat: body.geo.lat,
+            lng: body.geo.lng,
+            acc: body.geo.acc,
+          }
+        : undefined,
+      deviceId: body.deviceId,
+      note: body.note,
+    } as const;
 
-  const { error: insertError, data: insertedMark } = await supabase
-    .from('attendance_marks')
-    .insert(markInsert as never)
-    .select('*')
-    .maybeSingle<Tables['attendance_marks']['Row']>();
+    const hashSelf = computeHash(payload, prevHash);
+    const storagePath = `marks/${person.id}/${markId}.pdf`;
 
-  if (insertError || !insertedMark) {
-    return respond(500, { error: 'MARK_INSERT_FAILED', details: insertError?.message });
-  }
-
-  const receiptUrl = await generateAndStoreReceipt(
-    {
-      mark: insertedMark as Tables['attendance_marks']['Row'],
-      person: person as Tables['people']['Row'],
-      site: site as Tables['sites']['Row'],
-      hashChain: {
-        prev: prevHash,
-        self: hashSelf,
-      },
-    },
-    { storagePath }
-  );
-
-  const markDate = eventTs.substring(0, 10);
-  const { data: sameDayMarks, error: sameDayError } = await serviceSupabase
-    .from('attendance_marks')
-    .select('*')
-    .eq('person_id', person.id)
-    .gte('event_ts', `${markDate}T00:00:00Z`)
-    .lte('event_ts', `${markDate}T23:59:59Z`)
-    .order('event_ts', { ascending: true });
-
-  if (sameDayError) {
-    await writeAuditTrail(serviceSupabase, {
-      actorId: person.id,
-      action: 'attendance.alerts.failed_fetch',
-      entity: 'attendance_marks',
-      entityId: markId,
-      before: null,
-      after: { error: sameDayError.message },
-    }).catch(() => undefined);
-  }
-
-  const { data: schedule, error: scheduleError } = await serviceSupabase
-    .from('schedules')
-    .select('*')
-    .eq('person_id', person.id)
-    .eq('day_of_week', new Date(eventTs).getDay())
-    .maybeSingle();
-
-  if (scheduleError && scheduleError.code !== 'PGRST116') {
-    await writeAuditTrail(serviceSupabase, {
-      actorId: person.id,
-      action: 'attendance.alerts.schedule_lookup_failed',
-      entity: 'schedules',
-      entityId: person.id,
-      before: null,
-      after: { error: scheduleError.message },
-    }).catch(() => undefined);
-  }
-
-  const alerts = evaluateAlerts({
-    mark: insertedMark as Tables['attendance_marks']['Row'],
-    previousMark: prevMark ? (prevMark as Tables['attendance_marks']['Row']) : null,
-    sameDayMarks: sameDayMarks ?? [],
-    activeSchedule: schedule ?? null,
-  });
-
-  if (alerts.length > 0) {
-    await serviceSupabase
-      .from('alerts')
-      .insert(buildAlertRecords(person.id, alerts) as never);
-  }
-
-  await writeAuditTrail(serviceSupabase, {
-    actorId: person.id,
-    action: 'attendance.mark',
-    entity: 'attendance_marks',
-    entityId: markId,
-    after: {
+    const markInsert: TableInsert<'attendance_marks'> = {
       id: markId,
+      person_id: person.id,
+      site_id: site.id,
       event_type: body.eventType,
       event_ts: eventTs,
-      site_id: site.id,
-      person_id: person.id,
+      geo_lat: body.geo?.lat ?? null,
+      geo_lng: body.geo?.lng ?? null,
+      geo_acc: body.geo?.acc ?? null,
+      device_id: body.deviceId,
+      client_ts: body.clientTs ?? null,
+      note: body.note ?? null,
+      hash_prev: prevHash,
       hash_self: hashSelf,
-    },
-    ip: request.headers.get('x-forwarded-for'),
-    userAgent: request.headers.get('user-agent'),
-  });
+      receipt_url: storagePath,
+    };
 
-  return respond(201, {
-    id: markId,
-    event_ts: eventTs,
-    event_type: body.eventType,
-    site_id: site.id,
-    receipt_url: receiptUrl,
-    hash: hashSelf,
-  });
+    const { error: insertError, data: insertedMark } = await supabase
+      .from('attendance_marks')
+      .insert(markInsert as never)
+      .select('*')
+      .maybeSingle<Tables['attendance_marks']['Row']>();
+
+    if (insertError || !insertedMark) {
+      return respond(500, { error: 'MARK_INSERT_FAILED', details: insertError?.message });
+    }
+
+    let receiptUrl: string | null = null;
+    try {
+      receiptUrl = await generateAndStoreReceipt(
+        {
+          mark: insertedMark as Tables['attendance_marks']['Row'],
+          person: person as Tables['people']['Row'],
+          site: site as Tables['sites']['Row'],
+          hashChain: {
+            prev: prevHash,
+            self: hashSelf,
+          },
+        },
+        { storagePath }
+      );
+    } catch (receiptError) {
+      console.warn('[attendance_mark] receipt failed', { requestId, error: (receiptError as Error).message });
+    }
+
+    const markDate = eventTs.substring(0, 10);
+    const { data: sameDayMarks, error: sameDayError } = await serviceSupabase
+      .from('attendance_marks')
+      .select('*')
+      .eq('person_id', person.id)
+      .gte('event_ts', `${markDate}T00:00:00Z`)
+      .lte('event_ts', `${markDate}T23:59:59Z`)
+      .order('event_ts', { ascending: true });
+
+    if (sameDayError) {
+      await writeAuditTrail(serviceSupabase, {
+        actorId: person.id,
+        action: 'attendance.alerts.failed_fetch',
+        entity: 'attendance_marks',
+        entityId: markId,
+        before: null,
+        after: { error: sameDayError.message },
+      }).catch(() => undefined);
+    }
+
+    const { data: schedule, error: scheduleError } = await serviceSupabase
+      .from('schedules')
+      .select('*')
+      .eq('person_id', person.id)
+      .eq('day_of_week', new Date(eventTs).getDay())
+      .maybeSingle();
+
+    if (scheduleError && scheduleError.code !== 'PGRST116') {
+      await writeAuditTrail(serviceSupabase, {
+        actorId: person.id,
+        action: 'attendance.alerts.schedule_lookup_failed',
+        entity: 'schedules',
+        entityId: person.id,
+        before: null,
+        after: { error: scheduleError.message },
+      }).catch(() => undefined);
+    }
+
+    const alerts = evaluateAlerts({
+      mark: insertedMark as Tables['attendance_marks']['Row'],
+      previousMark: prevMark ? (prevMark as Tables['attendance_marks']['Row']) : null,
+      sameDayMarks: sameDayMarks ?? [],
+      activeSchedule: schedule ?? null,
+    });
+
+    if (alerts.length > 0) {
+      await serviceSupabase.from('alerts').insert(buildAlertRecords(person.id, alerts) as never);
+    }
+
+    await writeAuditTrail(serviceSupabase, {
+      actorId: person.id,
+      action: 'attendance.mark',
+      entity: 'attendance_marks',
+      entityId: markId,
+      after: {
+        id: markId,
+        event_type: body.eventType,
+        event_ts: eventTs,
+        site_id: site.id,
+        person_id: person.id,
+        hash_self: hashSelf,
+      },
+      ip: request.headers.get('x-forwarded-for'),
+      userAgent: request.headers.get('user-agent'),
+    });
+
+    return respond(201, {
+      id: markId,
+      event_ts: eventTs,
+      event_type: body.eventType,
+      site_id: site.id,
+      receipt_url: receiptUrl,
+      hash: hashSelf,
+    });
+  } catch (unexpected) {
+    console.error('[attendance_mark] unexpected', { requestId, error: (unexpected as Error).message });
+    return respond(500, { error: 'MARK_FAILED', requestId });
+  }
 }

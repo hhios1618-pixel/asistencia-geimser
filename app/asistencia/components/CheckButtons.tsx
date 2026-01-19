@@ -24,6 +24,7 @@ export type SuccessfulMark = {
 };
 
 const DEVICE_KEY = 'asistencia_device_id';
+const GEO_CONSENT_KEY = 'asistencia_geo_consent_version';
 
 const getDeviceId = () => {
   if (typeof window === 'undefined') {
@@ -36,6 +37,21 @@ const getDeviceId = () => {
   const generated = crypto.randomUUID();
   window.localStorage.setItem(DEVICE_KEY, generated);
   return generated;
+};
+
+const getStoredGeoConsentVersion = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const version = window.localStorage.getItem(GEO_CONSENT_KEY);
+  return version && version.trim().length > 0 ? version : null;
+};
+
+const storeGeoConsentVersion = (version: string) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(GEO_CONSENT_KEY, version);
 };
 
 const requestPosition = (): Promise<GeolocationPosition> =>
@@ -178,6 +194,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
       try {
         const position = await requestPosition();
         const deviceId = getDeviceId();
+        const storedConsent = getStoredGeoConsentVersion();
         const payload: MarkPayload = {
           eventType,
           siteId,
@@ -188,6 +205,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
             lng: position.coords.longitude,
             acc: position.coords.accuracy,
           },
+          ...(storedConsent ? { consent: { geoAcceptedVersion: storedConsent } } : {}),
         };
 
         if (!navigator.onLine) {
@@ -351,6 +369,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
                         );
                       }
                       onSuccess?.(result.data);
+                      storeGeoConsentVersion(GEO_CONSENT_VERSION);
                     }
                     setConsentOpen(false);
                     setPendingPayload(null);
