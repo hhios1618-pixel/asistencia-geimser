@@ -62,6 +62,7 @@ type MarkPayload = {
   clientTs: string;
   deviceId: string;
   geo: { lat: number; lng: number; acc?: number };
+  consent?: { geoAcceptedVersion: string };
 };
 
 type ApiError = { error?: string; details?: string; requiredVersion?: string };
@@ -114,20 +115,6 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
 
     const data = (await response.json()) as MarkResponse;
     return { ok: true as const, status: response.status, data };
-  };
-
-  const acceptGeoConsent = async () => {
-    setError(null);
-    const response = await fetch('/api/privacy/consent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ consentType: 'GEO', version: GEO_CONSENT_VERSION }),
-    });
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as ApiError;
-      throw new Error(body.details ?? body.error ?? 'No fue posible registrar el consentimiento.');
-    }
   };
 
   const resolveGeoError = (geoError: unknown) => {
@@ -307,9 +294,11 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
                     setConsentBusy(true);
                     setConsentError(null);
                     setLoadingEvent(pendingPayload?.eventType ?? 'IN');
-                    await acceptGeoConsent();
                     if (pendingPayload) {
-                      const result = await markRequest(pendingPayload);
+                      const result = await markRequest({
+                        ...pendingPayload,
+                        consent: { geoAcceptedVersion: GEO_CONSENT_VERSION },
+                      });
                       if (!result.ok) {
                         throw new Error(result.body.details ?? result.errorCode ?? 'Error al registrar marca');
                       }
