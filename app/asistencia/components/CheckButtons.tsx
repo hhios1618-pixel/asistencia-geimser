@@ -96,6 +96,8 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
   const [error, setError] = useState<string | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<MarkPayload | null>(null);
+  const [consentBusy, setConsentBusy] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   const markRequest = async (payload: MarkPayload) => {
     const response = await fetch('/api/attendance/mark', {
@@ -187,6 +189,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
           if (result.errorCode === 'CONSENT_GEO_MISSING') {
             setPendingPayload(payload);
             setConsentOpen(true);
+            setConsentError(null);
             setError('Debes aceptar el consentimiento de geolocalización para marcar tu asistencia.');
             return;
           }
@@ -281,22 +284,28 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
               Para confirmar tu asistencia necesitamos registrar tu ubicación y validar la geocerca del sitio. Esto solo se usa
               para el marcaje y auditoría.
             </p>
+            {consentError && <p className="mt-3 text-sm text-rose-200">{consentError}</p>}
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10 disabled:opacity-60"
+                disabled={consentBusy}
                 onClick={() => {
                   setConsentOpen(false);
                   setPendingPayload(null);
+                  setConsentError(null);
                 }}
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] hover:from-emerald-600 hover:to-teal-600"
+                className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60"
+                disabled={consentBusy}
                 onClick={async () => {
                   try {
+                    setConsentBusy(true);
+                    setConsentError(null);
                     setLoadingEvent(pendingPayload?.eventType ?? 'IN');
                     await acceptGeoConsent();
                     if (pendingPayload) {
@@ -310,13 +319,14 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
                     setPendingPayload(null);
                     setError(null);
                   } catch (consentErr) {
-                    setError((consentErr as Error).message);
+                    setConsentError((consentErr as Error).message);
                   } finally {
+                    setConsentBusy(false);
                     setLoadingEvent(null);
                   }
                 }}
               >
-                Aceptar y continuar
+                {consentBusy ? 'Aceptando…' : 'Aceptar y continuar'}
               </button>
             </div>
           </div>
