@@ -28,7 +28,11 @@ type PoolSlot = {
 let poolSlot: PoolSlot | null = null;
 
 const getConnectionString = () => {
-  const url = process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  const pooledUrl = process.env.POSTGRES_URL;
+  const nonPooledUrl = process.env.POSTGRES_URL_NON_POOLING;
+  const preferPooled = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+
+  const url = preferPooled ? pooledUrl ?? nonPooledUrl : nonPooledUrl ?? pooledUrl;
   if (!url) {
     throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL must be defined');
   }
@@ -63,6 +67,25 @@ const shouldResetPool = (error: unknown) => {
   return false;
 };
 
+const isConnectionLimitError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const pgError = error as { code?: string; message?: string };
+  if (pgError.code === '53300') {
+    return true; // too_many_connections
+  }
+  const message = typeof pgError.message === 'string' ? pgError.message : '';
+  return (
+    message.includes('MaxClientsInSessionMode') ||
+    message.toLowerCase().includes('max clients reached') ||
+    message.toLowerCase().includes('max client connections reached') ||
+    message.toLowerCase().includes('too many clients')
+  );
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const resetPool = async () => {
   if (!poolSlot) {
     return;
@@ -78,10 +101,18 @@ const resetPool = async () => {
 
 const createPool = () => {
   const connectionString = getConnectionString();
-  const pool = new Pool({
+  const poolMaxRaw = process.env.PG_POOL_MAX;
+  const poolMax = poolMaxRaw ? Math.max(1, Number.parseInt(poolMaxRaw, 10)) : process.env.VERCEL === '1' ? 3 : 10;
+  const baseConfig = {
     connectionString,
     ssl: { rejectUnauthorized: false },
-  });
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    allowExitOnIdle: process.env.VERCEL === '1',
+  } as unknown as Record<string, unknown>;
+
+  baseConfig.max = Number.isFinite(poolMax) ? poolMax : 3;
+  const pool = new Pool(baseConfig as never);
   pool.on('error', (error) => {
     console.error('[postgres] pool error', error);
     if (shouldResetPool(error)) {
@@ -107,6 +138,10 @@ export const runQuery = async <T = unknown>(query: string, params: unknown[] = [
   try {
     return await getPool().query<T>(query, params);
   } catch (error) {
+    if (isConnectionLimitError(error)) {
+      await sleep(250 + Math.floor(Math.random() * 250));
+      return await getPool().query<T>(query, params);
+    }
     if (shouldResetPool(error)) {
       await resetPool();
       return getPool().query<T>(query, params);
