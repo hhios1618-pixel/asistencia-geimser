@@ -14,11 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Atlas Trace',
-    template: '%s | Atlas Trace',
+    default: 'G-Trace',
+    template: '%s | G-Trace',
   },
   description:
-    'Atlas Trace® es el sistema inteligente de asistencia y trazabilidad que integra identificación biométrica, georreferencia, marcaje de entradas y salidas, rutas diarias y reportes automáticos. Todo sincronizado directamente con Atlas Suite, creando un flujo de control operativo sin fricción.',
+    'G-Trace® es el sistema inteligente de asistencia y trazabilidad que integra identificación biométrica, georreferencia, marcaje de entradas y salidas, rutas diarias y reportes automáticos. Todo sincronizado con la suite corporativa, creando un flujo de control operativo sin fricción.',
 };
 
 export default function RootLayout({

@@ -128,17 +128,17 @@ export default async function LoginPage() {
             <header className="space-y-8">
               <div className="inline-flex items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-2 shadow-[0_24px_60px_-38px_rgba(0,0,0,0.55)] ring-1 ring-white/5 backdrop-blur-xl">
                 <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#7cc8ff,#9dd8ff)] text-sm font-semibold text-[#05060c] shadow-[0_18px_40px_-18px_rgba(124,200,255,0.7)]">
-                  AT
+                  GT
                 </span>
                 <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-200">Atlas Trace</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-200">G-Trace</p>
                   <p className="text-xs text-slate-400">Presencia real. Datos reales. Decisiones inteligentes.</p>
                 </div>
               </div>
               <div className="space-y-4">
-                <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">Atlas Trace®</h1>
+                <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">G-Trace®</h1>
                 <p className="max-w-2xl text-base leading-relaxed text-slate-300">
-                  Atlas Trace® es el sistema inteligente de asistencia y trazabilidad que integra identificación biométrica, georreferencia, marcaje de entradas y salidas, rutas diarias y reportes automáticos. Todo sincronizado directamente con Atlas Suite, creando un flujo de control operativo sin fricción.
+                  G-Trace® es el sistema inteligente de asistencia y trazabilidad que integra identificación biométrica, georreferencia, marcaje de entradas y salidas, rutas diarias y reportes automáticos. Todo sincronizado con la suite corporativa, creando un flujo de control operativo sin fricción.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -148,12 +148,12 @@ export default async function LoginPage() {
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_22px_60px_-40px_rgba(0,0,0,0.5)]">
                   <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Decisiones inteligentes</p>
-                  <p className="mt-1 text-sm text-slate-200">Reportes automáticos y sincronización directa con Atlas Suite.</p>
+                  <p className="mt-1 text-sm text-slate-200">Reportes automáticos y sincronización directa con tu suite corporativa.</p>
                 </div>
               </div>
             </header>
             <footer className="hidden text-sm text-slate-500 lg:block">
-              © {currentYear} Atlas Trace. Todos los derechos reservados.
+              © {currentYear} G-Trace. Todos los derechos reservados.
             </footer>
           </div>
 
@@ -163,7 +163,7 @@ export default async function LoginPage() {
             <div className="relative space-y-6">
               <div className="space-y-2 text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Ingreso seguro</p>
-                <h2 className="text-3xl font-semibold text-white">Accede a Atlas Trace</h2>
+                <h2 className="text-3xl font-semibold text-white">Accede a G-Trace</h2>
                 <p className="text-sm text-slate-400">
                   Identifícate con tu correo corporativo para continuar.
                 </p>

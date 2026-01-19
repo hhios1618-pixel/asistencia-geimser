@@ -1,8 +1,8 @@
--- Seed data for Asistencia Atlas Trace MVP
+-- Seed data for Asistencia G-Trace MVP
 
 insert into people (id, rut, name, service, role, is_active, email)
 values
-    ('00000000-0000-0000-0000-000000000001', '12.345.678-9', 'Admin Atlas Trace', 'Administración', 'ADMIN', true, 'admin@atlastrace.com'),
+    ('00000000-0000-0000-0000-000000000001', '12.345.678-9', 'Admin G-Trace', 'Administración', 'ADMIN', true, 'admin@atlastrace.com'),
     ('00000000-0000-0000-0000-000000000002', '98.765.432-1', 'Trabajador Demo', 'Operaciones', 'WORKER', true, 'worker@atlastrace.com')
 on conflict (id) do nothing;
 

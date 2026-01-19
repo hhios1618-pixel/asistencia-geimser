@@ -1,4 +1,4 @@
--- Utility functions for Asistencia Atlas Trace
+-- Utility functions for Asistencia G-Trace
 
 create or replace function fn_compute_mark_hash(prev_hash text, payload jsonb)
 returns text

@@ -131,10 +131,10 @@ export function DashboardLayout({
             <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
               <Link href="/admin" className="flex items-center gap-3 text-left transition-transform duration-200 hover:-translate-y-[1px]">
                 <span className="flex h-11 w-11 items-center justify-center rounded-[20px] bg-[linear-gradient(140deg,#7cc8ff,#9dd8ff)] text-lg font-semibold text-[#05060c] shadow-[0_20px_50px_-28px_rgba(124,200,255,0.7)]">
-                  AT
+                  GT
                 </span>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-300">Atlas Trace</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-300">G-Trace</p>
                   <p className="text-base font-semibold text-white">Trazabilidad en vivo</p>
                 </div>
               </Link>

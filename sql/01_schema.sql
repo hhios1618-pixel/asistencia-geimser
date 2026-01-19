@@ -1,4 +1,4 @@
--- Asistencia Atlas Trace core schema
+-- Asistencia G-Trace core schema
 -- Ensure required extensions
 create extension if not exists pgcrypto;
 
