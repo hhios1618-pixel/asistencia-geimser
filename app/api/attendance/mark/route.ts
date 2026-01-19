@@ -3,7 +3,6 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import { ensureConsentVersion, GEO_CONSENT_VERSION } from '../../../../lib/privacy/consent';
-import { runQuery } from '../../../../lib/db/postgres';
 import { getGeofenceStatus } from '../../../../lib/geo/geofence';
 import { computeHash } from '../../../../lib/dt/hashchain';
 import { generateAndStoreReceipt } from '../../../../lib/dt/receipts';
@@ -39,48 +38,6 @@ const respond = (status: number, payload: unknown) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-type TableTarget = { schema: 'public' | 'asistencia'; name: string; qualified: string };
-
-const resolveTableTarget = async (name: string): Promise<TableTarget> => {
-  const { rows } = await runQuery<{ table_schema: 'public' | 'asistencia'; table_type: string }>(
-    `select table_schema, table_type
-     from information_schema.tables
-     where table_name = $1
-       and table_schema in ('public', 'asistencia')
-     order by case when table_schema = 'public' then 0 else 1 end`,
-    [name]
-  );
-
-  const base = rows.find((row) => row.table_type === 'BASE TABLE');
-  const first = rows[0];
-  const schema = (base?.table_schema ?? first?.table_schema ?? 'public') as TableTarget['schema'];
-  return { schema, name, qualified: `${schema}.${name}` };
-};
-
-let consentTarget: TableTarget | null = null;
-const getConsentTarget = async () => {
-  if (consentTarget) {
-    return consentTarget;
-  }
-  consentTarget = await resolveTableTarget('consent_logs');
-  return consentTarget;
-};
-
-const recordGeoConsent = async (params: {
-  personId: string;
-  version: string;
-  ip: string | null;
-  userAgent: string | null;
-}) => {
-  const target = await getConsentTarget();
-  await runQuery(
-    `insert into ${target.qualified} (person_id, consent_type, version, ip, user_agent)
-     values ($1, 'GEO', $2, $3, $4)
-     on conflict (person_id, consent_type, version) do nothing`,
-    [params.personId, params.version, params.ip, params.userAgent]
-  );
-};
-
 export async function POST(request: NextRequest) {
   const supabase = await createRouteSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -113,6 +70,13 @@ export async function POST(request: NextRequest) {
 
   const isManager = person.role === 'ADMIN' || person.role === 'SUPERVISOR';
 
+  let serviceSupabase: ReturnType<typeof getServiceSupabase>;
+  try {
+    serviceSupabase = getServiceSupabase();
+  } catch (error) {
+    return respond(503, { error: 'SERVICE_NOT_CONFIGURED', details: (error as Error).message });
+  }
+
   try {
     await ensureConsentVersion(supabase, person.id, 'GEO', GEO_CONSENT_VERSION);
   } catch (consentError) {
@@ -127,18 +91,22 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await recordGeoConsent({
-        personId: person.id,
-        version: GEO_CONSENT_VERSION,
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent'),
-      });
+      await serviceSupabase
+        .from('consent_logs')
+        .upsert(
+          {
+            person_id: person.id,
+            consent_type: 'GEO',
+            version: GEO_CONSENT_VERSION,
+            ip: request.headers.get('x-forwarded-for'),
+            user_agent: request.headers.get('user-agent'),
+          } as never,
+          { onConflict: 'person_id,consent_type,version', ignoreDuplicates: true }
+        );
     } catch (recordError) {
       return respond(500, { error: 'CONSENT_RECORD_FAILED', details: (recordError as Error).message });
     }
   }
-
-  const serviceSupabase = getServiceSupabase();
 
   const { data: site, error: siteError } = await serviceSupabase
     .from('sites')

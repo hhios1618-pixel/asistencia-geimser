@@ -101,20 +101,29 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
   const [consentError, setConsentError] = useState<string | null>(null);
 
   const markRequest = async (payload: MarkPayload) => {
-    const response = await fetch('/api/attendance/mark', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await fetch('/api/attendance/mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as ApiError;
-      const errorCode = body.error ?? 'MARK_FAILED';
-      return { ok: false as const, status: response.status, body, errorCode };
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as ApiError;
+        const errorCode = body.error ?? 'MARK_FAILED';
+        return { ok: false as const, status: response.status, body, errorCode };
+      }
+
+      const data = (await response.json()) as MarkResponse;
+      return { ok: true as const, status: response.status, data };
+    } catch (error) {
+      return {
+        ok: false as const,
+        status: 0,
+        body: { details: (error as Error).message } as ApiError,
+        errorCode: 'NETWORK_ERROR',
+      };
     }
-
-    const data = (await response.json()) as MarkResponse;
-    return { ok: true as const, status: response.status, data };
   };
 
   const resolveGeoError = (geoError: unknown) => {
@@ -138,6 +147,8 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
     switch (api.errorCode) {
       case 'SITE_NOT_ACCESSIBLE':
         return 'Sitio no accesible. Pide a un administrador que te asigne al sitio (people_sites) o revisa que esté activo.';
+      case 'SERVICE_NOT_CONFIGURED':
+        return 'Servidor sin configuración completa (SERVICE_NOT_CONFIGURED). Contacta al administrador.';
       case 'SITE_INACTIVE':
         return 'El sitio está inactivo. Contacta a un administrador.';
       case 'GEO_REQUIRED':
@@ -150,6 +161,9 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
         return api.details ? `${api.errorCode}: ${api.details}` : api.errorCode;
     }
   };
+
+  const shouldEnqueue = (status: number, errorCode: string) =>
+    status === 0 || status === 502 || status === 503 || status === 504 || errorCode === 'NETWORK_ERROR';
 
   const handleMark = useCallback(
     async (eventType: 'IN' | 'OUT') => {
@@ -197,7 +211,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
             setError('Debes aceptar el consentimiento de geolocalización para marcar tu asistencia.');
             return;
           }
-          if (result.status >= 500) {
+          if (shouldEnqueue(result.status, result.errorCode ?? 'MARK_FAILED')) {
             const pending: PendingMark = {
               id: crypto.randomUUID(),
               ...payload,
@@ -208,7 +222,9 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
             setError('Servidor indisponible. Marca encolada.');
             return;
           }
-          throw new Error(resolveMarkError({ errorCode: result.errorCode ?? 'MARK_FAILED', details: result.body.details }));
+          throw new Error(
+            resolveMarkError({ errorCode: result.errorCode ?? 'MARK_FAILED', details: result.body.details })
+          );
         }
 
         onSuccess?.(result.data);
@@ -317,6 +333,19 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
                         consent: { geoAcceptedVersion: GEO_CONSENT_VERSION },
                       });
                       if (!result.ok) {
+                        if (shouldEnqueue(result.status, result.errorCode ?? 'MARK_FAILED')) {
+                          const pending: PendingMark = {
+                            id: crypto.randomUUID(),
+                            ...pendingPayload,
+                            createdAt: Date.now(),
+                          };
+                          await offlineQueue.add(pending);
+                          onQueued?.(pending);
+                          setConsentOpen(false);
+                          setPendingPayload(null);
+                          setError('Servidor indisponible. Marca encolada.');
+                          return;
+                        }
                         throw new Error(
                           resolveMarkError({ errorCode: result.errorCode ?? 'MARK_FAILED', details: result.body.details })
                         );
