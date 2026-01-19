@@ -30,11 +30,49 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 
 export const runtime = 'nodejs';
 
+type TableTarget = { schema: 'public' | 'asistencia'; name: string; qualified: string };
+
+const resolveTableTarget = async (name: string): Promise<TableTarget> => {
+  const { rows } = await runQuery<{ table_schema: 'public' | 'asistencia'; table_type: string }>(
+    `select table_schema, table_type
+     from information_schema.tables
+     where table_name = $1
+       and table_schema in ('public', 'asistencia')
+     order by case when table_schema = 'public' then 0 else 1 end`,
+    [name]
+  );
+
+  const base = rows.find((row) => row.table_type === 'BASE TABLE');
+  const first = rows[0];
+  const schema = (base?.table_schema ?? first?.table_schema ?? 'public') as TableTarget['schema'];
+  return { schema, name, qualified: `${schema}.${name}` };
+};
+
+let sitesTarget: TableTarget | null = null;
+const getSitesTarget = async () => {
+  if (sitesTarget) {
+    return sitesTarget;
+  }
+  sitesTarget = await resolveTableTarget('sites');
+  return sitesTarget;
+};
+
+let peopleSitesTarget: TableTarget | null = null;
+const getPeopleSitesTarget = async () => {
+  if (peopleSitesTarget) {
+    return peopleSitesTarget;
+  }
+  peopleSitesTarget = await resolveTableTarget('people_sites');
+  return peopleSitesTarget;
+};
+
 let addressColumnEnsured = false;
 const ensureAddressColumn = async () => {
   if (addressColumnEnsured) {
     return;
   }
+
+  const sites = await getSitesTarget();
 
   const columnExists = async (schema: string) => {
     const { rows } = await runQuery<{ exists: boolean }>(
@@ -50,30 +88,12 @@ const ensureAddressColumn = async () => {
     return Boolean(rows[0]?.exists);
   };
 
-  if ((await columnExists('public')) || (await columnExists('asistencia'))) {
+  if (await columnExists(sites.schema)) {
     addressColumnEnsured = true;
     return;
   }
 
-  const statements = [
-    "alter table if exists asistencia.sites add column if not exists address text",
-    "alter table if exists public.sites add column if not exists address text",
-  ];
-
-  for (const statement of statements) {
-    try {
-      await runQuery(statement);
-      addressColumnEnsured = true;
-      return;
-    } catch (error) {
-      const pgError = error as { code?: string };
-      if (pgError?.code && ['42809', '3F000', '42P01'].includes(pgError.code)) {
-        continue;
-      }
-      throw error;
-    }
-  }
-
+  await runQuery(`alter table if exists ${sites.qualified} add column if not exists address text`);
   addressColumnEnsured = true;
 };
 
@@ -100,7 +120,8 @@ export async function GET() {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
   await ensureAddressColumn();
-  const { rows } = await runQuery<Tables['sites']['Row']>('select * from public.sites order by created_at');
+  const sites = await getSitesTarget();
+  const { rows } = await runQuery<Tables['sites']['Row']>(`select * from ${sites.qualified} order by created_at`);
   const parsed = rows.map((row) => ({
     ...row,
     lat: typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat)),
@@ -124,9 +145,10 @@ export async function POST(request: NextRequest) {
 
   try {
     await ensureAddressColumn();
+    const sites = await getSitesTarget();
     const address = payload.address ?? null;
     const { rows } = await runQuery<Tables['sites']['Row']>(
-      `insert into public.sites (name, address, lat, lng, radius_m, is_active)
+      `insert into ${sites.qualified} (name, address, lat, lng, radius_m, is_active)
        values ($1, $2, $3, $4, $5, $6)
        returning *`,
       [
@@ -163,8 +185,9 @@ export async function PATCH(request: NextRequest) {
 
   try {
     await ensureAddressColumn();
+    const sites = await getSitesTarget();
     if (entries.length === 0) {
-      const { rows } = await runQuery<Tables['sites']['Row']>('select * from public.sites where id = $1', [id]);
+      const { rows } = await runQuery<Tables['sites']['Row']>(`select * from ${sites.qualified} where id = $1`, [id]);
       return NextResponse.json({ item: rows[0] ?? null });
     }
 
@@ -172,7 +195,7 @@ export async function PATCH(request: NextRequest) {
     const params = [id, ...entries.map(([, value]) => value)];
 
     const { rows } = await runQuery<Tables['sites']['Row']>(
-      `update public.sites set ${setters} where id = $1 returning *`,
+      `update ${sites.qualified} set ${setters} where id = $1 returning *`,
       params
     );
 
@@ -198,8 +221,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await runQuery('delete from public.people_sites where site_id = $1', [id]);
-    await runQuery('delete from public.sites where id = $1', [id]);
+    const peopleSites = await getPeopleSitesTarget();
+    const sites = await getSitesTarget();
+    await runQuery(`delete from ${peopleSites.qualified} where site_id = $1`, [id]);
+    await runQuery(`delete from ${sites.qualified} where id = $1`, [id]);
   } catch (error) {
     return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }
