@@ -4,6 +4,7 @@ import { useState, useCallback, type SVGProps } from 'react';
 import { offlineQueue, type PendingMark } from '../../../lib/offline/queue';
 import type { Tables } from '../../../types/database';
 import { insecureGeolocationMessage, isSecureForGeolocation } from '../../../lib/utils/geoSecurity';
+import { GEO_CONSENT_VERSION } from '../../../lib/privacy/consent';
 
 interface Props {
   siteId: string | null;
@@ -55,6 +56,15 @@ const requestPosition = (): Promise<GeolocationPosition> =>
   });
 
 type MarkResponse = SuccessfulMark;
+type MarkPayload = {
+  eventType: 'IN' | 'OUT';
+  siteId: string;
+  clientTs: string;
+  deviceId: string;
+  geo: { lat: number; lng: number; acc?: number };
+};
+
+type ApiError = { error?: string; details?: string; requiredVersion?: string };
 
 const ClockIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} {...props}>
@@ -84,6 +94,56 @@ const ArrowIcon = (props: SVGProps<SVGSVGElement>) => (
 export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disabled }: Props) {
   const [loadingEvent, setLoadingEvent] = useState<'IN' | 'OUT' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<MarkPayload | null>(null);
+
+  const markRequest = async (payload: MarkPayload) => {
+    const response = await fetch('/api/attendance/mark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as ApiError;
+      const errorCode = body.error ?? 'MARK_FAILED';
+      return { ok: false as const, status: response.status, body, errorCode };
+    }
+
+    const data = (await response.json()) as MarkResponse;
+    return { ok: true as const, status: response.status, data };
+  };
+
+  const acceptGeoConsent = async () => {
+    setError(null);
+    const response = await fetch('/api/privacy/consent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ consentType: 'GEO', version: GEO_CONSENT_VERSION }),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as ApiError;
+      throw new Error(body.details ?? body.error ?? 'No fue posible registrar el consentimiento.');
+    }
+  };
+
+  const resolveGeoError = (geoError: unknown) => {
+    const err = geoError as { code?: number; message?: string };
+    if (typeof err?.code !== 'number') {
+      return (geoError as Error).message ?? 'No fue posible obtener tu ubicación.';
+    }
+    switch (err.code) {
+      case 1:
+        return 'Permiso de ubicación denegado. Actívalo en tu navegador/celular y vuelve a intentar.';
+      case 2:
+        return 'No fue posible determinar tu ubicación. Revisa tu conexión/GPS y vuelve a intentar.';
+      case 3:
+        return 'Tiempo de espera al obtener ubicación. Toca “Actualizar precisión” e intenta nuevamente.';
+      default:
+        return err.message ?? 'Error de geolocalización.';
+    }
+  };
 
   const handleMark = useCallback(
     async (eventType: 'IN' | 'OUT') => {
@@ -98,7 +158,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
       try {
         const position = await requestPosition();
         const deviceId = getDeviceId();
-        const payload = {
+        const payload: MarkPayload = {
           eventType,
           siteId,
           clientTs: new Date().toISOString(),
@@ -122,14 +182,15 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
           return;
         }
 
-        const response = await fetch('/api/attendance/mark', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          if (response.status >= 500) {
+        const result = await markRequest(payload);
+        if (!result.ok) {
+          if (result.errorCode === 'CONSENT_GEO_MISSING') {
+            setPendingPayload(payload);
+            setConsentOpen(true);
+            setError('Debes aceptar el consentimiento de geolocalización para marcar tu asistencia.');
+            return;
+          }
+          if (result.status >= 500) {
             const pending: PendingMark = {
               id: crypto.randomUUID(),
               ...payload,
@@ -140,15 +201,13 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
             setError('Servidor indisponible. Marca encolada.');
             return;
           }
-          const body = await response.json();
-          throw new Error(body.error ?? 'Error al registrar marca');
+          throw new Error(result.body.details ?? result.errorCode ?? 'Error al registrar marca');
         }
 
-        const data = (await response.json()) as MarkResponse;
-        onSuccess?.(data);
+        onSuccess?.(result.data);
         setError(null);
       } catch (err) {
-        setError((err as Error).message);
+        setError(resolveGeoError(err));
       } finally {
         setLoadingEvent(null);
       }
@@ -208,7 +267,61 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
           </span>
         </button>
       </div>
-      {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-rose-200">{error}</p>}
+      {consentOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Consentimiento de geolocalización"
+        >
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[rgba(8,10,18,0.96)] p-5 shadow-2xl">
+            <p className="text-sm font-semibold text-slate-100">Permiso requerido</p>
+            <p className="mt-2 text-sm text-slate-200">
+              Para confirmar tu asistencia necesitamos registrar tu ubicación y validar la geocerca del sitio. Esto solo se usa
+              para el marcaje y auditoría.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm font-semibold text-slate-100 hover:bg-white/10"
+                onClick={() => {
+                  setConsentOpen(false);
+                  setPendingPayload(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] hover:from-emerald-600 hover:to-teal-600"
+                onClick={async () => {
+                  try {
+                    setLoadingEvent(pendingPayload?.eventType ?? 'IN');
+                    await acceptGeoConsent();
+                    if (pendingPayload) {
+                      const result = await markRequest(pendingPayload);
+                      if (!result.ok) {
+                        throw new Error(result.body.details ?? result.errorCode ?? 'Error al registrar marca');
+                      }
+                      onSuccess?.(result.data);
+                    }
+                    setConsentOpen(false);
+                    setPendingPayload(null);
+                    setError(null);
+                  } catch (consentErr) {
+                    setError((consentErr as Error).message);
+                  } finally {
+                    setLoadingEvent(null);
+                  }
+                }}
+              >
+                Aceptar y continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
