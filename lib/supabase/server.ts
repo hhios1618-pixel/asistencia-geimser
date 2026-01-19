@@ -6,12 +6,19 @@ import { cookies } from 'next/headers';
 import type { Database } from '../../types/database';
 import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 
-const getSupabaseUrl = () => {
+export const isSupabaseConfigured = () =>
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+const getSupabaseEnv = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url) {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set');
   }
-  return url;
+  if (!anonKey) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
+  }
+  return { url, anonKey };
 };
 
 let serviceClient: SupabaseClient<Database, 'public'> | null = null;
@@ -20,7 +27,7 @@ export const getServiceSupabase = (): SupabaseClient<Database, 'public'> => {
     return serviceClient;
   }
 
-  const supabaseUrl = getSupabaseUrl();
+  const { url: supabaseUrl } = getSupabaseEnv();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
@@ -67,7 +74,7 @@ const decorateCookieStore = (store: ReadonlyRequestCookies) => {
 
 export const createServerSupabaseClient = async () => {
   // Validate env at runtime (not at build time).
-  getSupabaseUrl();
+  getSupabaseEnv();
   const cookieStore = await cookies();
   return createServerComponentClient<Database>({
     cookies: () => decorateCookieStore(cookieStore),
@@ -82,7 +89,7 @@ export const createServerSupabaseClient = async () => {
 
 export const createRouteSupabaseClient = async () => {
   // Validate env at runtime (not at build time).
-  getSupabaseUrl();
+  getSupabaseEnv();
   const cookieStore = await cookies();
   return createRouteHandlerClient<Database>({
     cookies: () => decorateCookieStore(cookieStore),

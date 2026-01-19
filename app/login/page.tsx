@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createServerSupabaseClient, getServiceSupabase } from '../../lib/supabase/server';
+import { createServerSupabaseClient, getServiceSupabase, isSupabaseConfigured } from '../../lib/supabase/server';
 import LoginForm from './components/LoginForm';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
@@ -8,6 +8,30 @@ import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColum
 export const dynamic = 'force-dynamic';
 
 export default async function LoginPage() {
+  if (!isSupabaseConfigured()) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#05060c] px-6 py-16 text-slate-100">
+        <div className="w-full max-w-xl rounded-[28px] border border-white/10 bg-white/5 p-8 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.75)]">
+          <h1 className="text-2xl font-semibold text-white">Falta configuración</h1>
+          <p className="mt-3 text-sm text-slate-300">
+            La app no puede iniciar sesión porque no están configuradas las variables de Supabase en el servidor.
+          </p>
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-slate-200">
+            <p className="font-semibold">Configura en Vercel (Production/Preview):</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-300">
+              <li>NEXT_PUBLIC_SUPABASE_URL</li>
+              <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
+              <li>SUPABASE_SERVICE_ROLE_KEY (solo si el backend lo usa)</li>
+            </ul>
+          </div>
+          <p className="mt-4 text-xs text-slate-400">
+            Cuando queden configuradas, recarga esta página.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   const supabase = await createServerSupabaseClient();
   let user = null;
 
@@ -39,7 +63,6 @@ export default async function LoginPage() {
 
     await ensurePeopleServiceColumn();
 
-    const serviceSupabase = getServiceSupabase();
     const upsertPayload: Tables['people']['Insert'] = {
       id: user.id as string,
       name: defaultName.trim(),
@@ -50,37 +73,41 @@ export default async function LoginPage() {
       rut: (user.user_metadata?.rut as string | undefined) ?? null,
     };
 
-    const attemptUpsert = async () =>
-      serviceSupabase.from('people').upsert<Tables['people']['Insert']>(upsertPayload, { onConflict: 'id' });
+    try {
+      const serviceSupabase = getServiceSupabase();
+      const { error: upsertError } = await serviceSupabase
+        .from('people')
+        .upsert<Tables['people']['Insert']>(upsertPayload, { onConflict: 'id' });
 
-    const { error: upsertError } = await attemptUpsert();
-
-    if (upsertError) {
-      console.error('[login] upsert person failed', upsertError);
-      try {
-        await runQuery(
-          `insert into public.people (id, name, email, role, is_active, service, rut)
-           values ($1, $2, $3, $4, $5, $6, $7)
-           on conflict (id) do update
-           set name = excluded.name,
-               email = excluded.email,
-               role = excluded.role,
-               is_active = excluded.is_active,
-               service = excluded.service,
-               rut = excluded.rut`,
-          [
-            user.id as string,
-            upsertPayload.name,
-            upsertPayload.email ?? null,
-            upsertPayload.role,
-            upsertPayload.is_active ?? true,
-            upsertPayload.service ?? null,
-            upsertPayload.rut ?? null,
-          ]
-        );
-      } catch (fallbackError) {
-        console.error('[login] fallback upsert failed', fallbackError);
+      if (upsertError) {
+        console.error('[login] upsert person failed', upsertError);
+        try {
+          await runQuery(
+            `insert into public.people (id, name, email, role, is_active, service, rut)
+             values ($1, $2, $3, $4, $5, $6, $7)
+             on conflict (id) do update
+             set name = excluded.name,
+                 email = excluded.email,
+                 role = excluded.role,
+                 is_active = excluded.is_active,
+                 service = excluded.service,
+                 rut = excluded.rut`,
+            [
+              user.id as string,
+              upsertPayload.name,
+              upsertPayload.email ?? null,
+              upsertPayload.role,
+              upsertPayload.is_active ?? true,
+              upsertPayload.service ?? null,
+              upsertPayload.rut ?? null,
+            ]
+          );
+        } catch (fallbackError) {
+          console.error('[login] fallback upsert failed', fallbackError);
+        }
       }
+    } catch (bootstrapError) {
+      console.error('[login] people bootstrap skipped', bootstrapError);
     }
 
     redirect('/asistencia');
