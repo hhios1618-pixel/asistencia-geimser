@@ -12,7 +12,7 @@ const addressSchema = z.preprocess(
     const trimmed = value.trim();
     return trimmed.length === 0 ? null : trimmed;
   },
-  z.string().min(3).max(255).or(z.null())
+  z.string().min(3).max(500).or(z.null())
 );
 
 const siteSchema = z.object({
@@ -31,6 +31,30 @@ const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' ||
 export const runtime = 'nodejs';
 
 type TableTarget = { schema: 'public' | 'asistencia'; name: string; qualified: string };
+
+type PgErrorLike = {
+  message?: string;
+  code?: string;
+  detail?: string;
+  hint?: string;
+  constraint?: string;
+};
+
+const formatDbError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return 'unknown_db_error';
+  }
+  const err = error as PgErrorLike;
+  const parts = [
+    err.message?.trim(),
+    err.code ? `code=${err.code}` : null,
+    err.constraint ? `constraint=${err.constraint}` : null,
+    err.detail ? `detail=${err.detail}` : null,
+    err.hint ? `hint=${err.hint}` : null,
+  ].filter((value): value is string => Boolean(value && value.length > 0));
+
+  return parts.length > 0 ? parts.join(' | ') : 'unknown_db_error';
+};
 
 const resolveTableTarget = async (name: string): Promise<TableTarget> => {
   const { rows } = await runQuery<{ table_schema: 'public' | 'asistencia'; table_type: string }>(
@@ -67,34 +91,41 @@ const getPeopleSitesTarget = async () => {
 };
 
 let addressColumnEnsured = false;
+let addressColumnAvailable: boolean | null = null;
+const hasAddressColumn = async (target: TableTarget) => {
+  const { rows } = await runQuery<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from information_schema.columns
+       where table_schema = $1
+         and table_name = $2
+         and column_name = 'address'
+     ) as exists`,
+    [target.schema, target.name]
+  );
+  return Boolean(rows[0]?.exists);
+};
+
 const ensureAddressColumn = async () => {
   if (addressColumnEnsured) {
     return;
   }
 
   const sites = await getSitesTarget();
-
-  const columnExists = async (schema: string) => {
-    const { rows } = await runQuery<{ exists: boolean }>(
-      `select exists (
-         select 1
-         from information_schema.columns
-         where table_schema = $1
-           and table_name = 'sites'
-           and column_name = 'address'
-       ) as exists`,
-      [schema]
-    );
-    return Boolean(rows[0]?.exists);
-  };
-
-  if (await columnExists(sites.schema)) {
+  try {
+    if (await hasAddressColumn(sites)) {
+      addressColumnAvailable = true;
+      addressColumnEnsured = true;
+      return;
+    }
+    await runQuery(`alter table if exists ${sites.qualified} add column if not exists address text`);
+    addressColumnAvailable = await hasAddressColumn(sites);
     addressColumnEnsured = true;
-    return;
+  } catch (error) {
+    console.warn('[sites] address column ensure failed', formatDbError(error));
+    addressColumnAvailable = false;
+    addressColumnEnsured = true;
   }
-
-  await runQuery(`alter table if exists ${sites.qualified} add column if not exists address text`);
-  addressColumnEnsured = true;
 };
 
 const authorize = async () => {
@@ -147,23 +178,24 @@ export async function POST(request: NextRequest) {
     await ensureAddressColumn();
     const sites = await getSitesTarget();
     const address = payload.address ?? null;
-    const { rows } = await runQuery<Tables['sites']['Row']>(
-      `insert into ${sites.qualified} (name, address, lat, lng, radius_m, is_active)
-       values ($1, $2, $3, $4, $5, $6)
-       returning *`,
-      [
-        payload.name,
-        address,
-        payload.lat,
-        payload.lng,
-        payload.radius_m,
-        payload.is_active ?? true,
-      ]
-    );
+    const addressEnabled = addressColumnAvailable ?? (await hasAddressColumn(sites));
+    const { rows } = addressEnabled
+      ? await runQuery<Tables['sites']['Row']>(
+          `insert into ${sites.qualified} (name, address, lat, lng, radius_m, is_active)
+           values ($1, $2, $3, $4, $5, $6)
+           returning *`,
+          [payload.name, address, payload.lat, payload.lng, payload.radius_m, payload.is_active ?? true]
+        )
+      : await runQuery<Tables['sites']['Row']>(
+          `insert into ${sites.qualified} (name, lat, lng, radius_m, is_active)
+           values ($1, $2, $3, $4, $5)
+           returning *`,
+          [payload.name, payload.lat, payload.lng, payload.radius_m, payload.is_active ?? true]
+        );
 
     return NextResponse.json({ item: rows[0] }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: 'CREATE_FAILED', details: (error as Error).message }, { status: 500 });
+    return NextResponse.json({ error: 'CREATE_FAILED', details: formatDbError(error) }, { status: 500 });
   }
 }
 
@@ -194,10 +226,7 @@ export async function PATCH(request: NextRequest) {
     const setters = entries.map(([column], index) => `${column} = $${index + 2}`).join(', ');
     const params = [id, ...entries.map(([, value]) => value)];
 
-    const { rows } = await runQuery<Tables['sites']['Row']>(
-      `update ${sites.qualified} set ${setters} where id = $1 returning *`,
-      params
-    );
+    const { rows } = await runQuery<Tables['sites']['Row']>(`update ${sites.qualified} set ${setters} where id = $1 returning *`, params);
 
     if (!rows[0]) {
       return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
@@ -205,7 +234,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ item: rows[0] });
   } catch (error) {
-    return NextResponse.json({ error: 'UPDATE_FAILED', details: (error as Error).message }, { status: 500 });
+    return NextResponse.json({ error: 'UPDATE_FAILED', details: formatDbError(error) }, { status: 500 });
   }
 }
 
@@ -226,7 +255,7 @@ export async function DELETE(request: NextRequest) {
     await runQuery(`delete from ${peopleSites.qualified} where site_id = $1`, [id]);
     await runQuery(`delete from ${sites.qualified} where id = $1`, [id]);
   } catch (error) {
-    return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
+    return NextResponse.json({ error: 'DELETE_FAILED', details: formatDbError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

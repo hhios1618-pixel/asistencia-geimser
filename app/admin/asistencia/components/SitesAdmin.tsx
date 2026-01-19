@@ -391,7 +391,7 @@ export function SitesAdmin() {
           </label>
           <label className="flex flex-col gap-2 text-sm">
             <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Dirección</span>
-            <div className="relative">
+            <div className="relative isolate">
               <input
                 required
                 value={addressQuery}
@@ -405,6 +405,9 @@ export function SitesAdmin() {
                     address: value,
                   }));
                 }}
+                onBlur={() => {
+                  window.setTimeout(() => setAddressSuggestions([]), 120);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && addressSuggestions.length > 0) {
                     event.preventDefault();
@@ -417,28 +420,34 @@ export function SitesAdmin() {
                 placeholder="Escribe para buscar (mín. 3 letras)"
                 className="w-full rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner placeholder:text-slate-400 focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
               />
+              {addressQuery.trim().length >= 3 &&
+                (addressLoading || addressSuggestions.length > 0 || addressLookupPerformed) && (
+                <div
+                  role="listbox"
+                  aria-label="Sugerencias de dirección"
+                  className="absolute left-0 right-0 top-full z-[100] mt-2 max-h-56 overflow-auto rounded-2xl border border-[rgba(255,255,255,0.16)] bg-[#070a12] shadow-2xl [scrollbar-width:thin] [scrollbar-color:rgba(124,200,255,0.35)_transparent]"
+                >
+                  {addressLoading && <p className="px-4 py-2 text-xs text-slate-200">Buscando direcciones…</p>}
+                  {!addressLoading && addressError && <p className="px-4 py-2 text-xs text-rose-200">{addressError}</p>}
+                  {!addressLoading && !addressError && addressSuggestions.length === 0 && addressLookupPerformed && (
+                    <p className="px-4 py-2 text-xs text-slate-200">No se encontraron coincidencias.</p>
+                  )}
+                  {addressSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSelectSuggestion(suggestion)}
+                      className="flex w-full items-start gap-2 border-t border-[rgba(255,255,255,0.08)] px-4 py-2 text-left text-xs text-slate-100 hover:bg-[rgba(124,200,255,0.12)]"
+                    >
+                      <span className="flex-1 whitespace-normal leading-snug">{suggestion.displayName}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {addressQuery.trim().length >= 3 &&
-              (addressLoading || addressSuggestions.length > 0 || addressLookupPerformed) && (
-              <div className="mt-2 max-h-52 overflow-auto rounded-2xl border border-[rgba(255,255,255,0.16)] bg-[#070a12] shadow-xl [scrollbar-width:thin] [scrollbar-color:rgba(124,200,255,0.35)_transparent]">
-                {addressLoading && <p className="px-4 py-2 text-xs text-slate-200">Buscando direcciones…</p>}
-                {!addressLoading && addressError && <p className="px-4 py-2 text-xs text-rose-200">{addressError}</p>}
-                {!addressLoading && !addressError && addressSuggestions.length === 0 && addressLookupPerformed && (
-                  <p className="px-4 py-2 text-xs text-slate-200">No se encontraron coincidencias.</p>
-                )}
-                {addressSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.id}
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => handleSelectSuggestion(suggestion)}
-                    className="flex w-full items-start gap-2 border-t border-[rgba(255,255,255,0.08)] px-4 py-2 text-left text-xs text-slate-100 hover:bg-[rgba(124,200,255,0.12)]"
-                  >
-                    <span className="flex-1 whitespace-normal leading-snug">{suggestion.displayName}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </label>
           <label className="flex flex-col gap-2 text-sm">
             <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Latitud</span>
