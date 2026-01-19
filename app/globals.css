@@ -8,9 +8,9 @@
     radial-gradient(circle at 50% 86%, rgba(48, 140, 255, 0.14), transparent 45%),
     linear-gradient(135deg, #06070d 0%, #04050b 100%);
   --foreground: #e7ebf5;
-  --surface: rgba(15, 18, 28, 0.9);
-  --surface-highlight: rgba(22, 26, 38, 0.85);
-  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface: rgba(15, 18, 28, 0.92);
+  --surface-highlight: rgba(22, 26, 38, 0.9);
+  --surface-border: rgba(255, 255, 255, 0.14);
   --surface-border-strong: rgba(124, 200, 255, 0.45);
   --shadow-soft: 0 32px 120px -70px rgba(0, 0, 0, 0.65), 0 26px 80px -60px rgba(86, 144, 255, 0.35);
   --accent: #7cc8ff;
@@ -71,7 +71,7 @@ a:hover {
   position: absolute;
   inset: 1px;
   border-radius: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   pointer-events: none;
   mix-blend-mode: screen;
 }
@@ -117,7 +117,7 @@ a:hover {
 .bg-white\/95,
 .bg-white\/90,
 .bg-white\/85 {
-  background-color: rgba(255, 255, 255, 0.06) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .bg-white\/80,
@@ -126,7 +126,7 @@ a:hover {
 .bg-white\/60,
 .bg-white\/55,
 .bg-white\/50 {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(255, 255, 255, 0.085) !important;
 }
 
 .border-white\/80,
@@ -134,11 +134,11 @@ a:hover {
 .border-white\/60,
 .border-white\/50,
 .border-white\/40 {
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 .bg-slate-100 {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .shadow-inner {

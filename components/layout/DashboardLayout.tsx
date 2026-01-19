@@ -110,7 +110,7 @@ export function DashboardLayout({
         />
       )}
 
-      <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-4 pb-10 pt-6 sm:px-6 lg:px-10">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 pb-10 pt-6 sm:px-6 lg:px-10">
         <button
           type="button"
           onClick={() => setSidebarOpen((open) => !open)}
@@ -163,7 +163,7 @@ export function DashboardLayout({
           </aside>
 
           <div className="flex flex-1 flex-col gap-6 md:pt-2">
-            <header className="glass-panel relative mx-auto w-full max-w-[1180px] rounded-[34px] px-6 py-7 shadow-[0_32px_100px_-65px_rgba(0,0,0,0.6)] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(124,200,255,0.6),rgba(139,92,246,0.32),transparent)] before:content-[''] sm:px-9 md:py-8 lg:px-12">
+            <header className="glass-panel relative mx-auto w-full max-w-[1440px] rounded-[34px] px-6 py-7 shadow-[0_32px_100px_-65px_rgba(0,0,0,0.6)] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(124,200,255,0.6),rgba(139,92,246,0.32),transparent)] before:content-[''] sm:px-9 md:py-8 lg:px-12">
               <div className="flex flex-wrap items-start justify-between gap-6 text-slate-200">
                 <div className="min-w-[240px] flex-1">
                   {breadcrumb && breadcrumb.length > 0 && (
@@ -190,7 +190,7 @@ export function DashboardLayout({
             </header>
 
             <main className="relative flex-1">
-              <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-10 pb-20">{children}</div>
+              <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10 pb-20">{children}</div>
             </main>
           </div>
         </div>

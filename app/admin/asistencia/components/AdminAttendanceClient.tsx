@@ -314,43 +314,97 @@ export function AdminAttendanceClient() {
     }
   };
 
+  const openSection = (sectionId: string) => {
+    setActiveTab(sectionId);
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    params.set('panel', sectionId);
+    router.replace(`/admin/asistencia?${params.toString()}`, { scroll: false });
+  };
+
   return (
-    <div className="flex flex-col gap-8">
-      <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        {SECTIONS.map((section) => {
-          const Icon = section.icon;
-          const isActive = section.id === activeTab;
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => {
-                setActiveTab(section.id);
-                const params = new URLSearchParams(searchParams?.toString() ?? '');
-                params.set('panel', section.id);
-                router.replace(`/admin/asistencia?${params.toString()}`, { scroll: false });
-              }}
-              className={`glass-panel flex items-start gap-3 rounded-3xl border px-4 py-3 text-left transition ${
-                isActive
-                  ? 'border-indigo-200 bg-indigo-50/90 text-indigo-700 shadow-[0_18px_40px_-30px_rgba(79,70,229,0.55)]'
-                  : 'border-transparent bg-white/70 text-slate-500 hover:border-indigo-100 hover:bg-white'
-              }`}
-            >
-              <span
-                className={`rounded-xl p-2 ${isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}
+    <div className="grid gap-8 xl:grid-cols-[320px_1fr]">
+      <aside className="glass-panel h-fit rounded-3xl border border-white/60 bg-white/70 p-4 xl:sticky xl:top-6">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">Panel</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">Secciones</p>
+          </div>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
+            {activeMeta.label}
+          </span>
+        </div>
+
+        <nav className="flex flex-col gap-2" aria-label="Secciones de administración">
+          {SECTIONS.map((section) => {
+            const Icon = section.icon;
+            const isActive = section.id === activeTab;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => openSection(section.id)}
+                className={`group relative flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                  isActive
+                    ? 'border-[rgba(124,200,255,0.45)] bg-[linear-gradient(135deg,rgba(124,200,255,0.18),rgba(94,234,212,0.1))] text-white shadow-[0_22px_60px_-42px_rgba(124,200,255,0.55)]'
+                    : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10'
+                }`}
               >
-                <Icon size={18} />
-              </span>
-              <span className="flex-1">
-                <span className="block text-sm font-semibold">{section.label}</span>
-                <span className="mt-1 block text-xs text-slate-500">{section.description}</span>
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-      <p className="text-sm text-slate-500">{activeMeta.description}</p>
-      <div className="flex flex-col gap-8">{renderContent()}</div>
+                <span
+                  className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-[14px] border transition ${
+                    isActive
+                      ? 'border-[rgba(124,200,255,0.35)] bg-[rgba(124,200,255,0.18)] text-white'
+                      : 'border-white/10 bg-black/20 text-slate-200 group-hover:border-white/20 group-hover:bg-black/25'
+                  }`}
+                >
+                  <Icon size={18} />
+                </span>
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold">{section.label}</span>
+                  <span className={`mt-1 block text-xs ${isActive ? 'text-slate-100/80' : 'text-slate-400'}`}>
+                    {section.description}
+                  </span>
+                </span>
+                {isActive && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[linear-gradient(180deg,rgba(124,200,255,0.9),rgba(139,92,246,0.55))]"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{activeMeta.label}</p>
+            <p className="mt-2 text-sm text-slate-300">{activeMeta.description}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 xl:hidden">
+            {SECTIONS.slice(0, 5).map((section) => {
+              const isActive = section.id === activeTab;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => openSection(section.id)}
+                  className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                    isActive
+                      ? 'border-[rgba(124,200,255,0.45)] bg-[rgba(124,200,255,0.16)] text-white'
+                      : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10'
+                  }`}
+                >
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-8">{renderContent()}</div>
+      </div>
     </div>
   );
 }
