@@ -1,17 +1,28 @@
-import Link from 'next/link';
+'use client';
 
-export const dynamic = 'force-static';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import DashboardLayout, { ADMIN_NAV, SUPERVISOR_NAV, WORKER_NAV } from '../../components/layout/DashboardLayout';
+import BackButton from '../../components/ui/BackButton';
+import SectionHeader from '../../components/ui/SectionHeader';
+import { useBrowserSupabase } from '../../lib/hooks/useBrowserSupabase';
+import type { Tables } from '../../types/database';
+
+type Role = Tables['people']['Row']['role'];
+
+const isKnownRole = (value: unknown): value is Role =>
+  value === 'ADMIN' || value === 'SUPERVISOR' || value === 'DT_VIEWER' || value === 'WORKER';
 
 const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="glass-panel rounded-3xl border border-white/60 bg-white/70 p-6">
-    <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+    <h3 className="text-base font-semibold text-slate-900">{title}</h3>
     <div className="mt-3 space-y-3 text-sm text-slate-500">{children}</div>
   </section>
 );
 
 const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
   <div className="flex gap-3">
-    <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(124,200,255,0.18)] text-xs font-semibold text-white">
+    <span className="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[rgba(124,200,255,0.18)] text-xs font-semibold text-white">
       {n}
     </span>
     <div className="flex-1">{children}</div>
@@ -19,224 +30,177 @@ const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
 );
 
 export default function AyudaPage() {
+  const supabase = useBrowserSupabase();
+  const [role, setRole] = useState<Role>('WORKER');
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!active) return;
+      const user = data.user;
+      setHasSession(Boolean(user));
+      const rawRole =
+        (user?.app_metadata?.role as unknown) ??
+        (user?.user_metadata?.role as unknown) ??
+        (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as unknown) ??
+        'WORKER';
+      setRole(isKnownRole(rawRole) ? rawRole : 'WORKER');
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
+
+  const navItems = useMemo(() => {
+    if (role === 'ADMIN' || role === 'DT_VIEWER') return ADMIN_NAV;
+    if (role === 'SUPERVISOR') return SUPERVISOR_NAV;
+    return WORKER_NAV;
+  }, [role]);
+
+  const homeHref = role === 'ADMIN' || role === 'DT_VIEWER' ? '/admin' : role === 'SUPERVISOR' ? '/supervisor' : '/asistencia';
+
   return (
-    <main className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-      <header className="glass-panel rounded-[34px] border border-white/60 bg-white/70 px-8 py-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">Ayuda</p>
-        <h1 className="mt-3 text-3xl font-semibold text-slate-900">Guía rápida de G-Trace</h1>
-        <p className="mt-3 max-w-3xl text-sm text-slate-500">
-          Aquí está lo esencial, explicado en simple. Si algo no calza con tu operación, dímelo y lo ajustamos a tu flujo.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3 text-sm">
-          <a
-            href="#admin"
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
+    <DashboardLayout
+      title="Ayuda"
+      description="Guía rápida y solución de problemas de G-Trace, en simple."
+      breadcrumb={[{ label: 'Ayuda' }]}
+      navItems={navItems}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <BackButton fallbackHref={homeHref} />
+          <Link
+            href={homeHref}
+            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-[0_18px_55px_-40px_rgba(0,0,0,0.75)] transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15 hover:text-white"
           >
-            Admin
-          </a>
-          <a
-            href="#supervisor"
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
-          >
-            Supervisor
-          </a>
-          <a
-            href="#trabajador"
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
-          >
-            Trabajador
-          </a>
-          <a
-            href="#faq"
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
-          >
-            Preguntas frecuentes
-          </a>
+            Ir a mi panel
+          </Link>
         </div>
-      </header>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <Card title="¿Qué es G-Trace?">
-          <p>
-            G-Trace te ayuda a registrar entradas y salidas, ver asistencia por persona y gestionar turnos, sitios y
-            roles. El objetivo: menos fricción y más claridad.
-          </p>
-          <p>
-            Tip: La información más importante vive en <span className="font-semibold text-slate-700">Asistencia</span> y{' '}
-            <span className="font-semibold text-slate-700">Personas</span>.
-          </p>
-        </Card>
-
-        <Card title="Roles (en simple)">
-          <p>
-            <span className="font-semibold text-slate-700">Admin</span>: configura todo (personas, sitios, turnos,
-            reportes) y ve la operación completa.
-          </p>
-          <p>
-            <span className="font-semibold text-slate-700">Supervisor</span>: ve su equipo, revisa alertas y aprueba
-            solicitudes.
-          </p>
-          <p>
-            <span className="font-semibold text-slate-700">Trabajador</span>: marca su jornada y revisa su historial.
-          </p>
-        </Card>
-      </div>
-
-      <div id="admin" className="mt-8">
-        <Card title="Admin: crear un trabajador (paso a paso)">
-          <Step n={1}>
-            Entra a <span className="font-semibold text-slate-700">Administración → Asistencia</span>.
-          </Step>
-          <Step n={2}>
-            Abre la sección <span className="font-semibold text-slate-700">Personas</span>.
-          </Step>
-          <Step n={3}>
-            Presiona <span className="font-semibold text-slate-700">Nueva persona</span> y completa nombre, correo y rol
-            (Trabajador / Supervisor / Admin).
-          </Step>
-          <Step n={4}>
-            Asigna sitios (si aplica) y guarda.
-          </Step>
-          <p className="text-xs text-slate-400">
-            Consejo: si el usuario no ve su sitio, revisa su asignación en Personas → Sitios asignados.
-          </p>
-        </Card>
-      </div>
-
-      <div className="mt-6">
-        <Card title="Admin: revisar asistencia de una persona">
-          <Step n={1}>
-            Ve a <span className="font-semibold text-slate-700">Administración → Asistencia</span>.
-          </Step>
-          <Step n={2}>
-            Revisa el <span className="font-semibold text-slate-700">Resumen</span> para visión general (marcas, sitios
-            más activos, etc.).
-          </Step>
-          <Step n={3}>
-            En <span className="font-semibold text-slate-700">Personas</span>, busca a la persona y revisa su estado,
-            rol y asignaciones.
-          </Step>
-          <p className="text-xs text-slate-400">
-            Si necesitas exportar o compartir, usa la sección de reportes (según esté habilitada en tu instancia).
-          </p>
-        </Card>
-      </div>
-
-      <div className="mt-6">
-        <Card title="Admin: turnos (manual y carga masiva)">
-          <p>
-            En la sección <span className="font-semibold text-slate-700">Turnos</span> puedes:
-          </p>
-          <ul className="list-disc space-y-2 pl-5">
-            <li>Definir turnos manualmente por colaborador y semana.</li>
-            <li>Cargar turnos en bloque (si tu operación lo usa).</li>
-            <li>Generar propuestas con IA (si está configurado).</li>
-          </ul>
-          <p className="text-xs text-slate-400">Tip: parte por un “turno base” y luego ajusta excepciones.</p>
-        </Card>
-      </div>
-
-      <div id="supervisor" className="mt-8">
-        <Card title="Supervisor: qué puedes hacer">
-          <ul className="list-disc space-y-2 pl-5">
-            <li>Ver tu equipo y sus marcas recientes.</li>
-            <li>Revisar alertas y casos que requieren atención.</li>
-            <li>Gestionar solicitudes (aprobar/rechazar) según tu flujo.</li>
-          </ul>
-          <p className="text-xs text-slate-400">
-            Si no ves a un trabajador en tu lista, es porque no está asignado a tu equipo.
-          </p>
-        </Card>
-      </div>
-
-      <div id="trabajador" className="mt-8">
-        <Card title="Trabajador: cómo marcar (entrada / salida)">
-          <Step n={1}>
-            Entra a <span className="font-semibold text-slate-700">Mi jornada</span>.
-          </Step>
-          <Step n={2}>
-            Acepta permisos de ubicación si el sistema te los pide (sirve para validar sitio/geocerca).
-          </Step>
-          <Step n={3}>
-            Presiona <span className="font-semibold text-slate-700">Marcar entrada</span> al iniciar y{' '}
-            <span className="font-semibold text-slate-700">Marcar salida</span> al terminar.
-          </Step>
-          <p className="text-xs text-slate-400">
-            Si la app no te deja marcar, revisa conexión, GPS y que estés dentro del sitio asignado (si aplica).
-          </p>
-        </Card>
-      </div>
-
-      <div className="mt-6">
-        <Card title="Trabajador: historial y solicitudes">
-          <p>
-            En <span className="font-semibold text-slate-700">Historial</span> puedes ver tus marcas previas.
-          </p>
-          <p>
-            En <span className="font-semibold text-slate-700">Solicitudes</span> puedes pedir correcciones o permisos
-            según tu política interna.
-          </p>
-        </Card>
-      </div>
-
-      <div id="faq" className="mt-8 space-y-6">
-        <Card title="Preguntas frecuentes">
-          <details className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <summary className="cursor-pointer font-semibold text-slate-700">
-              ¿Por qué no veo mi sitio o no me deja marcar?
-            </summary>
-            <div className="mt-3 space-y-2">
-              <p>Normalmente es uno de estos puntos:</p>
-              <ul className="list-disc space-y-1 pl-5">
-                <li>Ubicación/GPS desactivado.</li>
-                <li>Estás fuera de la geocerca del sitio.</li>
-                <li>Tu usuario no tiene sitios asignados o está inactivo.</li>
-              </ul>
-            </div>
-          </details>
-          <details className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <summary className="cursor-pointer font-semibold text-slate-700">¿Cómo cambio el rol de una persona?</summary>
-            <div className="mt-3 space-y-2">
-              <p>
-                Admin: entra a <span className="font-semibold text-slate-700">Personas</span>, edita el usuario y cambia
-                el rol.
-              </p>
-            </div>
-          </details>
-          <details className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <summary className="cursor-pointer font-semibold text-slate-700">¿Dónde cierro sesión?</summary>
-            <div className="mt-3 space-y-2">
-              <p>
-                En el header superior encontrarás <span className="font-semibold text-slate-700">Cerrar sesión</span>.
-              </p>
-            </div>
-          </details>
-        </Card>
-
-        <Card title="Volver a tu panel">
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/asistencia"
-              className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
-            >
-              Mi jornada
-            </Link>
-            <Link
-              href="/admin"
-              className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
-            >
-              Administración
-            </Link>
-            <Link
-              href="/supervisor"
-              className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15"
-            >
-              Supervisor
-            </Link>
+      }
+    >
+      <div className="grid gap-6">
+        {!hasSession && (
+          <div className="glass-panel rounded-3xl border border-amber-200/30 bg-[rgba(245,158,11,0.08)] p-5 text-sm text-amber-100">
+            <p className="font-semibold">Tip rápido</p>
+            <p className="mt-2 text-amber-100/90">
+              Puedes leer esta guía sin iniciar sesión, pero para ver datos reales debes entrar con tu cuenta.
+              {' '}
+              <Link href="/login" className="font-semibold underline underline-offset-4">
+                Ir a Login
+              </Link>
+            </p>
           </div>
-        </Card>
+        )}
+
+        <SectionHeader
+          overline="Guía rápida"
+          title="Qué puede hacer cada rol"
+          description="Elegimos lo importante y lo explicamos en pasos cortos."
+        />
+
+        <div className="grid gap-6 xl:grid-cols-3">
+          <Card title="Admin (configura todo)">
+            <p className="text-slate-400">Ideal para RRHH / Operaciones.</p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Crear personas, activar/desactivar, y asignar roles.</li>
+              <li>Definir sitios (geocercas) y asignar a colaboradores.</li>
+              <li>Revisar asistencia global y auditar eventos.</li>
+              <li>Gestionar turnos manuales o masivos (si aplica).</li>
+            </ul>
+          </Card>
+          <Card title="Supervisor (gestiona equipo)">
+            <p className="text-slate-400">Para jefaturas y coordinadores.</p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Ver su equipo y marcas recientes.</li>
+              <li>Revisar alertas y casos pendientes.</li>
+              <li>Gestionar solicitudes según el flujo interno.</li>
+            </ul>
+          </Card>
+          <Card title="Trabajador (marca y revisa)">
+            <p className="text-slate-400">Uso diario.</p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Marcar entrada y salida.</li>
+              <li>Ver historial de marcajes.</li>
+              <li>Enviar solicitudes/correcciones (si está habilitado).</li>
+            </ul>
+          </Card>
+        </div>
+
+        <SectionHeader
+          overline="Pasos"
+          title="Tareas típicas (sin tecnicismos)"
+          description="Los flujos más comunes en G-Trace."
+        />
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card title="Crear un trabajador (Admin)">
+            <Step n={1}>
+              Entra a <span className="font-semibold text-slate-700">Administración → Asistencia</span>.
+            </Step>
+            <Step n={2}>
+              Ve a <span className="font-semibold text-slate-700">Personas</span> y presiona{' '}
+              <span className="font-semibold text-slate-700">Nueva persona</span>.
+            </Step>
+            <Step n={3}>
+              Completa los datos básicos (nombre, correo, rol) y guarda.
+            </Step>
+            <Step n={4}>
+              Si tu operación usa geocercas, asigna uno o más sitios.
+            </Step>
+          </Card>
+
+          <Card title="Cómo debe marcar un trabajador">
+            <Step n={1}>
+              En <span className="font-semibold text-slate-700">Mi jornada</span>, presiona <span className="font-semibold text-slate-700">Marcar entrada</span>.
+            </Step>
+            <Step n={2}>
+              Al terminar, presiona <span className="font-semibold text-slate-700">Marcar salida</span>.
+            </Step>
+            <Step n={3}>
+              Si te pide ubicación, acéptala (sirve para validar sitio/geocerca).
+            </Step>
+          </Card>
+        </div>
+
+        <SectionHeader
+          overline="Troubleshooting"
+          title="Solución de problemas (rápido)"
+          description="Si algo se ve mal o no funciona, parte por acá."
+        />
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card title="No me deja marcar / no aparece el botón">
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Revisa conexión a internet.</li>
+              <li>Activa GPS/Ubicación.</li>
+              <li>Confirma que tu usuario está activo.</li>
+              <li>Si hay geocerca: asegúrate de estar dentro del sitio asignado.</li>
+            </ul>
+          </Card>
+          <Card title="No veo a un trabajador en mi equipo (Supervisor)">
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Ese trabajador debe estar asignado a tu equipo por un Admin.</li>
+              <li>Si está inactivo, no aparecerá o tendrá restricciones.</li>
+            </ul>
+          </Card>
+          <Card title="El panel se ve raro (letras encima / colores)">
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Recarga la página (Ctrl/Cmd+R).</li>
+              <li>Prueba modo incógnito (descarta extensiones).</li>
+              <li>Si usas zoom del navegador, vuelve a 100%.</li>
+            </ul>
+          </Card>
+          <Card title="Necesito ayuda humana">
+            <p>Escríbenos y cuéntanos qué estabas intentando hacer.</p>
+            <p>
+              Correo: <a className="font-semibold underline underline-offset-4" href="mailto:soporte@g-trace.com">soporte@g-trace.com</a>
+            </p>
+          </Card>
+        </div>
       </div>
-    </main>
+    </DashboardLayout>
   );
 }
 

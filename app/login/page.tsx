@@ -175,10 +175,10 @@ export default async function LoginPage() {
                 <p className="mt-3">
                   ¿Necesitas ayuda?{' '}
                   <a
-                    href="mailto:soporte@atlastrace.com"
+                    href="mailto:soporte@g-trace.com"
                     className="font-medium text-slate-200 underline decoration-slate-600 underline-offset-6 transition hover:text-white"
                   >
-                    soporte@atlastrace.com
+                    soporte@g-trace.com
                   </a>
                 </p>
               </div>

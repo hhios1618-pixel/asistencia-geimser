@@ -58,7 +58,7 @@ export function LoginForm() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="h-12 w-full bg-transparent text-base text-white placeholder:text-slate-500 focus:outline-none"
-              placeholder="persona@atlastrace.com"
+              placeholder="persona@g-trace.com"
               required
               autoComplete="email"
             />
