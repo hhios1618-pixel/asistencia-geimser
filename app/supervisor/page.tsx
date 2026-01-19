@@ -9,6 +9,8 @@ import type { Tables } from '../../types/database';
 import { redirect } from 'next/navigation';
 import { IconMapPin, IconUsers, IconAlertTriangle, IconUserCheck } from '@tabler/icons-react';
 
+export const dynamic = 'force-dynamic';
+
 const isSupervisor = (role: Tables['people']['Row']['role']) => role === 'SUPERVISOR' || role === 'ADMIN';
 
 const getUserContext = async () => {

@@ -4,6 +4,8 @@ import type { Tables } from '../../../types/database';
 import { redirect } from 'next/navigation';
 import RequestsInbox from '../components/RequestsInbox';
 
+export const dynamic = 'force-dynamic';
+
 const isSupervisor = (role: Tables['people']['Row']['role']) => role === 'SUPERVISOR' || role === 'ADMIN';
 
 async function getContext() {

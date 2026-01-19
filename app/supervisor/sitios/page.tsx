@@ -5,6 +5,8 @@ import type { Tables } from '../../../types/database';
 import { redirect } from 'next/navigation';
 import KpiCard from '../../../components/ui/KpiCard';
 
+export const dynamic = 'force-dynamic';
+
 const isSupervisor = (role: Tables['people']['Row']['role']) => role === 'SUPERVISOR' || role === 'ADMIN';
 
 async function getContext() {
@@ -85,4 +87,3 @@ export default async function SupervisorSitesPage() {
     </DashboardLayout>
   );
 }
-

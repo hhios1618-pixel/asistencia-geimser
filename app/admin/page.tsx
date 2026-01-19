@@ -9,6 +9,8 @@ import { createServerSupabaseClient } from '../../lib/supabase/server';
 import type { Tables } from '../../types/database';
 import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics } from '@tabler/icons-react';
 
+export const dynamic = 'force-dynamic';
+
 const ROLE_LABELS: Record<Tables['people']['Row']['role'], string> = {
   WORKER: 'Trabajador',
   ADMIN: 'Administrador',
