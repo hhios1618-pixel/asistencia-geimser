@@ -1,9 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import type { DragEndEvent, Map as LeafletMap } from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 
 interface Site {
@@ -23,10 +21,7 @@ interface AddressSuggestion {
   lng: number;
 }
 
-const MapContainer = dynamic(() => import('react-leaflet').then((mod) => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then((mod) => mod.TileLayer), { ssr: false });
-const Circle = dynamic(() => import('react-leaflet').then((mod) => mod.Circle), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then((mod) => mod.Marker), { ssr: false });
+const SiteMap = dynamic(() => import('./SiteMap'), { ssr: false });
 
 export function SitesAdmin() {
   const [sites, setSites] = useState<Site[]>([]);
@@ -39,10 +34,10 @@ export function SitesAdmin() {
   const [addressQuery, setAddressQuery] = useState('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [acceptedSuggestion, setAcceptedSuggestion] = useState<string | null>(null);
   const [addressLookupPerformed, setAddressLookupPerformed] = useState(false);
   const acceptedSuggestionRef = useRef<string | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
   const mapZoom = 16;
 
   const updateEditing = (updater: (current: Site) => Site) => {
@@ -62,8 +57,6 @@ export function SitesAdmin() {
   const currentLat = Number(editing?.lat ?? -33.45);
   const currentLng = Number(editing?.lng ?? -70.66);
   const defaultPosition: [number, number] = [currentLat, currentLng];
-  const mapKey = editing ? `map-${editing.id}-${currentLat.toFixed(6)}-${currentLng.toFixed(6)}` : 'map-default';
-  const markerKey = editing ? `marker-${editing.id}-${currentLat.toFixed(6)}-${currentLng.toFixed(6)}` : 'marker-default';
 
   const fetchSites = async () => {
     setLoading(true);
@@ -81,24 +74,7 @@ export function SitesAdmin() {
   };
 
   useEffect(() => {
-    let mounted = true;
-    const setupLeaflet = async () => {
-      const leafletModule = await import('leaflet');
-      const L = leafletModule.default ?? leafletModule;
-      if (!mounted) {
-        return;
-      }
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-    };
-    void setupLeaflet();
     void fetchSites();
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -108,11 +84,13 @@ export function SitesAdmin() {
       setAddressSuggestions([]);
       setAcceptedSuggestion(address || null);
       setAddressLookupPerformed(false);
+      setAddressError(null);
     } else {
       setAddressQuery('');
       setAddressSuggestions([]);
       setAcceptedSuggestion(null);
       setAddressLookupPerformed(false);
+      setAddressError(null);
     }
   }, [editing]);
 
@@ -125,6 +103,7 @@ export function SitesAdmin() {
       setAddressSuggestions([]);
       setAddressLoading(false);
       setAddressLookupPerformed(false);
+      setAddressError(null);
       return;
     }
 
@@ -133,6 +112,7 @@ export function SitesAdmin() {
       setAddressSuggestions([]);
       setAddressLoading(false);
       setAddressLookupPerformed(false);
+      setAddressError(null);
       return;
     }
     const controller = new AbortController();
@@ -142,25 +122,34 @@ export function SitesAdmin() {
         setAddressSuggestions([]);
         setAddressLoading(false);
         setAddressLookupPerformed(true);
+        setAddressError(null);
         return;
       }
       setAddressLookupPerformed(false);
       setAddressLoading(true);
+      setAddressError(null);
       try {
-        console.log('[SitesAdmin] fetching suggestions', { query });
         const params = new URLSearchParams({ q: query, limit: '5' });
         const response = await fetch(`/api/admin/attendance/geocode?${params.toString()}`, {
           signal: controller.signal,
         });
         if (!response.ok) {
-          throw new Error(`status_${response.status}`);
+          const body = (await response.json().catch(() => ({}))) as { error?: string; details?: string };
+          if (response.status === 403) {
+            setAddressError('No autorizado para buscar direcciones (verifica tu sesión/rol).');
+          } else {
+            setAddressError(body.error ?? `No fue posible buscar direcciones (status ${response.status}).`);
+          }
+          setAddressSuggestions([]);
+          setAddressLookupPerformed(true);
+          return;
         }
         const data = (await response.json()) as { suggestions?: AddressSuggestion[] };
         setAddressSuggestions(data.suggestions ?? []);
         setAddressLookupPerformed(true);
       } catch (suggestError) {
         if (!(suggestError instanceof DOMException && suggestError.name === 'AbortError')) {
-          console.warn('address lookup failed', suggestError);
+          setAddressError('No fue posible buscar direcciones. Revisa tu conexión.');
           setAddressSuggestions([]);
           setAddressLookupPerformed(true);
         }
@@ -174,26 +163,10 @@ export function SitesAdmin() {
     };
   }, [addressQuery, editing]);
 
-  const handleMapRef = useCallback(
-    (instance: LeafletMap | null) => {
-      mapRef.current = instance;
-      if (instance) {
-        console.log('[SitesAdmin] map ready', instance.getCenter());
-      }
-    },
-    []
-  );
-
   const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
     const lat = Number(suggestion.lat);
     const lng = Number(suggestion.lng);
     const normalizedAddress = suggestion.displayName;
-
-    console.log('[SitesAdmin] suggestion selected', {
-      displayName: normalizedAddress,
-      lat,
-      lng,
-    });
 
     updateEditing((current) => ({
       ...current,
@@ -207,12 +180,7 @@ export function SitesAdmin() {
     setAcceptedSuggestion(normalizedAddress);
     setAddressLoading(false);
     setAddressLookupPerformed(true);
-
-    if (mapRef.current) {
-      mapRef.current.setView([lat, lng], mapZoom, { animate: true });
-    } else {
-      console.warn('[SitesAdmin] mapRef not ready to set view', { lat, lng });
-    }
+    setAddressError(null);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -221,8 +189,9 @@ export function SitesAdmin() {
       return;
     }
     setSuccess(null);
+    setError(null);
     const normalizeForSubmit = (site: Site) => {
-      const trimmedAddress = (site.address ?? '').trim();
+      const trimmedAddress = addressQuery.trim();
       return {
         ...site,
         address: trimmedAddress.length > 0 ? trimmedAddress : null,
@@ -239,8 +208,9 @@ export function SitesAdmin() {
       body: JSON.stringify(isExisting ? normalized : createBase),
     });
     if (!response.ok) {
-      const body = await response.json();
-      setError(body.error ?? 'No fue posible guardar el sitio');
+      const body = (await response.json().catch(() => ({}))) as { error?: string; details?: string };
+      const messageBase = body.error ?? 'No fue posible guardar el sitio';
+      setError(body.details ? `${messageBase}\n${body.details}` : messageBase);
       return;
     }
     setEditing(null);
@@ -249,6 +219,8 @@ export function SitesAdmin() {
   };
 
   const startCreation = () => {
+    setError(null);
+    setSuccess(null);
     setEditing({
       id: crypto.randomUUID(),
       name: '',
@@ -258,18 +230,20 @@ export function SitesAdmin() {
       radius_m: 100,
       is_active: true,
     });
-    console.log('Update:', -33.45, -70.66);
     setAddressQuery('');
     setAddressSuggestions([]);
     setAcceptedSuggestion(null);
+    setAddressError(null);
   };
 
   const startEdit = (site: Site) => {
+    setError(null);
+    setSuccess(null);
     setEditing({ ...site, address: site.address ?? '' });
-    console.log('Update:', site.lat, site.lng);
     setAddressQuery(site.address ?? '');
     setAddressSuggestions([]);
     setAcceptedSuggestion(site.address ?? null);
+    setAddressError(null);
   };
 
   const deleteSite = async (site: Site) => {
@@ -330,24 +304,28 @@ export function SitesAdmin() {
         }
       />
       {loading && <p className="text-sm text-slate-500">Cargando sitios…</p>}
-      {error && <p className="text-sm text-rose-500">{error}</p>}
-      {success && <p className="glass-panel border border-emerald-200/70 bg-emerald-50/70 p-3 text-sm text-emerald-700">{success}</p>}
+      {error && <p className="whitespace-pre-wrap text-sm text-rose-200">{error}</p>}
+      {success && (
+        <p className="rounded-3xl border border-emerald-400/30 bg-[rgba(16,185,129,0.12)] p-3 text-sm text-emerald-100">
+          {success}
+        </p>
+      )}
       <div className="glass-panel grid gap-3 rounded-3xl border border-white/60 bg-white/85 p-4 text-sm md:grid-cols-3">
         <label className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Búsqueda</span>
+          <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Búsqueda</span>
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Nombre, dirección o coordenadas"
-            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+            className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner placeholder:text-slate-400 focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
           />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Estado</span>
+          <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Estado</span>
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
-            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+            className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
           >
             <option value="ALL">Todos</option>
             <option value="ACTIVE">Activos</option>
@@ -355,7 +333,7 @@ export function SitesAdmin() {
           </select>
         </label>
         <div className="flex items-end">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-300">
             {filteredSites.length} de {sites.length} sitios visibles
           </p>
         </div>
@@ -374,14 +352,14 @@ export function SitesAdmin() {
             <div className="mt-3 flex gap-3 text-sm">
               <button
                 type="button"
-                className="rounded-full bg-blue-500/10 px-4 py-1 text-blue-600 transition hover:bg-blue-500/20"
+                className="rounded-full bg-sky-500/10 px-4 py-1 text-sky-200 transition hover:bg-sky-500/20"
                 onClick={() => startEdit(site)}
               >
                 Editar
               </button>
               <button
                 type="button"
-                className="rounded-full bg-rose-500/10 px-4 py-1 text-rose-600 transition hover:bg-rose-500/20"
+                className="rounded-full bg-rose-500/10 px-4 py-1 text-rose-200 transition hover:bg-rose-500/20"
                 onClick={() => deleteSite(site)}
               >
                 Eliminar
@@ -398,7 +376,7 @@ export function SitesAdmin() {
       {editing && (
         <form onSubmit={submit} className="glass-panel grid gap-4 rounded-3xl border border-white/60 bg-white/90 p-6 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Nombre</span>
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Nombre</span>
             <input
               required
               value={editing.name}
@@ -408,12 +386,12 @@ export function SitesAdmin() {
                   name: event.target.value,
                 }))
               }
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner placeholder:text-slate-400 focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
             />
           </label>
           <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Dirección</span>
-            <div className="relative">
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Dirección</span>
+            <div className="relative isolate">
               <input
                 required
                 value={addressQuery}
@@ -421,27 +399,50 @@ export function SitesAdmin() {
                   const value = event.target.value;
                   setAddressQuery(value);
                   setAcceptedSuggestion(null);
+                  setAddressError(null);
+                  updateEditing((current) => ({
+                    ...current,
+                    address: value,
+                  }));
                 }}
-                className="w-full rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+                onBlur={() => {
+                  window.setTimeout(() => setAddressSuggestions([]), 120);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && addressSuggestions.length > 0) {
+                    event.preventDefault();
+                    handleSelectSuggestion(addressSuggestions[0]);
+                  }
+                  if (event.key === 'Escape') {
+                    setAddressSuggestions([]);
+                  }
+                }}
+                placeholder="Escribe para buscar (mín. 3 letras)"
+                className="w-full rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner placeholder:text-slate-400 focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
               />
               {addressQuery.trim().length >= 3 &&
                 (addressLoading || addressSuggestions.length > 0 || addressLookupPerformed) && (
-                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-xl">
-                  {addressLoading && (
-                    <p className="px-4 py-2 text-xs text-slate-400">Buscando direcciones…</p>
-                  )}
-                  {!addressLoading && addressSuggestions.length === 0 && addressLookupPerformed && (
-                    <p className="px-4 py-2 text-xs text-slate-400">No se encontraron coincidencias.</p>
+                <div
+                  role="listbox"
+                  aria-label="Sugerencias de dirección"
+                  className="absolute left-0 right-0 top-full z-[100] mt-2 max-h-56 overflow-auto rounded-2xl border border-[rgba(255,255,255,0.16)] bg-[#070a12] shadow-2xl [scrollbar-width:thin] [scrollbar-color:rgba(124,200,255,0.35)_transparent]"
+                >
+                  {addressLoading && <p className="px-4 py-2 text-xs text-slate-200">Buscando direcciones…</p>}
+                  {!addressLoading && addressError && <p className="px-4 py-2 text-xs text-rose-200">{addressError}</p>}
+                  {!addressLoading && !addressError && addressSuggestions.length === 0 && addressLookupPerformed && (
+                    <p className="px-4 py-2 text-xs text-slate-200">No se encontraron coincidencias.</p>
                   )}
                   {addressSuggestions.map((suggestion) => (
                     <button
                       key={suggestion.id}
                       type="button"
+                      role="option"
+                      aria-selected="false"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => handleSelectSuggestion(suggestion)}
-                      className="flex w-full items-start gap-2 px-4 py-2 text-left text-xs text-slate-600 hover:bg-blue-50/70"
+                      className="flex w-full items-start gap-2 border-t border-[rgba(255,255,255,0.08)] px-4 py-2 text-left text-xs text-slate-100 hover:bg-[rgba(124,200,255,0.12)]"
                     >
-                      <span className="flex-1 leading-snug">{suggestion.displayName}</span>
+                      <span className="flex-1 whitespace-normal leading-snug">{suggestion.displayName}</span>
                     </button>
                   ))}
                 </div>
@@ -449,7 +450,7 @@ export function SitesAdmin() {
             </div>
           </label>
           <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Latitud</span>
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Latitud</span>
             <input
               type="number"
               value={editing.lat}
@@ -459,12 +460,12 @@ export function SitesAdmin() {
                   lat: Number(event.target.value),
                 }))
               }
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
               step={0.000001}
             />
           </label>
           <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Longitud</span>
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Longitud</span>
             <input
               type="number"
               value={editing.lng}
@@ -474,12 +475,12 @@ export function SitesAdmin() {
                   lng: Number(event.target.value),
                 }))
               }
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
               step={0.000001}
             />
           </label>
           <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Radio (m)</span>
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-300">Radio (m)</span>
             <input
               type="number"
               min={0}
@@ -490,36 +491,22 @@ export function SitesAdmin() {
                   radius_m: Number(event.target.value),
                 }))
               }
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              className="rounded-2xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.06)] p-3 text-sm text-slate-100 shadow-inner focus:border-[rgba(124,200,255,0.55)] focus:outline-none"
             />
           </label>
           <div className="md:col-span-2 h-64 overflow-hidden rounded-3xl border border-white/60">
-            <MapContainer
-              key={mapKey}
+            <SiteMap
               center={defaultPosition}
               zoom={mapZoom}
-              className="h-full w-full"
-              ref={handleMapRef}
-            >
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <Marker
-                key={markerKey}
-                position={defaultPosition}
-                draggable={true}
-                eventHandlers={{
-                  dragend: (event: DragEndEvent) => {
-                    const pos = event.target.getLatLng();
-                    updateEditing((current) => ({
-                      ...current,
-                      lat: pos.lat,
-                      lng: pos.lng,
-                    }));
-                    console.log('[SitesAdmin] marker dragged', pos);
-                  },
-                }}
-              />
-              <Circle key={`circle-${markerKey}`} center={defaultPosition} radius={editing.radius_m} />
-            </MapContainer>
+              radius={editing.radius_m}
+              onDragEnd={(pos) =>
+                updateEditing((current) => ({
+                  ...current,
+                  lat: pos.lat,
+                  lng: pos.lng,
+                }))
+              }
+            />
           </div>
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
             <label className="flex items-center gap-2 text-sm text-slate-600">

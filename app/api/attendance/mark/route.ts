@@ -66,7 +66,11 @@ export async function POST(request: NextRequest) {
   try {
     await ensureConsentVersion(supabase, person.id, 'GEO', GEO_CONSENT_VERSION);
   } catch (consentError) {
-    return respond(409, { error: (consentError as Error).message });
+    const message = (consentError as Error).message;
+    if (message === 'CONSENT_GEO_MISSING') {
+      return respond(409, { error: message, requiredVersion: GEO_CONSENT_VERSION });
+    }
+    return respond(409, { error: message });
   }
 
   const { data: site, error: siteError } = await supabase
