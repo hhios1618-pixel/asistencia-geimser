@@ -13,6 +13,7 @@ import {
   IconX,
   IconCalendarStats,
   IconClipboardText,
+  IconHelpCircle,
 } from '@tabler/icons-react';
 
 export type NavItem = {
@@ -28,6 +29,7 @@ export const ADMIN_NAV: NavItem[] = [
   { label: 'Sitios', href: '/admin/asistencia?panel=sites', icon: IconMapPins },
   { label: 'Turnos', href: '/admin/asistencia?panel=schedules', icon: IconCalendarStats },
   { label: 'Alertas', href: '/admin/asistencia?panel=alerts', icon: IconBellRinging },
+  { label: 'Ayuda', href: '/ayuda', icon: IconHelpCircle },
 ];
 
 export const SUPERVISOR_NAV: NavItem[] = [
@@ -36,6 +38,7 @@ export const SUPERVISOR_NAV: NavItem[] = [
   { label: 'Solicitudes', href: '/supervisor/solicitudes', icon: IconClipboardText },
   { label: 'Sitios asignados', href: '/supervisor/sitios', icon: IconMapPins },
   { label: 'Alertas', href: '/supervisor/alertas', icon: IconBellRinging },
+  { label: 'Ayuda', href: '/ayuda', icon: IconHelpCircle },
 ];
 
 export const WORKER_NAV: NavItem[] = [
@@ -43,6 +46,7 @@ export const WORKER_NAV: NavItem[] = [
   { label: 'Historial', href: '/asistencia/historial', icon: IconCalendarStats },
   { label: 'Solicitudes', href: '/asistencia/solicitudes', icon: IconClipboardText },
   { label: 'Alertas', href: '/asistencia/alertas', icon: IconBellRinging },
+  { label: 'Ayuda', href: '/ayuda', icon: IconHelpCircle },
 ];
 
 type DashboardLayoutProps = {
