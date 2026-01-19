@@ -444,9 +444,11 @@ export function PeopleAdmin() {
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-100 text-sm">
-            <thead className="bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
+            <thead className="bg-[rgba(8,10,16,0.88)] text-xs uppercase tracking-[0.3em] text-slate-400">
               <tr>
-                <th className="sticky left-0 z-10 bg-white/95 px-6 py-4 text-left">Nombre</th>
+                <th className="sticky left-0 z-20 border-r border-white/10 bg-[rgba(8,10,16,0.98)] px-6 py-4 text-left shadow-[12px_0_24px_-20px_rgba(0,0,0,0.9)]">
+                  Nombre
+                </th>
                 <th className="px-4 py-4 text-left">Rol</th>
                 <th className="px-4 py-4 text-left">Servicio</th>
                 <th className="px-4 py-4 text-left">RUT</th>
@@ -471,8 +473,8 @@ export function PeopleAdmin() {
                 const gradient = roleAccent[person.role];
                 const isInactive = !person.is_active;
                 return (
-                  <tr key={person.id} className="transition hover:bg-blue-50/30">
-                    <td className="sticky left-0 z-0 bg-white/95 px-6 py-4">
+                  <tr key={person.id} className="transition hover:bg-white/5">
+                    <td className="sticky left-0 z-10 border-r border-white/10 bg-[rgba(8,10,16,0.98)] px-6 py-4 shadow-[12px_0_24px_-20px_rgba(0,0,0,0.9)]">
                       <div className="flex items-center gap-4">
                         <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-blue-200 text-sm font-semibold text-blue-700">
                           {getInitials(person.name)}
