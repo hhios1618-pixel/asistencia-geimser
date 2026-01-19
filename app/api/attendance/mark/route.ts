@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
     return respond(403, { error: 'PERSON_INACTIVE' });
   }
 
+  const isManager = person.role === 'ADMIN' || person.role === 'SUPERVISOR';
+
   try {
     await ensureConsentVersion(supabase, person.id, 'GEO', GEO_CONSENT_VERSION);
   } catch (consentError) {
@@ -136,7 +138,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: site, error: siteError } = await supabase
+  const serviceSupabase = getServiceSupabase();
+
+  const { data: site, error: siteError } = await serviceSupabase
     .from('sites')
     .select('*')
     .eq('id', body.siteId)
@@ -144,6 +148,23 @@ export async function POST(request: NextRequest) {
 
   if (siteError || !site) {
     return respond(404, { error: 'SITE_NOT_ACCESSIBLE' });
+  }
+
+  if (!isManager) {
+    const { data: assignment, error: assignmentError } = await serviceSupabase
+      .from('people_sites')
+      .select('active')
+      .eq('person_id', person.id)
+      .eq('site_id', body.siteId)
+      .maybeSingle<{ active: boolean }>();
+
+    if (assignmentError && assignmentError.code !== 'PGRST116') {
+      return respond(500, { error: 'ASSIGNMENT_LOOKUP_FAILED', details: assignmentError.message });
+    }
+
+    if (!assignment?.active) {
+      return respond(404, { error: 'SITE_NOT_ACCESSIBLE' });
+    }
   }
 
   if (site.is_active === false) {
@@ -223,8 +244,6 @@ export async function POST(request: NextRequest) {
   if (insertError || !insertedMark) {
     return respond(500, { error: 'MARK_INSERT_FAILED', details: insertError?.message });
   }
-
-  const serviceSupabase = getServiceSupabase();
 
   const receiptUrl = await generateAndStoreReceipt(
     {

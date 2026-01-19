@@ -134,6 +134,23 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
     }
   };
 
+  const resolveMarkError = (api: { errorCode: string; details?: string }) => {
+    switch (api.errorCode) {
+      case 'SITE_NOT_ACCESSIBLE':
+        return 'Sitio no accesible. Pide a un administrador que te asigne al sitio (people_sites) o revisa que esté activo.';
+      case 'SITE_INACTIVE':
+        return 'El sitio está inactivo. Contacta a un administrador.';
+      case 'GEO_REQUIRED':
+        return 'Ubicación requerida para validar la geocerca.';
+      case 'OUTSIDE_GEOFENCE':
+        return 'Estás fuera del perímetro permitido del sitio.';
+      case 'UNAUTHENTICATED':
+        return 'Sesión expirada. Vuelve a iniciar sesión.';
+      default:
+        return api.details ? `${api.errorCode}: ${api.details}` : api.errorCode;
+    }
+  };
+
   const handleMark = useCallback(
     async (eventType: 'IN' | 'OUT') => {
       if (!siteId) {
@@ -191,7 +208,7 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
             setError('Servidor indisponible. Marca encolada.');
             return;
           }
-          throw new Error(result.body.details ?? result.errorCode ?? 'Error al registrar marca');
+          throw new Error(resolveMarkError({ errorCode: result.errorCode ?? 'MARK_FAILED', details: result.body.details }));
         }
 
         onSuccess?.(result.data);
@@ -300,7 +317,9 @@ export function CheckButtons({ siteId, lastEventType, onSuccess, onQueued, disab
                         consent: { geoAcceptedVersion: GEO_CONSENT_VERSION },
                       });
                       if (!result.ok) {
-                        throw new Error(result.body.details ?? result.errorCode ?? 'Error al registrar marca');
+                        throw new Error(
+                          resolveMarkError({ errorCode: result.errorCode ?? 'MARK_FAILED', details: result.body.details })
+                        );
                       }
                       onSuccess?.(result.data);
                     }
