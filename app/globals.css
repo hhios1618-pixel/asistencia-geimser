@@ -57,12 +57,12 @@ button {
   color-scheme: dark;
 }
 
-a {
+a:not([class]) {
   color: rgba(0, 229, 255, 0.92);
   text-decoration: none;
 }
 
-a:hover {
+a:not([class]):hover {
   text-decoration: underline;
 }
 

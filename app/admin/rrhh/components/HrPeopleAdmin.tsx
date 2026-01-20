@@ -237,7 +237,7 @@ export default function HrPeopleAdmin() {
                         <button
                           type="button"
                           onClick={() => startEdit(person)}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 transition hover:border-[rgba(0,229,255,0.35)] hover:bg-white/15 hover:text-white"
                         >
                           Editar
                         </button>
@@ -265,7 +265,7 @@ export default function HrPeopleAdmin() {
             <button
               type="button"
               onClick={() => setEditing(emptyPerson)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 transition hover:border-[rgba(0,229,255,0.35)] hover:bg-white/15 hover:text-white"
             >
               Limpiar
             </button>
@@ -413,4 +413,3 @@ export default function HrPeopleAdmin() {
     </section>
   );
 }
-
