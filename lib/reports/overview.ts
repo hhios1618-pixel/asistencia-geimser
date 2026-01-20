@@ -12,6 +12,8 @@ export type AdminOverviewData = {
   eventDistribution: { event_type: 'IN' | 'OUT'; total: number }[];
   topSites: { site: string; total: number }[];
   recentPeople: { name: string; role: Tables['people']['Row']['role']; created_at: string }[];
+  latestMarks: { person: string; event_type: 'IN' | 'OUT'; event_ts: string; site: string | null }[];
+  heatmap: { day: string; hours: number[] }[];
 };
 
 export const getAdminOverview = async (): Promise<AdminOverviewData> => {
@@ -72,6 +74,52 @@ export const getAdminOverview = async (): Promise<AdminOverviewData> => {
      limit 5`
   );
 
+  const latestMarksResult = await runQuery<{ person: string; event_type: 'IN' | 'OUT'; event_ts: string; site: string | null }>(
+    `select
+       coalesce(p.name, 'Colaborador') as person,
+       m.event_type,
+       m.event_ts::text as event_ts,
+       s.name as site
+     from public.attendance_marks m
+     left join public.people p on p.id = m.person_id
+     left join public.sites s on s.id = m.site_id
+     order by m.event_ts desc
+     limit 12`
+  );
+
+  const heatmapRows = await runQuery<{ day: string; hour: number; in_total: number }>(
+    `with hours as (
+       select generate_series(0, 23) as hour
+     ),
+     days as (
+       select generate_series(current_date - interval '6 days', current_date, interval '1 day')::date as day
+     ),
+     marks as (
+       select
+         event_ts::date as day,
+         extract(hour from event_ts)::int as hour,
+         count(*) filter (where event_type = 'IN') as in_total
+       from public.attendance_marks
+       where event_ts >= current_date - interval '6 days'
+       group by 1, 2
+     )
+     select
+       to_char(d.day, 'YYYY-MM-DD') as day,
+       h.hour,
+       coalesce(m.in_total, 0) as in_total
+     from days d
+     cross join hours h
+     left join marks m on m.day = d.day and m.hour = h.hour
+     order by d.day, h.hour`
+  );
+
+  const heatmapByDay = new Map<string, number[]>();
+  heatmapRows.rows.forEach((row) => {
+    const hours = heatmapByDay.get(row.day) ?? Array.from({ length: 24 }, () => 0);
+    hours[row.hour] = row.in_total;
+    heatmapByDay.set(row.day, hours);
+  });
+
   return {
     totals:
       totalsResult.rows[0] ?? 
@@ -85,5 +133,7 @@ export const getAdminOverview = async (): Promise<AdminOverviewData> => {
     eventDistribution: distributionResult.rows,
     topSites: topSitesResult.rows,
     recentPeople: recentPeopleResult.rows,
+    latestMarks: latestMarksResult.rows,
+    heatmap: Array.from(heatmapByDay.entries()).map(([day, hours]) => ({ day, hours })),
   };
 };

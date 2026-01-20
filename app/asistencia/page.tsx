@@ -29,6 +29,10 @@ export default async function AsistenciaPage() {
     .maybeSingle<Tables['people']['Row']>();
 
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+  const inferredRole =
+    (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+    defaultRole;
 
   if (personError) {
     const code = (personError as PostgrestError | null)?.code;
@@ -62,7 +66,7 @@ export default async function AsistenciaPage() {
         user.id as string,
         fallbackName.trim(),
         user.email ?? null,
-        defaultRole,
+        inferredRole,
         true,
         (user.user_metadata?.service as string | undefined) ?? null,
         (user.user_metadata?.rut as string | undefined) ?? null,
@@ -80,7 +84,7 @@ export default async function AsistenciaPage() {
         id: user.id as string,
         name: fallbackName.trim(),
         email: user.email ?? null,
-        role: defaultRole,
+        role: inferredRole,
         is_active: true,
         rut: (user.user_metadata?.rut as string | undefined) ?? null,
         service: (user.user_metadata?.service as string | undefined) ?? null,
@@ -130,7 +134,7 @@ export default async function AsistenciaPage() {
               <p className="font-semibold">¿Necesitas configurar usuarios, sitios o reportes?</p>
               <Link
                 href="/admin/asistencia"
-                className="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(37,99,235,0.55)] transition hover:from-blue-600 hover:via-indigo-600 hover:to-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
+                className="mt-3 inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] px-4 py-2 text-sm font-semibold text-black shadow-[0_18px_40px_-24px_rgba(0,229,255,0.45)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]/60"
               >
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs font-medium text-white">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
@@ -138,7 +142,7 @@ export default async function AsistenciaPage() {
                     <path d="m11 6 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
-                <span className="text-white drop-shadow-[0_10px_18px_rgba(15,23,42,0.35)]">Ir al panel administrativo</span>
+                <span className="text-black drop-shadow-[0_10px_18px_rgba(255,255,255,0.25)]">Ir al panel administrativo</span>
               </Link>
             </div>
           )}

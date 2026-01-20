@@ -14,11 +14,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'G-Trace',
-    template: '%s | G-Trace',
+    default: 'G‑Trace',
+    template: '%s | G‑Trace',
   },
-  description:
-    'G-Trace® es el sistema inteligente de asistencia y trazabilidad que integra identificación biométrica, georreferencia, marcaje de entradas y salidas, rutas diarias y reportes automáticos. Todo sincronizado con la suite corporativa, creando un flujo de control operativo sin fricción.',
+  description: 'G‑Trace: plataforma de RR.HH. para asistencia, nómina y gestión de personal.',
 };
 
 export default function RootLayout({
@@ -31,8 +30,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} relative min-h-screen overflow-x-hidden bg-[var(--background-gradient)] text-[var(--foreground)] antialiased`}
       >
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_18%_20%,rgba(120,196,255,0.16),transparent_36%),radial-gradient(circle_at_82%_14%,rgba(140,124,255,0.12),transparent_40%),radial-gradient(circle_at_50%_88%,rgba(48,140,255,0.12),transparent_45%)] blur-[90px]" />
-        <div className="pointer-events-none fixed inset-0 -z-20 bg-[linear-gradient(180deg,rgba(3,5,9,0.94),rgba(5,6,12,0.94))]" />
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_14%_20%,rgba(0,229,255,0.18),transparent_40%),radial-gradient(circle_at_86%_14%,rgba(255,43,214,0.14),transparent_44%),radial-gradient(circle_at_52%_90%,rgba(0,229,255,0.08),transparent_52%)] blur-[96px]" />
+        <div className="pointer-events-none fixed inset-0 -z-20 bg-[linear-gradient(180deg,rgba(0,0,0,0.95),rgba(0,0,0,0.98))]" />
         <div className="relative flex min-h-screen flex-col">{children}</div>
       </body>
     </html>

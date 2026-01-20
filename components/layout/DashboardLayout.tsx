@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   IconGauge,
   IconUserCheck,
@@ -18,26 +18,69 @@ import {
   IconHelpCircle,
 } from '@tabler/icons-react';
 
+export type NavSubItem = {
+  label: string;
+  href: string;
+};
+
 export type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ size?: number } & Record<string, unknown>>;
+  subItems?: NavSubItem[];
+  match?: (pathname: string) => boolean;
 };
 
 export const ADMIN_NAV: NavItem[] = [
-  { label: 'Resumen', href: '/admin', icon: IconGauge },
-  { label: 'Asistencia', href: '/admin/asistencia', icon: IconUserCheck },
-  { label: 'RRHH', href: '/admin/rrhh', icon: IconBuilding },
-  { label: 'Payroll', href: '/admin/payroll', icon: IconCashBanknote },
-  { label: 'Personas', href: '/admin/asistencia?panel=people', icon: IconUsers },
-  { label: 'Sitios', href: '/admin/asistencia?panel=sites', icon: IconMapPins },
-  { label: 'Turnos', href: '/admin/asistencia?panel=schedules', icon: IconCalendarStats },
-  { label: 'Alertas', href: '/admin/asistencia?panel=alerts', icon: IconBellRinging },
-  { label: 'Ayuda', href: '/ayuda', icon: IconHelpCircle },
+  {
+    label: 'Panel de control',
+    href: '/admin',
+    icon: IconGauge,
+    match: (pathname) => pathname === '/admin',
+  },
+  {
+    label: 'Asistencia',
+    href: '/admin/asistencia?panel=overview',
+    icon: IconUserCheck,
+    subItems: [
+      { label: 'Visión general', href: '/admin/asistencia?panel=overview' },
+      { label: 'Control diario', href: '/admin/asistencia?panel=daily' },
+      { label: 'Correcciones', href: '/admin/asistencia?panel=modifications' },
+      { label: 'Políticas', href: '/admin/asistencia?panel=policies' },
+      { label: 'Auditoría', href: '/admin/asistencia?panel=audit' },
+    ],
+  },
+  {
+    label: 'Gestión de RR.HH.',
+    href: '/admin/rrhh?panel=employees',
+    icon: IconBuilding,
+    subItems: [
+      { label: 'Empleados', href: '/admin/rrhh?panel=employees' },
+      { label: 'Roles y permisos', href: '/admin/rrhh?panel=roles' },
+      { label: 'Gestión de ausencias', href: '/admin/rrhh?panel=absences' },
+      { label: 'Evaluaciones', href: '/admin/rrhh?panel=performance' },
+      { label: 'Onboarding/Offboarding', href: '/admin/rrhh?panel=onboarding' },
+    ],
+  },
+  {
+    label: 'Nómina',
+    href: '/admin/payroll?panel=runs',
+    icon: IconCashBanknote,
+    subItems: [
+      { label: 'Registros salariales', href: '/admin/payroll?panel=salary' },
+      { label: 'Calendario de pagos', href: '/admin/payroll?panel=periods' },
+      { label: 'Bonos y comisiones', href: '/admin/payroll?panel=variables' },
+      { label: 'Reportes', href: '/admin/payroll?panel=reports' },
+    ],
+  },
+  { label: 'Sitios y ubicaciones', href: '/admin/sitios', icon: IconMapPins },
+  { label: 'Turnos y horarios', href: '/admin/turnos', icon: IconCalendarStats },
+  { label: 'Alertas y notificaciones', href: '/admin/alertas', icon: IconBellRinging },
+  { label: 'Ayuda / soporte', href: '/ayuda', icon: IconHelpCircle },
 ];
 
 export const SUPERVISOR_NAV: NavItem[] = [
-  { label: 'Resumen', href: '/supervisor', icon: IconGauge },
+  { label: 'Panel', href: '/supervisor', icon: IconGauge },
   { label: 'Equipo', href: '/supervisor/equipo', icon: IconUsers },
   { label: 'Solicitudes', href: '/supervisor/solicitudes', icon: IconClipboardText },
   { label: 'Sitios asignados', href: '/supervisor/sitios', icon: IconMapPins },
@@ -46,11 +89,10 @@ export const SUPERVISOR_NAV: NavItem[] = [
 ];
 
 export const WORKER_NAV: NavItem[] = [
-  { label: 'Mi jornada', href: '/asistencia', icon: IconGauge },
-  { label: 'Historial', href: '/asistencia/historial', icon: IconCalendarStats },
-  { label: 'Solicitudes', href: '/asistencia/solicitudes', icon: IconClipboardText },
-  { label: 'Alertas', href: '/asistencia/alertas', icon: IconBellRinging },
-  { label: 'Ayuda', href: '/ayuda', icon: IconHelpCircle },
+  { label: 'Mi horario', href: '/asistencia/horario', icon: IconCalendarStats },
+  { label: 'Mi asistencia', href: '/asistencia', icon: IconUserCheck },
+  { label: 'Mis solicitudes', href: '/asistencia/solicitudes', icon: IconClipboardText },
+  { label: 'Notificaciones', href: '/asistencia/notificaciones', icon: IconBellRinging },
 ];
 
 type DashboardLayoutProps = {
@@ -66,20 +108,38 @@ type DashboardLayoutProps = {
 const baseNavStyles =
   'group relative flex items-center gap-3 rounded-[18px] border border-transparent px-4 py-3 text-sm font-medium text-slate-200 transition-all duration-200 ease-out will-change-transform focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]/60';
 
-export function DashboardLayout({
-  title,
-  description,
-  breadcrumb,
-  actions,
-  navItems = ADMIN_NAV,
-  sidebarFooter,
-  children,
-}: DashboardLayoutProps) {
-  const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+const normalizePath = (href: string) => href.split('?')[0] ?? href;
+
+const getPanelParam = (href: string) => {
+  const match = href.match(/[?&]panel=([^&]+)/);
+  return match?.[1] ?? null;
+};
+
+function SidebarNav({
+  pathname,
+  navItems,
+  onNavigate,
+}: {
+  pathname: string;
+  navItems: NavItem[];
+  onNavigate: () => void;
+}) {
+  const searchParams = useSearchParams();
+  const activePanel = searchParams?.get('panel');
+
+  const isActiveModule = (item: NavItem) => {
+    if (item.match) {
+      return item.match(pathname);
+    }
+    const basePath = normalizePath(item.href);
+    if (basePath === '/') return pathname === '/';
+    return pathname === basePath || pathname.startsWith(`${basePath}/`);
+  };
+
+  const activeModule = navItems.find(isActiveModule) ?? null;
 
   const renderNavItem = (item: NavItem) => {
-    const active = pathname === item.href;
+    const active = isActiveModule(item);
     const Icon = item.icon;
     return (
       <Link
@@ -90,7 +150,7 @@ export function DashboardLayout({
             ? 'border-[rgba(255,255,255,0.14)] bg-white/10 text-white shadow-[0_20px_60px_-30px_rgba(124,200,255,0.55)] ring-1 ring-inset ring-[rgba(255,255,255,0.12)]'
             : 'border-transparent text-slate-400 hover:-translate-y-[1px] hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white hover:shadow-[0_18px_48px_-36px_rgba(0,0,0,0.45)]'
         }`}
-        onClick={() => setSidebarOpen(false)}
+        onClick={onNavigate}
       >
         <span
           className={`flex h-9 w-9 items-center justify-center rounded-[14px] transition-all duration-200 ease-out ${
@@ -105,6 +165,58 @@ export function DashboardLayout({
       </Link>
     );
   };
+
+  const renderSubItem = (item: NavSubItem) => {
+    const basePath = normalizePath(item.href);
+    const panel = getPanelParam(item.href);
+    const active = pathname === basePath && (panel ? activePanel === panel : !activePanel);
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`group flex items-center gap-3 rounded-[16px] border px-4 py-2.5 text-sm transition ${
+          active
+            ? 'border-[rgba(0,229,255,0.35)] bg-[rgba(0,229,255,0.10)] text-white shadow-[0_16px_44px_-30px_rgba(0,229,255,0.45)]'
+            : 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white'
+        }`}
+        onClick={onNavigate}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[var(--accent)]' : 'bg-white/20 group-hover:bg-white/35'}`}
+          aria-hidden
+        />
+        <span className="truncate">{item.label}</span>
+      </Link>
+    );
+  };
+
+  return (
+    <>
+      {navItems.map(renderNavItem)}
+      {activeModule?.subItems && activeModule.subItems.length > 0 && (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">
+            {activeModule.label}
+          </p>
+          <div className="flex flex-col gap-1">{activeModule.subItems.map(renderSubItem)}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function DashboardLayout({
+  title,
+  description,
+  breadcrumb,
+  actions,
+  navItems = ADMIN_NAV,
+  sidebarFooter,
+  children,
+}: DashboardLayoutProps) {
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[var(--background)]">
@@ -137,13 +249,22 @@ export function DashboardLayout({
             }`}
           >
             <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <Link href="/admin" className="flex items-center gap-3 text-left transition-transform duration-200 hover:-translate-y-[1px]">
-                <span className="flex h-11 w-11 items-center justify-center rounded-[20px] bg-[linear-gradient(140deg,#7cc8ff,#9dd8ff)] text-lg font-semibold text-[#05060c] shadow-[0_20px_50px_-28px_rgba(124,200,255,0.7)]">
+              <Link
+                href={
+                  pathname.startsWith('/asistencia')
+                    ? '/asistencia'
+                    : pathname.startsWith('/supervisor')
+                      ? '/supervisor'
+                      : '/admin'
+                }
+                className="flex items-center gap-3 text-left transition-transform duration-200 hover:-translate-y-[1px]"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] text-lg font-semibold text-black shadow-[0_20px_50px_-28px_rgba(0,229,255,0.55)]">
                   GT
                 </span>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-300">G-Trace</p>
-                  <p className="text-base font-semibold text-white">Trazabilidad en vivo</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-300">G‑Trace</p>
+                  <p className="text-base font-semibold text-white">Recursos Humanos</p>
                 </div>
               </Link>
               <button
@@ -159,7 +280,22 @@ export function DashboardLayout({
               className="flex flex-1 flex-col gap-2 overflow-y-auto pb-6 pr-1 md:pb-1"
               aria-label="Navegación principal"
             >
-              {navItems.map(renderNavItem)}
+              <Suspense fallback={<>{navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${baseNavStyles} ${
+                    (item.match ? item.match(pathname) : pathname === normalizePath(item.href) || pathname.startsWith(`${normalizePath(item.href)}/`))
+                      ? 'border-[rgba(255,255,255,0.14)] bg-white/10 text-white ring-1 ring-inset ring-[rgba(255,255,255,0.12)]'
+                      : 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white'
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <span className="tracking-[0.01em]">{item.label}</span>
+                </Link>
+              ))}</>}>
+                <SidebarNav pathname={pathname} navItems={navItems} onNavigate={() => setSidebarOpen(false)} />
+              </Suspense>
             </nav>
             {sidebarFooter ?? (
               <div className="rounded-[18px] border border-[rgba(255,255,255,0.14)] bg-[linear-gradient(150deg,rgba(124,200,255,0.12),rgba(94,234,212,0.08),rgba(255,255,255,0.04))] p-4 text-sm text-slate-100 shadow-[0_24px_55px_-32px_rgba(0,0,0,0.55)]">

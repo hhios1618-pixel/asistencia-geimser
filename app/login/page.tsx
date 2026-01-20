@@ -60,6 +60,10 @@ export default async function LoginPage() {
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
+    const role =
+      (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+      (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
+      defaultRole;
 
     await ensurePeopleServiceColumn();
 
@@ -67,7 +71,7 @@ export default async function LoginPage() {
       id: user.id as string,
       name: defaultName.trim(),
       email: user.email ?? null,
-      role: defaultRole,
+      role,
       is_active: true,
       service: (user.user_metadata?.service as string | undefined) ?? null,
       rut: (user.user_metadata?.rut as string | undefined) ?? null,
@@ -110,15 +114,15 @@ export default async function LoginPage() {
       console.error('[login] people bootstrap skipped', bootstrapError);
     }
 
-    redirect('/asistencia');
+    redirect(role === 'ADMIN' ? '/admin' : role === 'SUPERVISOR' ? '/supervisor' : '/asistencia');
   }
 
   const currentYear = new Date().getFullYear();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#05060c] text-slate-100">
+    <main className="relative min-h-screen overflow-hidden bg-black text-slate-100">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(124,200,255,0.22),transparent_38%),radial-gradient(circle_at_82%_0%,rgba(120,119,255,0.16),transparent_45%),radial-gradient(circle_at_40%_78%,rgba(56,140,255,0.18),transparent_48%)] blur-[90px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_24%,rgba(0,229,255,0.2),transparent_42%),radial-gradient(circle_at_84%_6%,rgba(255,43,214,0.16),transparent_48%),radial-gradient(circle_at_44%_82%,rgba(0,229,255,0.12),transparent_52%)] blur-[96px]" />
         <div className="absolute inset-x-1/4 top-[18%] h-64 rounded-full bg-white/5 blur-3xl" />
       </div>
 
@@ -126,48 +130,46 @@ export default async function LoginPage() {
         <div className="grid w-full max-w-5xl grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_.95fr]">
           <div className="flex flex-col justify-between gap-12">
             <header className="space-y-8">
-              <div className="inline-flex items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-2 shadow-[0_24px_60px_-38px_rgba(0,0,0,0.55)] ring-1 ring-white/5 backdrop-blur-xl">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#7cc8ff,#9dd8ff)] text-sm font-semibold text-[#05060c] shadow-[0_18px_40px_-18px_rgba(124,200,255,0.7)]">
-                  GT
-                </span>
-                <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-200">G-Trace</p>
-                  <p className="text-xs text-slate-400">Presencia real. Datos reales. Decisiones inteligentes.</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">G-Trace®</h1>
-                <p className="max-w-2xl text-base leading-relaxed text-slate-300">
-                  G-Trace® es el sistema inteligente de asistencia y trazabilidad que integra identificación biométrica, georreferencia, marcaje de entradas y salidas, rutas diarias y reportes automáticos. Todo sincronizado con la suite corporativa, creando un flujo de control operativo sin fricción.
-                </p>
-              </div>
+	              <div className="inline-flex items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-2 shadow-[0_24px_60px_-38px_rgba(0,0,0,0.55)] ring-1 ring-white/5 backdrop-blur-xl">
+	                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] text-sm font-semibold text-black shadow-[0_18px_40px_-18px_rgba(0,229,255,0.35)]">
+	                  GT
+	                </span>
+	                <div className="space-y-1">
+	                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-200">G‑Trace</p>
+	                  <p className="text-xs text-slate-400">Asistencia, RR.HH. y nómina en un solo lugar.</p>
+	                </div>
+	              </div>
+	              <div className="space-y-4">
+	                <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">G‑Trace</h1>
+	                <p className="max-w-2xl text-base leading-relaxed text-slate-300">
+	                  Inicia sesión para acceder a tus módulos: asistencia, RR.HH. y nómina.
+	                </p>
+	              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_22px_60px_-40px_rgba(0,0,0,0.5)]">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Identidad viva</p>
-                  <p className="mt-1 text-sm text-slate-200">Biometría, georreferencia y rutas en un panel continuo.</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Control</p>
+                  <p className="mt-1 text-sm text-slate-200">Asistencia, turnos y alertas en tiempo real.</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_22px_60px_-40px_rgba(0,0,0,0.5)]">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Decisiones inteligentes</p>
-                  <p className="mt-1 text-sm text-slate-200">Reportes automáticos y sincronización directa con tu suite corporativa.</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Gestión</p>
+                  <p className="mt-1 text-sm text-slate-200">Personas, roles, payroll y auditoría.</p>
                 </div>
               </div>
             </header>
-            <footer className="hidden text-sm text-slate-500 lg:block">
-              © {currentYear} G-Trace. Todos los derechos reservados.
-            </footer>
-          </div>
+	            <footer className="hidden text-sm text-slate-500 lg:block">© {currentYear} G‑Trace</footer>
+	          </div>
 
           <section className="relative overflow-hidden rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-10 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
             <div className="pointer-events-none absolute inset-0 rounded-[32px] border border-[rgba(255,255,255,0.08)]" />
             <div className="absolute inset-x-10 top-0 h-24 rounded-b-[32px] bg-gradient-to-b from-white/10 via-white/0 to-transparent" />
             <div className="relative space-y-6">
-              <div className="space-y-2 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Ingreso seguro</p>
-                <h2 className="text-3xl font-semibold text-white">Accede a G-Trace</h2>
-                <p className="text-sm text-slate-400">
-                  Identifícate con tu correo corporativo para continuar.
-                </p>
-              </div>
+	              <div className="space-y-2 text-center">
+	                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Ingreso seguro</p>
+	                <h2 className="text-3xl font-semibold text-white">Accede a G‑Trace</h2>
+	                <p className="text-sm text-slate-400">
+	                  Identifícate con tu correo corporativo para continuar.
+	                </p>
+	              </div>
               <LoginForm />
               <div className="pt-6 text-center text-xs text-slate-500">
                 <p>Acceso exclusivo para personal autorizado.</p>

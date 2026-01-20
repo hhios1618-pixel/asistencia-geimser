@@ -38,6 +38,8 @@ type OverviewResponse = {
   eventDistribution: { event_type: 'IN' | 'OUT'; total: number }[];
   topSites: { site: string; total: number }[];
   recentPeople: { name: string; role: 'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER'; created_at: string }[];
+  latestMarks?: { person: string; event_type: 'IN' | 'OUT'; event_ts: string; site: string | null }[];
+  heatmap?: { day: string; hours: number[] }[];
 };
 
 const ROLE_LABELS: Record<'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER', string> = {
@@ -107,9 +109,72 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
 
   const maxMarks = Math.max(...data.marksByDay.map((item) => item.total), 1);
   const totalEvents = data.eventDistribution.reduce((acc, item) => acc + item.total, 0);
+  const heatmapMax = Math.max(
+    1,
+    ...(data.heatmap ?? []).flatMap((row) => row.hours)
+  );
 
   return (
     <div className="grid gap-8">
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Visión general</p>
+          <h4 className="text-lg font-semibold text-slate-900">Mapa de calor (check-ins)</h4>
+          <p className="mt-2 text-sm text-slate-500">Últimos 7 días · intensidad por hora (solo IN).</p>
+
+          <div className="mt-5 space-y-3">
+            {(data.heatmap ?? []).map((row) => (
+              <div key={row.day} className="flex items-center gap-3">
+                <span className="w-16 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  {new Intl.DateTimeFormat('es-CL', { weekday: 'short' }).format(new Date(row.day))}
+                </span>
+                <div className="grid flex-1 grid-cols-[repeat(24,minmax(0,1fr))] gap-1">
+                  {row.hours.map((value, index) => (
+                    <span
+                      key={`${row.day}-${index}`}
+                      title={`${index}:00 · ${value} IN`}
+                      className="h-3 rounded-sm border border-white/30"
+                      style={{
+                        backgroundColor: `rgba(0, 229, 255, ${Math.min(0.78, (value / heatmapMax) * 0.78)})`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {(data.heatmap ?? []).length === 0 && <p className="text-sm text-slate-400">Sin datos para graficar.</p>}
+          </div>
+        </div>
+
+        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Tiempo real</p>
+          <h4 className="text-lg font-semibold text-slate-900">Últimos check-ins</h4>
+          <div className="mt-4 space-y-3">
+            {(data.latestMarks ?? []).slice(0, 8).map((mark, index) => (
+              <div
+                key={`${mark.person}-${mark.event_ts}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-800">{mark.person}</p>
+                  <p className="truncate text-xs text-slate-400">{mark.site ?? 'Sitio no registrado'}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge
+                    label={mark.event_type === 'IN' ? 'Entrada' : 'Salida'}
+                    variant={mark.event_type === 'IN' ? 'success' : 'warning'}
+                  />
+                  <span className="text-xs font-semibold text-slate-500">
+                    {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(new Date(mark.event_ts))}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {(data.latestMarks ?? []).length === 0 && <p className="text-sm text-slate-400">Sin eventos recientes.</p>}
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="Colaboradores activos"
@@ -244,17 +309,35 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
 }
 
 export function AdminAttendanceClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    const preset = searchParams?.get('panel');
-    return preset && SECTIONS.some((section) => section.id === preset) ? preset : 'overview';
-  });
+  const router = useRouter();
+  const rawPanel = searchParams?.get('panel') ?? 'overview';
+  const activeTab = SECTIONS.some((section) => section.id === rawPanel) ? rawPanel : 'overview';
   const [overviewData, setOverviewData] = useState<OverviewResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState<boolean>(true);
   const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (activeTab === 'sites') {
+      router.replace('/admin/sitios');
+      return;
+    }
+    if (activeTab === 'schedules') {
+      router.replace('/admin/turnos');
+      return;
+    }
+    if (activeTab === 'alerts') {
+      router.replace('/admin/alertas');
+      return;
+    }
+  }, [activeTab, router]);
+
+  useEffect(() => {
+    if (activeTab !== 'overview') {
+      setOverviewLoading(false);
+      return;
+    }
+
     let active = true;
     const fetchOverview = async () => {
       try {
@@ -281,14 +364,7 @@ export function AdminAttendanceClient() {
     return () => {
       active = false;
     };
-  }, []);
-
-  useEffect(() => {
-    const panel = searchParams?.get('panel');
-    if (panel && SECTIONS.some((section) => section.id === panel) && panel !== activeTab) {
-      setActiveTab(panel);
-    }
-  }, [searchParams, activeTab]);
+  }, [activeTab]);
 
   const activeMeta = useMemo(() => SECTIONS.find((section) => section.id === activeTab) ?? SECTIONS[0], [activeTab]);
 
@@ -319,98 +395,16 @@ export function AdminAttendanceClient() {
     }
   };
 
-  const openSection = (sectionId: string) => {
-    setActiveTab(sectionId);
-    const params = new URLSearchParams(searchParams?.toString() ?? '');
-    params.set('panel', sectionId);
-    router.replace(`/admin/asistencia?${params.toString()}`, { scroll: false });
-  };
-
   return (
-    <div className="grid gap-8 xl:grid-cols-[320px_1fr]">
-      <aside className="glass-panel h-fit rounded-3xl border border-white/60 bg-white/70 p-4 xl:sticky xl:top-6">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">Panel</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Secciones</p>
-          </div>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
-            {activeMeta.label}
-          </span>
+    <section className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{activeMeta.label}</p>
+          <p className="mt-2 text-sm text-slate-300">{activeMeta.description}</p>
         </div>
-
-        <nav className="flex flex-col gap-2" aria-label="Secciones de administración">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon;
-            const isActive = section.id === activeTab;
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => openSection(section.id)}
-                className={`group relative flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                  isActive
-                    ? 'border-[rgba(124,200,255,0.45)] bg-[linear-gradient(135deg,rgba(124,200,255,0.18),rgba(94,234,212,0.1))] text-white shadow-[0_22px_60px_-42px_rgba(124,200,255,0.55)]'
-                    : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10'
-                }`}
-              >
-                <span
-                  className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-[14px] border transition ${
-                    isActive
-                      ? 'border-[rgba(124,200,255,0.35)] bg-[rgba(124,200,255,0.18)] text-white'
-                      : 'border-white/10 bg-black/20 text-slate-200 group-hover:border-white/20 group-hover:bg-black/25'
-                  }`}
-                >
-                  <Icon size={18} />
-                </span>
-                <span className="flex-1">
-                  <span className="block text-sm font-semibold">{section.label}</span>
-                  <span className={`mt-1 block text-xs ${isActive ? 'text-slate-100/80' : 'text-slate-400'}`}>
-                    {section.description}
-                  </span>
-                </span>
-                {isActive && (
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[linear-gradient(180deg,rgba(124,200,255,0.9),rgba(139,92,246,0.55))]"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
-
-      <div className="flex min-w-0 flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{activeMeta.label}</p>
-            <p className="mt-2 text-sm text-slate-300">{activeMeta.description}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 xl:hidden">
-            {SECTIONS.slice(0, 5).map((section) => {
-              const isActive = section.id === activeTab;
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => openSection(section.id)}
-                  className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                    isActive
-                      ? 'border-[rgba(124,200,255,0.45)] bg-[rgba(124,200,255,0.16)] text-white'
-                      : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10'
-                  }`}
-                >
-                  {section.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-8">{renderContent()}</div>
-      </div>
-    </div>
+      </header>
+      <div className="flex flex-col gap-8">{renderContent()}</div>
+    </section>
   );
 }
 

@@ -58,7 +58,7 @@ export function LoginForm() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="h-12 w-full bg-transparent text-base text-white placeholder:text-slate-500 focus:outline-none"
-              placeholder="persona@g-trace.com"
+              placeholder="persona@empresa.com"
               required
               autoComplete="email"
             />
@@ -99,7 +99,7 @@ export function LoginForm() {
       )}
       <button
         type="submit"
-        className="group relative flex h-12 items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#7cc8ff,#5aa7f5)] text-sm font-semibold uppercase tracking-[0.2em] text-[#05060c] shadow-[0_20px_50px_-24px_rgba(124,200,255,0.55)] transition hover:shadow-[0_26px_70px_-26px_rgba(124,200,255,0.65)] disabled:cursor-not-allowed disabled:bg-slate-500 disabled:text-slate-200"
+        className="group relative flex h-12 items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] text-sm font-semibold uppercase tracking-[0.2em] text-black shadow-[0_20px_55px_-26px_rgba(0,229,255,0.28)] transition hover:shadow-[0_28px_80px_-30px_rgba(255,43,214,0.22)] disabled:cursor-not-allowed disabled:bg-slate-500 disabled:text-slate-200"
         disabled={loading}
       >
         <span className="relative z-10">{loading ? 'Ingresando…' : 'Ingresar'}</span>

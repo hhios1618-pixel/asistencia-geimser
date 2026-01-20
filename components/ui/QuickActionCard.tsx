@@ -7,14 +7,17 @@ type QuickActionCardProps = {
   description: string;
   href: string;
   icon?: React.ReactNode;
-  accent?: 'blue' | 'emerald' | 'amber' | 'indigo';
+  accent?: 'cyan' | 'fuchsia' | 'neutral' | 'blue' | 'emerald' | 'amber' | 'indigo';
 };
 
 const accentMap: Record<Required<QuickActionCardProps>['accent'], string> = {
-  blue: 'from-[#7cc8ff] to-[#5aa7f5] text-[#05060c]',
-  emerald: 'from-[#64dfc3] to-[#43b59f] text-[#041014]',
-  amber: 'from-[#f6c96f] to-[#f59e3b] text-[#1f1305]',
-  indigo: 'from-[#a8b7ff] to-[#7c91ff] text-[#0b0f1c]',
+  cyan: 'from-[var(--accent)] to-[rgba(0,229,255,0.72)] text-black',
+  fuchsia: 'from-[var(--accent-2)] to-[rgba(255,43,214,0.78)] text-black',
+  neutral: 'from-[rgba(255,255,255,0.18)] to-[rgba(255,255,255,0.10)] text-white',
+  blue: 'from-[var(--accent)] to-[rgba(0,229,255,0.72)] text-black',
+  emerald: 'from-[var(--accent)] to-[rgba(0,229,255,0.72)] text-black',
+  amber: 'from-[var(--accent-2)] to-[rgba(255,43,214,0.78)] text-black',
+  indigo: 'from-[var(--accent-2)] to-[rgba(255,43,214,0.78)] text-black',
 };
 
 export function QuickActionCard({ title, description, href, icon, accent = 'blue' }: QuickActionCardProps) {

@@ -7,7 +7,8 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { getAdminOverview, type AdminOverviewData } from '../../lib/reports/overview';
 import { createServerSupabaseClient } from '../../lib/supabase/server';
 import type { Tables } from '../../types/database';
-import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics, IconBuilding, IconCashBanknote } from '@tabler/icons-react';
+import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics, IconBuilding, IconCashBanknote, IconBellRinging, IconCake } from '@tabler/icons-react';
+import { runQuery } from '../../lib/db/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,65 +51,121 @@ function buildAlertItems(data: AdminOverviewData): Parameters<typeof AlertStack>
   }));
 }
 
+const PAYROLL_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Borrador',
+  CALCULATED: 'Calculada',
+  FINALIZED: 'Finalizada',
+  PAID: 'Pagada',
+  CANCELLED: 'Cancelada',
+};
+
 export default async function AdminHomePage() {
   const { user } = await authorizeAdmin();
   const overview = await getAdminOverview();
 
+  const [{ rows: attendanceTodayRows }, { rows: pendingRequestRows }, { rows: payrollRows }, { rows: birthdaysRows }] =
+    await Promise.all([
+      runQuery<{ active_checkins: number; in_today: number }>(
+        `with last_event as (
+           select person_id, max(event_ts) as last_ts
+           from public.attendance_marks
+           where event_ts::date = current_date
+           group by person_id
+         ),
+         last_type as (
+           select m.person_id, m.event_type
+           from public.attendance_marks m
+           join last_event le on le.person_id = m.person_id and le.last_ts = m.event_ts
+         )
+         select
+           coalesce(count(*) filter (where lt.event_type = 'IN'), 0) as active_checkins,
+           coalesce((
+             select count(distinct person_id)
+             from public.attendance_marks
+             where event_ts::date = current_date and event_type = 'IN'
+           ), 0) as in_today
+         from last_type lt`
+      ),
+      runQuery<{ pending_requests: number }>(
+        `select count(*) as pending_requests
+         from public.attendance_requests
+         where status = 'PENDING'`
+      ),
+      runQuery<{ status: string; created_at: string; label: string | null; start_date: string; end_date: string }>(
+        `select r.status, r.created_at, p.label, p.start_date::text as start_date, p.end_date::text as end_date
+         from public.payroll_runs r
+         join public.payroll_periods p on p.id = r.period_id
+         order by r.created_at desc
+         limit 1`
+      ),
+      runQuery<{ upcoming_birthdays: number }>(
+        `with dates as (
+           select
+             case
+               when make_date(extract(year from current_date)::int, extract(month from birth_date)::int, extract(day from birth_date)::int) < current_date
+                 then make_date(extract(year from current_date)::int + 1, extract(month from birth_date)::int, extract(day from birth_date)::int)
+               else make_date(extract(year from current_date)::int, extract(month from birth_date)::int, extract(day from birth_date)::int)
+             end as next_bday
+           from public.people
+           where birth_date is not null and is_active = true
+         )
+         select count(*) as upcoming_birthdays
+         from dates
+         where next_bday <= (current_date + interval '30 days')`
+      ),
+    ]);
+
+  const todayAttendance = attendanceTodayRows[0] ?? { active_checkins: 0, in_today: 0 };
+  const pendingRequests = pendingRequestRows[0]?.pending_requests ?? 0;
+  const absencesToday = Math.max(overview.totals.active_people - todayAttendance.in_today, 0);
+
+  const payroll = payrollRows[0] ?? null;
+  const payrollLabel = payroll?.label ?? (payroll ? `${payroll.start_date} → ${payroll.end_date}` : '—');
+  const payrollStatus = payroll?.status ? (PAYROLL_STATUS_LABELS[payroll.status] ?? payroll.status) : 'Sin corridas';
+
+  const upcomingBirthdays = birthdaysRows[0]?.upcoming_birthdays ?? 0;
+
   const quickActions = [
     {
-      title: 'Gestionar asistencia',
-      description: 'Revisa marcas, ajustes y auditoría diaria.',
-      href: '/admin/asistencia',
+      title: 'Añadir empleado',
+      description: 'Incorpora y edita ficha laboral.',
+      href: '/admin/rrhh?panel=employees',
       icon: <IconUserCheck size={20} />,
-      accent: 'indigo' as const,
+      accent: 'cyan' as const,
     },
     {
-      title: 'RRHH',
-      description: 'Negocios, cargos, ficha laboral y headcount.',
-      href: '/admin/rrhh',
+      title: 'Aprobar ausencias',
+      description: 'Revisa solicitudes del equipo.',
+      href: '/supervisor/solicitudes',
       icon: <IconBuilding size={20} />,
-      accent: 'emerald' as const,
+      accent: 'fuchsia' as const,
     },
     {
-      title: 'Payroll',
-      description: 'Calcula remuneraciones por días trabajados.',
-      href: '/admin/payroll',
+      title: 'Ejecutar nómina',
+      description: 'Calcula y valida corridas del periodo.',
+      href: '/admin/payroll?panel=runs',
       icon: <IconCashBanknote size={20} />,
-      accent: 'blue' as const,
+      accent: 'cyan' as const,
     },
     {
-      title: 'Administrar personas',
-      description: 'Incorpora nuevos colaboradores y gestiona roles.',
-      href: '/admin/asistencia?panel=people',
-      icon: <IconUsers size={20} />,
-      accent: 'emerald' as const,
-    },
-    {
-      title: 'Sitios y geocercas',
-      description: 'Configura ubicaciones, radios permitidos y responsables.',
-      href: '/admin/asistencia?panel=sites',
-      icon: <IconMapPin size={20} />,
-      accent: 'amber' as const,
-    },
-    {
-      title: 'Reportes ejecutivos',
-      description: 'Genera reportes PDF/CSV para dirección y clientes.',
-      href: '/admin/asistencia?panel=dt',
-      icon: <IconReportAnalytics size={20} />,
-      accent: 'blue' as const,
+      title: 'Revisar alertas',
+      description: 'Monitorea incidencias y anomalías.',
+      href: '/admin/alertas',
+      icon: <IconBellRinging size={20} />,
+      accent: 'neutral' as const,
     },
   ];
 
   return (
     <DashboardLayout
       title="Panel corporativo"
-      description={`Bienvenido, ${user.user_metadata?.full_name ?? user.email}. Control total de la operación de asistencia.`}
+      description={`Bienvenido, ${user.user_metadata?.full_name ?? user.email}. Visión unificada de asistencia, RR.HH. y nómina.`}
       breadcrumb={[{ label: 'Administración' }, { label: 'Resumen' }]}
       actions={
         <div className="flex gap-2">
           <a
             href="/asistencia"
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-[0_18px_55px_-40px_rgba(0,0,0,0.75)] transition hover:border-[rgba(124,200,255,0.35)] hover:bg-white/15 hover:text-white"
+            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-[0_18px_55px_-40px_rgba(0,0,0,0.75)] transition hover:border-[rgba(0,229,255,0.35)] hover:bg-white/15 hover:text-white"
           >
             Ir a mi jornada
           </a>
@@ -134,12 +191,14 @@ export default async function AdminHomePage() {
           hint="Entradas + salidas"
           icon={<IconUserCheck size={22} />}
         />
-        <KpiCard
-          title="Colaboradores inactivos"
-          value={overview.totals.inactive_people}
-          hint="Revisión requerida"
-          icon={<IconReportAnalytics size={22} />}
-        />
+        <KpiCard title="Check-ins activos" value={todayAttendance.active_checkins} hint="Hoy" icon={<IconUserCheck size={22} />} />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard title="Ausencias del día" value={absencesToday} hint="Sin IN registrado" icon={<IconUsers size={22} />} />
+        <KpiCard title="Solicitudes pendientes" value={pendingRequests} hint="Aprobación requerida" icon={<IconReportAnalytics size={22} />} />
+        <KpiCard title="Estado de nómina" value={payrollStatus} hint={payrollLabel} icon={<IconCashBanknote size={22} />} />
+        <KpiCard title="Cumpleaños (30 días)" value={upcomingBirthdays} hint="Próximos" icon={<IconCake size={22} />} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
