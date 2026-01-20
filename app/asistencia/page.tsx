@@ -127,10 +127,10 @@ export default async function AsistenciaPage() {
       breadcrumb={[{ label: 'Asistencia' }, { label: 'Mi jornada' }]}
       navItems={WORKER_NAV}
     >
-      <div className="glass-panel w-full rounded-[32px] border border-white/70 bg-white/95 p-8 shadow-[0_36px_110px_-68px_rgba(30,64,175,0.55)]">
+      <div className="glass-panel w-full rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-8 shadow-[0_36px_110px_-68px_rgba(0,229,255,0.22)]">
         <LocationPermissionGuard>
           {(ensuredPerson.role === 'ADMIN' || ensuredPerson.role === 'SUPERVISOR') && (
-            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900">
+            <div className="mb-6 rounded-2xl border border-[rgba(0,229,255,0.22)] bg-[rgba(0,229,255,0.06)] p-4 text-sm text-slate-100">
               <p className="font-semibold">¿Necesitas configurar usuarios, sitios o reportes?</p>
               <Link
                 href="/admin/asistencia"

@@ -81,16 +81,15 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="overflow-hidden rounded-[32px] border border-white/70 bg-gradient-to-br from-indigo-500/10 via-white/96 to-blue-500/10 p-[1px] shadow-[0_40px_110px_-68px_rgba(30,64,175,0.55)]">
-        <div className="relative rounded-[28px] bg-white/96 p-6 sm:p-10">
-          <div className="absolute -right-32 top-1/2 hidden h-64 w-64 -translate-y-1/2 rounded-full bg-gradient-to-br from-indigo-500/30 via-blue-500/15 to-transparent blur-3xl lg:block" />
-          <div className="relative grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <section className="glass-panel overflow-hidden rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.7)] sm:p-10">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_18%_30%,rgba(0,229,255,0.16),transparent_46%),radial-gradient(circle_at_86%_14%,rgba(255,43,214,0.12),transparent_46%)]" />
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
             <div className="flex flex-col gap-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bienvenido</p>
-                  <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">{person.name}</h1>
-                  <p className="mt-2 text-sm text-slate-500">
+                  <h1 className="text-3xl font-semibold text-white sm:text-4xl">{person.name}</h1>
+                  <p className="mt-2 text-sm text-slate-300">
                     Rol {ROLE_LABELS[person.role]}. Gestiona tus marcaciones en tiempo real con validación geográfica y
                     respaldo criptográfico.
                   </p>
@@ -114,7 +113,6 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
             </div>
             <ShiftInfoCard schedule={schedule} currentDate={new Date()} />
           </div>
-        </div>
       </section>
 
       <AlertsBanner />
@@ -127,18 +125,18 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
             onSelect={setSelectedSiteId}
           />
 
-          <section className="glass-panel rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_32px_90px_-60px_rgba(37,99,235,0.45)]">
+          <section className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(0,229,255,0.18)]">
             <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Marcaje seguro</p>
-                <h2 className="text-lg font-semibold text-slate-900">Valida tu ubicación y marca tu jornada</h2>
+                <h2 className="text-lg font-semibold text-white">Valida tu ubicación y marca tu jornada</h2>
               </div>
               <LogoutButton />
             </header>
             {selectedSite ? (
               <GeofenceBadge site={selectedSite} />
             ) : (
-              <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-700">
+              <p className="rounded-2xl border border-[rgba(255,43,214,0.35)] bg-[rgba(255,43,214,0.08)] px-4 py-3 text-sm text-slate-100">
                 Selecciona un sitio para verificar la geocerca antes de marcar.
               </p>
             )}
@@ -185,27 +183,27 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
         </div>
 
         <aside className="flex flex-col gap-8">
-          <section className="glass-panel rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_32px_90px_-60px_rgba(37,99,235,0.45)]">
+          <section className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(255,43,214,0.14)]">
             <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Resumen criptográfico</h3>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-300">
               Cada marcaje genera un hash SHA-256 con enlace verificable. Descarga el recibo para auditoría.
             </p>
             {lastEvent ? (
-              <div className="mt-4 space-y-2 rounded-2xl border border-slate-100 bg-white/90 p-4 text-xs text-slate-500">
+              <div className="mt-4 space-y-2 rounded-2xl border border-[rgba(255,255,255,0.12)] bg-black/20 p-4 text-xs text-slate-200">
                 <p>
-                  <span className="font-semibold text-slate-700">Último evento:</span>{' '}
+                  <span className="font-semibold text-white/90">Último evento:</span>{' '}
                   {lastEventType === 'IN' ? 'Entrada' : 'Salida'} · {formatDateTime(lastEvent.event_ts)}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-700">Sitio:</span>{' '}
+                  <span className="font-semibold text-white/90">Sitio:</span>{' '}
                   {lastEventSiteName ?? 'Sin registro'}
                 </p>
                 <p className="break-all">
-                  <span className="font-semibold text-slate-700">Hash:</span> {lastEvent.hash_self}
+                  <span className="font-semibold text-white/90">Hash:</span> {lastEvent.hash_self}
                 </p>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-slate-500">Aún no registras marcajes. Tus hash aparecerán aquí.</p>
+              <p className="mt-4 text-sm text-slate-300">Aún no registras marcajes. Tus hash aparecerán aquí.</p>
             )}
           </section>
         </aside>
@@ -226,7 +224,7 @@ type StatusSummaryProps = {
 };
 
 const StatusSummary = ({ lastEventType, lastEvent, siteName, formatDateTime }: StatusSummaryProps) => (
-  <div className="grid gap-3 text-xs text-slate-500 sm:grid-cols-2 lg:grid-cols-3">
+  <div className="grid gap-3 text-xs text-slate-300 sm:grid-cols-2 lg:grid-cols-3">
     <InfoChip
       label="Estado actual"
       value={
@@ -253,16 +251,16 @@ type InfoChipProps = {
 };
 
 const variantStyles: Record<Exclude<InfoChipProps['variant'], undefined>, string> = {
-  default: 'border-slate-200 bg-white/80 text-slate-700',
-  success: 'border-emerald-200 bg-emerald-50/80 text-emerald-700',
-  warning: 'border-amber-200 bg-amber-50/80 text-amber-700',
+  default: 'border-[rgba(255,255,255,0.12)] bg-white/5 text-slate-200',
+  success: 'border-[rgba(0,229,255,0.32)] bg-[rgba(0,229,255,0.08)] text-slate-100',
+  warning: 'border-[rgba(255,43,214,0.32)] bg-[rgba(255,43,214,0.08)] text-slate-100',
 };
 
 const InfoChip = ({ label, value, variant = 'default' }: InfoChipProps) => (
   <div
-    className={`rounded-2xl border px-4 py-3 text-sm shadow-[0_18px_40px_-30px_rgba(15,23,42,0.25)] ${variantStyles[variant]}`}
+    className={`rounded-2xl border px-4 py-3 text-sm shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] ${variantStyles[variant]}`}
   >
-    <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">{label}</p>
+    <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">{label}</p>
     <p className="mt-2 font-semibold">{value}</p>
   </div>
 );

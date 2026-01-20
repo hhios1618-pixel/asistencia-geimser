@@ -152,6 +152,12 @@ a:hover {
   background-color: rgba(255, 255, 255, 0.13) !important;
 }
 
+.bg-white\/96,
+.bg-white\/92,
+.bg-white\/88 {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
 .bg-white\/80,
 .bg-white\/75,
 .bg-white\/70,
