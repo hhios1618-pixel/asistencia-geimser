@@ -7,7 +7,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { getAdminOverview, type AdminOverviewData } from '../../lib/reports/overview';
 import { createServerSupabaseClient } from '../../lib/supabase/server';
 import type { Tables } from '../../types/database';
-import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics } from '@tabler/icons-react';
+import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics, IconBuilding, IconCashBanknote } from '@tabler/icons-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +61,20 @@ export default async function AdminHomePage() {
       href: '/admin/asistencia',
       icon: <IconUserCheck size={20} />,
       accent: 'indigo' as const,
+    },
+    {
+      title: 'RRHH',
+      description: 'Negocios, cargos, ficha laboral y headcount.',
+      href: '/admin/rrhh',
+      icon: <IconBuilding size={20} />,
+      accent: 'emerald' as const,
+    },
+    {
+      title: 'Payroll',
+      description: 'Calcula remuneraciones por días trabajados.',
+      href: '/admin/payroll',
+      icon: <IconCashBanknote size={20} />,
+      accent: 'blue' as const,
     },
     {
       title: 'Administrar personas',

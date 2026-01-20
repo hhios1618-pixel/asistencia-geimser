@@ -13,6 +13,8 @@ import {
   IconX,
   IconCalendarStats,
   IconClipboardText,
+  IconBuilding,
+  IconCashBanknote,
   IconHelpCircle,
 } from '@tabler/icons-react';
 
@@ -25,6 +27,8 @@ export type NavItem = {
 export const ADMIN_NAV: NavItem[] = [
   { label: 'Resumen', href: '/admin', icon: IconGauge },
   { label: 'Asistencia', href: '/admin/asistencia', icon: IconUserCheck },
+  { label: 'RRHH', href: '/admin/rrhh', icon: IconBuilding },
+  { label: 'Payroll', href: '/admin/payroll', icon: IconCashBanknote },
   { label: 'Personas', href: '/admin/asistencia?panel=people', icon: IconUsers },
   { label: 'Sitios', href: '/admin/asistencia?panel=sites', icon: IconMapPins },
   { label: 'Turnos', href: '/admin/asistencia?panel=schedules', icon: IconCalendarStats },

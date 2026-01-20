@@ -13,6 +13,7 @@ import {
   IconCalendarStats,
   IconBellRinging,
   IconAlertTriangle,
+  IconClipboardList,
 } from '@tabler/icons-react';
 import SitesAdmin from './SitesAdmin';
 import PeopleAdmin from './PeopleAdmin';
@@ -24,6 +25,7 @@ import TurnosAdmin from './TurnosAdmin';
 import KpiCard from '../../../../components/ui/KpiCard';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import AlertsAdmin from './AlertsAdmin';
+import DailyControlPanel from './DailyControlPanel';
 
 type OverviewResponse = {
   totals: {
@@ -47,6 +49,7 @@ const ROLE_LABELS: Record<'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER', strin
 
 const SECTIONS = [
   { id: 'overview', label: 'Resumen', description: 'Indicadores globales y actividad reciente', icon: IconLayoutDashboard },
+  { id: 'daily', label: 'Control diario', description: 'Asistencia por día, por persona', icon: IconClipboardList },
   { id: 'people', label: 'Personas', description: 'Usuarios, roles y asignaciones', icon: IconUsers },
   { id: 'sites', label: 'Sitios', description: 'Ubicaciones y geocercas', icon: IconMapPin },
   { id: 'schedules', label: 'Turnos semanales', description: 'Planificación semanal y feriados', icon: IconCalendarStats },
@@ -293,6 +296,8 @@ export function AdminAttendanceClient() {
     switch (activeTab) {
       case 'overview':
         return <OverviewPanel data={overviewData} loading={overviewLoading} error={overviewError} />;
+      case 'daily':
+        return <DailyControlPanel />;
       case 'people':
         return <PeopleAdmin />;
       case 'sites':
