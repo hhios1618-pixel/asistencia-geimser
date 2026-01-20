@@ -120,6 +120,22 @@ export default async function AsistenciaPage() {
     .eq('day_of_week', today.getDay())
     .maybeSingle<Tables['schedules']['Row']>();
 
+  let birthdaysThisMonth: Array<{ name: string; service: string | null; birth_date: string }> = [];
+  try {
+    const result = await runQuery<{ name: string; service: string | null; birth_date: string }>(
+      `select name, service, birth_date::text as birth_date
+       from public.people
+       where is_active = true
+         and birth_date is not null
+         and extract(month from birth_date) = extract(month from current_date)
+       order by extract(day from birth_date), name
+       limit 30`
+    );
+    birthdaysThisMonth = result.rows;
+  } catch (error) {
+    console.warn('[asistencia] birthdays query failed', error);
+  }
+
   return (
     <DashboardLayout
       title="Mi jornada"
@@ -146,7 +162,7 @@ export default async function AsistenciaPage() {
               </Link>
             </div>
           )}
-          <AttendanceClient person={ensuredPerson} sites={sites} schedule={schedule ?? null} />
+          <AttendanceClient person={ensuredPerson} sites={sites} schedule={schedule ?? null} birthdaysThisMonth={birthdaysThisMonth} />
         </LocationPermissionGuard>
       </div>
     </DashboardLayout>

@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Tables } from '../../../types/database';
 import AlertsBanner from './AlertsBanner';
-import CheckButtons from './CheckButtons';
 import OfflineSyncTray from './OfflineSyncTray';
-import SiteSelector from './SiteSelector';
-import GeofenceBadge from './GeofenceBadge';
 import ShiftInfoCard from './ShiftInfoCard';
 import HistoryTable from './HistoryTable';
-import LogoutButton from './LogoutButton';
+import MarkAttendanceModal from './MarkAttendanceModal';
+import Link from 'next/link';
 
 type HistoryItem = {
   id: string;
@@ -25,6 +23,7 @@ interface Props {
   person: Tables['people']['Row'];
   sites: Tables['sites']['Row'][];
   schedule: Tables['schedules']['Row'] | null;
+  birthdaysThisMonth: Array<{ name: string; service: string | null; birth_date: string }>;
 }
 
 const ROLE_LABELS: Record<Tables['people']['Row']['role'], string> = {
@@ -34,12 +33,12 @@ const ROLE_LABELS: Record<Tables['people']['Row']['role'], string> = {
   DT_VIEWER: 'DT Viewer',
 };
 
-export function AttendanceClient({ person, sites, schedule }: Props) {
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(sites[0]?.id ?? null);
+export function AttendanceClient({ person, sites, schedule, birthdaysThisMonth }: Props) {
   const [lastEventType, setLastEventType] = useState<'IN' | 'OUT' | null>(null);
   const [lastEvent, setLastEvent] = useState<HistoryItem | null>(null);
   const [offlineRefreshKey, setOfflineRefreshKey] = useState(0);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [markModalOpen, setMarkModalOpen] = useState(false);
 
   useEffect(() => {
     const loadLastMark = async () => {
@@ -55,11 +54,6 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
     };
     void loadLastMark();
   }, []);
-
-  const selectedSite = useMemo(
-    () => sites.find((site) => site.id === selectedSiteId) ?? null,
-    [selectedSiteId, sites]
-  );
 
   const lastEventSiteName = useMemo(() => {
     if (!lastEvent?.site_id) {
@@ -84,132 +78,136 @@ export function AttendanceClient({ person, sites, schedule }: Props) {
       <section className="glass-panel overflow-hidden rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.7)] sm:p-10">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_18%_30%,rgba(0,229,255,0.16),transparent_46%),radial-gradient(circle_at_86%_14%,rgba(255,43,214,0.12),transparent_46%)]" />
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bienvenido</p>
-                  <h1 className="text-3xl font-semibold text-white sm:text-4xl">{person.name}</h1>
-                  <p className="mt-2 text-sm text-slate-300">
-                    Rol {ROLE_LABELS[person.role]}. Gestiona tus marcaciones en tiempo real con validación geográfica y
-                    respaldo criptográfico.
-                  </p>
-                </div>
-                <StatusSummary
-                  lastEventType={lastEventType}
-                  lastEvent={lastEvent}
-                  siteName={lastEventSiteName}
-                  formatDateTime={formatDateTime}
-                />
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bienvenido</p>
+                <h1 className="text-3xl font-semibold text-white sm:text-4xl">{person.name}</h1>
+                <p className="mt-2 text-sm text-slate-300">
+                  Rol {ROLE_LABELS[person.role]}. Revisa tu jornada, solicitudes y registros en un solo lugar.
+                </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <InfoChip label="Sitios asignados" value={sites.length} />
-                <InfoChip
-                  label="Sitio seleccionado"
-                  value={selectedSite?.name ?? 'Selecciona un sitio'}
-                  variant={selectedSite ? 'default' : 'warning'}
-                />
-                <InfoChip label="Turno de hoy" value={nextShiftDescription} />
+              <StatusSummary
+                lastEventType={lastEventType}
+                lastEvent={lastEvent}
+                siteName={lastEventSiteName}
+                formatDateTime={formatDateTime}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <InfoChip label="Sitios asignados" value={sites.length} />
+              <InfoChip label="Turno de hoy" value={nextShiftDescription} />
+              <div className="flex flex-col justify-between gap-3 rounded-2xl border border-[rgba(255,255,255,0.12)] bg-white/5 p-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)]">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Acción</p>
+                <button
+                  type="button"
+                  onClick={() => setMarkModalOpen(true)}
+                  className="inline-flex w-full items-center justify-between gap-3 rounded-2xl bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] px-4 py-3 text-sm font-semibold text-black shadow-[0_16px_40px_-28px_rgba(0,229,255,0.45)] transition hover:brightness-110"
+                >
+                  Marcar asistencia
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/30 text-xs font-semibold text-black">
+                    →
+                  </span>
+                </button>
               </div>
             </div>
-            <ShiftInfoCard schedule={schedule} currentDate={new Date()} />
           </div>
+          <ShiftInfoCard schedule={schedule} currentDate={new Date()} />
+        </div>
       </section>
 
       <AlertsBanner />
 
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="flex flex-col gap-8">
-          <SiteSelector
-            sites={sites.map((site) => ({ id: site.id, name: site.name }))}
-            selectedSiteId={selectedSiteId}
-            onSelect={setSelectedSiteId}
-          />
-
-          <section className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(0,229,255,0.18)]">
-            <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Marcaje seguro</p>
-                <h2 className="text-lg font-semibold text-white">Valida tu ubicación y marca tu jornada</h2>
-              </div>
-              <LogoutButton />
-            </header>
-            {selectedSite ? (
-              <GeofenceBadge site={selectedSite} />
-            ) : (
-              <p className="rounded-2xl border border-[rgba(255,43,214,0.35)] bg-[rgba(255,43,214,0.08)] px-4 py-3 text-sm text-slate-100">
-                Selecciona un sitio para verificar la geocerca antes de marcar.
-              </p>
-            )}
-            <div className="mt-6">
-              <CheckButtons
-                siteId={selectedSiteId}
-                lastEventType={lastEventType}
-                onSuccess={(mark) => {
-                  setLastEventType(mark.event_type);
-                  setLastEvent({
-                    id: mark.id,
-                    event_type: mark.event_type,
-                    event_ts: mark.event_ts,
-                    site_id: mark.site_id,
-                    hash_self: mark.hash,
-                    receipt_url: mark.receipt_url ?? null,
-                    receipt_signed_url: mark.receipt_url ?? null,
-                  });
-                  setHistoryRefreshKey((prev) => prev + 1);
-                }}
-                onQueued={() => {
-                  setOfflineRefreshKey((prev) => prev + 1);
-                }}
-              />
-            </div>
-          </section>
-
-          <OfflineSyncTray
-            refreshKey={offlineRefreshKey}
-            onSynced={(result) => {
-              setLastEventType(result.event_type);
-              setLastEvent({
-                id: result.id,
-                event_type: result.event_type,
-                event_ts: result.event_ts,
-                site_id: result.site_id,
-                hash_self: result.hash,
-                receipt_url: result.receipt_url ?? null,
-                receipt_signed_url: result.receipt_url ?? null,
-              });
-              setHistoryRefreshKey((prev) => prev + 1);
-            }}
-          />
+      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.65)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">Accesos rápidos</p>
+          <h2 className="mt-2 text-lg font-semibold text-white">Tu operación del día</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Link
+              href="/asistencia/historial"
+              className="rounded-3xl border border-white/15 bg-white/10 p-5 text-left text-slate-100 transition hover:border-[rgba(0,229,255,0.28)] hover:bg-white/15"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">Mis marcas</p>
+              <p className="mt-2 text-base font-semibold text-white">Ver historial</p>
+              <p className="mt-2 text-sm text-slate-300">Filtra, exporta y revisa tus entradas/salidas.</p>
+            </Link>
+            <Link
+              href="/asistencia/solicitudes"
+              className="rounded-3xl border border-white/15 bg-white/10 p-5 text-left text-slate-100 transition hover:border-[rgba(255,43,214,0.28)] hover:bg-white/15"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">Mis solicitudes</p>
+              <p className="mt-2 text-base font-semibold text-white">Permisos y cambios</p>
+              <p className="mt-2 text-sm text-slate-300">Envía, revisa estados y comentarios.</p>
+            </Link>
+          </div>
         </div>
 
-        <aside className="flex flex-col gap-8">
-          <section className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(255,43,214,0.14)]">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">Resumen criptográfico</h3>
-            <p className="mt-2 text-xs text-slate-300">
-              Cada marcaje genera un hash SHA-256 con enlace verificable. Descarga el recibo para auditoría.
-            </p>
-            {lastEvent ? (
-              <div className="mt-4 space-y-2 rounded-2xl border border-[rgba(255,255,255,0.12)] bg-black/20 p-4 text-xs text-slate-200">
-                <p>
-                  <span className="font-semibold text-white/90">Último evento:</span>{' '}
-                  {lastEventType === 'IN' ? 'Entrada' : 'Salida'} · {formatDateTime(lastEvent.event_ts)}
-                </p>
-                <p>
-                  <span className="font-semibold text-white/90">Sitio:</span>{' '}
-                  {lastEventSiteName ?? 'Sin registro'}
-                </p>
-                <p className="break-all">
-                  <span className="font-semibold text-white/90">Hash:</span> {lastEvent.hash_self}
+        <div className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.65)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">Cultura</p>
+          <h2 className="mt-2 text-lg font-semibold text-white">Cumpleaños del mes</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            {birthdaysThisMonth.length === 0
+              ? 'No hay cumpleaños registrados este mes.'
+              : `${birthdaysThisMonth.length} personas cumplen años este mes.`}
+          </p>
+          <div className="mt-5 space-y-2">
+            {birthdaysThisMonth.slice(0, 6).map((item, index) => (
+              <div
+                key={`${item.name}-${index}`}
+                className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-white">{item.name}</p>
+                  <p className="truncate text-xs text-slate-400">{item.service ?? 'Sin área'}</p>
+                </div>
+                <p className="text-xs font-semibold text-slate-300">
+                  {new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short' }).format(new Date(item.birth_date))}
                 </p>
               </div>
-            ) : (
-              <p className="mt-4 text-sm text-slate-300">Aún no registras marcajes. Tus hash aparecerán aquí.</p>
-            )}
-          </section>
-        </aside>
-      </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <OfflineSyncTray
+        refreshKey={offlineRefreshKey}
+        onSynced={(result) => {
+          setLastEventType(result.event_type);
+          setLastEvent({
+            id: result.id,
+            event_type: result.event_type,
+            event_ts: result.event_ts,
+            site_id: result.site_id,
+            hash_self: result.hash,
+            receipt_url: result.receipt_url ?? null,
+            receipt_signed_url: result.receipt_url ?? null,
+          });
+          setHistoryRefreshKey((prev) => prev + 1);
+        }}
+      />
 
       <HistoryTable refreshKey={historyRefreshKey} />
+
+      <MarkAttendanceModal
+        open={markModalOpen}
+        onClose={() => setMarkModalOpen(false)}
+        sites={sites}
+        lastEventType={lastEventType}
+        onMarkSuccess={(mark) => {
+          setLastEventType(mark.event_type);
+          setLastEvent({
+            id: mark.id,
+            event_type: mark.event_type,
+            event_ts: mark.event_ts,
+            site_id: mark.site_id,
+            hash_self: mark.hash,
+            receipt_url: mark.receipt_url ?? null,
+            receipt_signed_url: mark.receipt_url ?? null,
+          });
+          setHistoryRefreshKey((prev) => prev + 1);
+        }}
+        onMarkQueued={() => setOfflineRefreshKey((prev) => prev + 1)}
+      />
     </div>
   );
 }
