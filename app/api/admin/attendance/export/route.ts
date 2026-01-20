@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
 import { runQuery } from '../../../../../lib/db/postgres';
+import { resolveUserRole } from '../../../../../lib/auth/role';
 
 const querySchema = z.object({
   from: z.string().datetime({ offset: true }),
@@ -80,25 +81,8 @@ export async function GET(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'UNAUTHENTICATED' }), { status: 401 });
   }
 
-  const userId = authData.user.id as string;
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-  const fallbackRole =
-    (authData.user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (authData.user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
-
-  let role = fallbackRole;
-  try {
-    const { rows } = await runQuery<Pick<Tables['people']['Row'], 'role'>>(
-      'select role from public.people where id = $1',
-      [userId]
-    );
-    if (rows[0]?.role) {
-      role = rows[0].role;
-    }
-  } catch (error) {
-    console.warn('[attendance_export] role lookup failed', error);
-  }
+  const role = await resolveUserRole(authData.user, defaultRole);
 
   if (!isManager(role)) {
     return new Response(JSON.stringify({ error: 'FORBIDDEN' }), { status: 403 });

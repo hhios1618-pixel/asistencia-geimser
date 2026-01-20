@@ -61,9 +61,9 @@ export default function PayrollRunsAdmin() {
         fetch('/api/admin/payroll/runs', { cache: 'no-store' }),
       ]);
 
-      if (!periodsRes.ok) throw new Error('No fue posible cargar periodos');
+      if (!periodsRes.ok) throw new Error('No fue posible cargar períodos');
       if (!businessesRes.ok) throw new Error('No fue posible cargar negocios');
-      if (!runsRes.ok) throw new Error('No fue posible cargar corridas');
+      if (!runsRes.ok) throw new Error('No fue posible cargar procesos');
 
       const periodsBody = (await periodsRes.json()) as { items: Period[] };
       const businessesBody = (await businessesRes.json()) as { items: Business[] };
@@ -130,10 +130,10 @@ export default function PayrollRunsAdmin() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible crear la corrida');
+        throw new Error(body.error ?? 'No fue posible crear el proceso');
       }
       await load();
-      setSuccess('Corrida creada.');
+      setSuccess('Proceso creado.');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -167,7 +167,7 @@ export default function PayrollRunsAdmin() {
   };
 
   const deleteRun = async (runId: string) => {
-    const confirmed = window.confirm('¿Eliminar esta corrida? Se borrarán sus liquidaciones asociadas.');
+    const confirmed = window.confirm('¿Eliminar este proceso? Se borrarán sus liquidaciones asociadas.');
     if (!confirmed) return;
     setSaving(true);
     setError(null);
@@ -176,14 +176,14 @@ export default function PayrollRunsAdmin() {
       const response = await fetch(`/api/admin/payroll/runs?id=${encodeURIComponent(runId)}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible eliminar la corrida');
+        throw new Error(body.error ?? 'No fue posible eliminar el proceso');
       }
       if (selectedRunId === runId) {
         setSelectedRunId('');
         setPayslips([]);
       }
       await load();
-      setSuccess('Corrida eliminada.');
+      setSuccess('Proceso eliminado.');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -205,9 +205,9 @@ export default function PayrollRunsAdmin() {
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader
-        overline="Cálculo"
-        title="Corridas de payroll"
-        description="Crea una corrida por periodo (y opcionalmente por negocio) y calcula netos según días trabajados."
+        overline="Nómina"
+        title="Procesos de nómina"
+        description="Crea un proceso por período (y opcionalmente por negocio) y calcula netos según días trabajados."
       />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -216,7 +216,7 @@ export default function PayrollRunsAdmin() {
       <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
         <div className="grid gap-4 md:grid-cols-3">
           <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Periodo
+            Período
             <select
               value={selectedPeriodId}
               onChange={(e) => setSelectedPeriodId(e.target.value)}
@@ -256,7 +256,7 @@ export default function PayrollRunsAdmin() {
               disabled={saving || !selectedPeriodId}
               className="w-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-5 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(37,99,235,0.6)] transition hover:from-indigo-600 hover:to-blue-600 disabled:opacity-60"
             >
-              Crear corrida
+              Crear proceso
             </button>
           </div>
         </div>
@@ -264,12 +264,12 @@ export default function PayrollRunsAdmin() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
         <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-          <p className="text-sm font-semibold text-slate-800">Corridas</p>
+          <p className="text-sm font-semibold text-slate-800">Procesos</p>
           <div className="mt-4 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 text-left">Periodo</th>
+                  <th className="px-4 py-3 text-left">Período</th>
                   <th className="px-4 py-3 text-left">Negocio</th>
                   <th className="px-4 py-3 text-left">Estado</th>
                   <th className="px-4 py-3 text-left">Acciones</th>
@@ -333,7 +333,7 @@ export default function PayrollRunsAdmin() {
                 {!loading && runs.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-400">
-                      Aún no hay corridas.
+                      Aún no hay procesos.
                     </td>
                   </tr>
                 )}
@@ -347,7 +347,7 @@ export default function PayrollRunsAdmin() {
             <div>
               <p className="text-sm font-semibold text-slate-800">Liquidaciones</p>
               <p className="mt-1 text-xs text-slate-500">
-                {selectedRunId ? `Run ${selectedRunId.slice(0, 8)}… · Personas: ${totals.people} · Neto: ${formatClp(totals.net)}` : 'Selecciona una corrida.'}
+                {selectedRunId ? `Proceso ${selectedRunId.slice(0, 8)}… · Personas: ${totals.people} · Neto: ${formatClp(totals.net)}` : 'Selecciona un proceso.'}
               </p>
             </div>
             <button
@@ -396,7 +396,7 @@ export default function PayrollRunsAdmin() {
                 {!loadingPayslips && payslips.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-400">
-                      {selectedRunId ? 'Aún no hay liquidaciones. Presiona “Calcular”.' : 'Selecciona una corrida.'}
+                      {selectedRunId ? 'Aún no hay liquidaciones. Presiona “Calcular”.' : 'Selecciona un proceso.'}
                     </td>
                   </tr>
                 )}
@@ -408,4 +408,3 @@ export default function PayrollRunsAdmin() {
     </section>
   );
 }
-

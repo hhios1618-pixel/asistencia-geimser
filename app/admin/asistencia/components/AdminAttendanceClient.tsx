@@ -119,8 +119,8 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Visión general</p>
-          <h4 className="text-lg font-semibold text-slate-900">Mapa de calor (check-ins)</h4>
-          <p className="mt-2 text-sm text-slate-500">Últimos 7 días · intensidad por hora (solo IN).</p>
+          <h4 className="text-lg font-semibold text-slate-900">Mapa de calor (entradas)</h4>
+          <p className="mt-2 text-sm text-slate-500">Últimos 7 días · intensidad por hora (solo ENTRADA).</p>
 
           <div className="mt-5 space-y-3">
             {(data.heatmap ?? []).map((row) => (
@@ -148,7 +148,7 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
 
         <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Tiempo real</p>
-          <h4 className="text-lg font-semibold text-slate-900">Últimos check-ins</h4>
+          <h4 className="text-lg font-semibold text-slate-900">Últimos fichajes</h4>
           <div className="mt-4 space-y-3">
             {(data.latestMarks ?? []).slice(0, 8).map((mark, index) => (
               <div

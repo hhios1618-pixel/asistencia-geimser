@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '../../lib/supabase/server';
 import type { Tables } from '../../types/database';
+import { resolveUserRole } from '../../lib/auth/role';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,10 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-  const role =
-    (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
+  const role = await resolveUserRole(user, defaultRole);
 
   if (!isManager(role)) {
     redirect('/asistencia');
@@ -28,4 +26,3 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return children;
 }
-

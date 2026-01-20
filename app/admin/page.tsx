@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from '../../lib/supabase/server';
 import type { Tables } from '../../types/database';
 import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics, IconBuilding, IconCashBanknote, IconBellRinging, IconCake } from '@tabler/icons-react';
 import { runQuery } from '../../lib/db/postgres';
+import { resolveUserRole } from '../../lib/auth/role';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,10 +31,7 @@ async function authorizeAdmin() {
     redirect('/login');
   }
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-  const role =
-    (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
+  const role = await resolveUserRole(user, defaultRole);
   if (!isManager(role)) {
     redirect('/asistencia');
   }
@@ -121,7 +119,7 @@ export default async function AdminHomePage() {
 
   const payroll = payrollRows[0] ?? null;
   const payrollLabel = payroll?.label ?? (payroll ? `${payroll.start_date} → ${payroll.end_date}` : '—');
-  const payrollStatus = payroll?.status ? (PAYROLL_STATUS_LABELS[payroll.status] ?? payroll.status) : 'Sin corridas';
+  const payrollStatus = payroll?.status ? (PAYROLL_STATUS_LABELS[payroll.status] ?? payroll.status) : 'Sin procesos';
 
   const upcomingBirthdays = birthdaysRows[0]?.upcoming_birthdays ?? 0;
 
@@ -142,7 +140,7 @@ export default async function AdminHomePage() {
     },
     {
       title: 'Ejecutar nómina',
-      description: 'Calcula y valida corridas del periodo.',
+      description: 'Calcula y valida procesos del período.',
       href: '/admin/payroll?panel=runs',
       icon: <IconCashBanknote size={20} />,
       accent: 'cyan' as const,
@@ -191,7 +189,7 @@ export default async function AdminHomePage() {
           hint="Entradas + salidas"
           icon={<IconUserCheck size={22} />}
         />
-        <KpiCard title="Check-ins activos" value={todayAttendance.active_checkins} hint="Hoy" icon={<IconUserCheck size={22} />} />
+        <KpiCard title="Fichajes activos" value={todayAttendance.active_checkins} hint="Hoy" icon={<IconUserCheck size={22} />} />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

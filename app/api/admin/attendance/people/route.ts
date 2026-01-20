@@ -5,6 +5,7 @@ import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../li
 import type { Tables } from '../../../../../types/database';
 import { runQuery } from '../../../../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../../../../lib/db/ensurePeopleServiceColumn';
+import { resolveUserRole } from '../../../../../lib/auth/role';
 
 const rutSchema = z.preprocess(
   (value) => {
@@ -51,10 +52,7 @@ const authorize = async () => {
     return { supabase, user: null, role: null as Tables['people']['Row']['role'] | null } as const;
   }
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-  const role =
-    (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
+  const role = await resolveUserRole(user, defaultRole);
   if (!isManager(role)) {
     return { supabase, user: null, role: null as Tables['people']['Row']['role'] | null } as const;
   }

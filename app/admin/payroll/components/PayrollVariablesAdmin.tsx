@@ -62,7 +62,7 @@ export default function PayrollVariablesAdmin() {
         fetch('/api/admin/hr/people', { cache: 'no-store' }),
         fetch('/api/admin/payroll/variables/types', { cache: 'no-store' }),
       ]);
-      if (!periodsRes.ok) throw new Error('No fue posible cargar periodos');
+      if (!periodsRes.ok) throw new Error('No fue posible cargar períodos');
       if (!peopleRes.ok) throw new Error('No fue posible cargar personas');
       if (!typesRes.ok) throw new Error('No fue posible cargar variables');
 
@@ -228,9 +228,9 @@ export default function PayrollVariablesAdmin() {
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader
-        overline="Variables"
+        overline="Nómina"
         title="Bonos y descuentos"
-        description="Define variables (earning/deduction) y asigna montos por persona y periodo. El cálculo las incluye automáticamente."
+        description="Define variables (asignación/deducción) y asigna montos por persona y período. El cálculo las incluye automáticamente."
       />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -243,7 +243,7 @@ export default function PayrollVariablesAdmin() {
             <button
               type="button"
               onClick={startNewType}
-              className="rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(37,99,235,0.6)] transition hover:from-indigo-600 hover:to-blue-600"
+              className="rounded-full bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] px-4 py-2 text-xs font-semibold text-black shadow-[0_12px_30px_-18px_rgba(0,229,255,0.45)] transition hover:brightness-110"
             >
               Nueva variable
             </button>
@@ -253,8 +253,8 @@ export default function PayrollVariablesAdmin() {
             <table className="w-full border-collapse text-xs">
               <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 text-left">Code</th>
-                  <th className="px-4 py-3 text-left">Label</th>
+                  <th className="px-4 py-3 text-left">Código</th>
+                  <th className="px-4 py-3 text-left">Nombre</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
                   <th className="px-4 py-3 text-left">Activo</th>
                   <th className="px-4 py-3 text-left">Acciones</th>
@@ -270,10 +270,18 @@ export default function PayrollVariablesAdmin() {
                 )}
                 {!loading &&
                   types.map((t) => (
-                    <tr key={t.id} className="border-t border-slate-100 hover:bg-blue-50/40">
+                    <tr key={t.id} className="border-t border-slate-100 hover:bg-white/60">
                       <td className="px-4 py-3 text-sm font-semibold text-slate-800">{t.code}</td>
                       <td className="px-4 py-3 text-slate-600">{t.label}</td>
-                      <td className="px-4 py-3 text-slate-600">{t.line_type}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {t.line_type === 'EARNING'
+                          ? 'Asignación'
+                          : t.line_type === 'DEDUCTION'
+                            ? 'Deducción'
+                            : t.line_type === 'TAX'
+                              ? 'Impuesto'
+                              : 'Otro'}
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{t.is_active ? 'Sí' : 'No'}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
@@ -370,10 +378,10 @@ export default function PayrollVariablesAdmin() {
         </div>
 
         <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-          <p className="text-sm font-semibold text-slate-800">Asignaciones por periodo</p>
+          <p className="text-sm font-semibold text-slate-800">Asignaciones por período</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Periodo
+              Período
               <select
                 value={selectedPeriodId}
                 onChange={(e) => setSelectedPeriodId(e.target.value)}
@@ -496,14 +504,14 @@ export default function PayrollVariablesAdmin() {
                 {selectedPeriodId && assignments.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                      Sin asignaciones para este periodo.
+                      Sin asignaciones para este período.
                     </td>
                   </tr>
                 )}
                 {!selectedPeriodId && (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                      Selecciona un periodo.
+                      Selecciona un período.
                     </td>
                   </tr>
                 )}
@@ -515,4 +523,3 @@ export default function PayrollVariablesAdmin() {
     </section>
   );
 }
-

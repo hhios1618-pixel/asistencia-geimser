@@ -8,6 +8,7 @@ import { createServerSupabaseClient } from '../../lib/supabase/server';
 import type { Tables } from '../../types/database';
 import { redirect } from 'next/navigation';
 import { IconMapPin, IconUsers, IconAlertTriangle, IconUserCheck } from '@tabler/icons-react';
+import { resolveUserRole } from '../../lib/auth/role';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +25,7 @@ const getUserContext = async () => {
   }
 
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'WORKER';
-  const role =
-    (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
+  const role = await resolveUserRole(user, defaultRole);
 
   if (!isSupervisor(role)) {
     redirect('/asistencia');

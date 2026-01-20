@@ -36,7 +36,7 @@ export default function PayrollPeriodsAdmin() {
       const response = await fetch('/api/admin/payroll/periods', { cache: 'no-store' });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible cargar periodos');
+        throw new Error(body.error ?? 'No fue posible cargar períodos');
       }
       const body = (await response.json()) as { items: Period[] };
       setItems(body.items ?? []);
@@ -87,7 +87,7 @@ export default function PayrollPeriodsAdmin() {
         throw new Error(body.error ?? 'No fue posible guardar el periodo');
       }
       await load();
-      setSuccess(exists ? 'Periodo actualizado.' : 'Periodo creado.');
+      setSuccess(exists ? 'Período actualizado.' : 'Período creado.');
       setEditing(emptyPeriod);
     } catch (err) {
       setError((err as Error).message);
@@ -109,7 +109,7 @@ export default function PayrollPeriodsAdmin() {
         throw new Error(body.error ?? 'No fue posible eliminar el periodo');
       }
       await load();
-      setSuccess('Periodo eliminado.');
+      setSuccess('Período eliminado.');
       if (editing.id === period.id) setEditing(emptyPeriod);
     } catch (err) {
       setError((err as Error).message);
@@ -122,7 +122,7 @@ export default function PayrollPeriodsAdmin() {
 
   return (
     <section className="flex flex-col gap-6">
-      <SectionHeader overline="Payroll" title="Periodos" description="Define el rango de fechas para calcular días trabajados." />
+      <SectionHeader overline="Nómina" title="Períodos" description="Define el rango de fechas para calcular días trabajados." />
 
       <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -188,7 +188,7 @@ export default function PayrollPeriodsAdmin() {
               {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                    Aún no hay periodos.
+                    Aún no hay períodos.
                   </td>
                 </tr>
               )}
@@ -267,4 +267,3 @@ export default function PayrollPeriodsAdmin() {
     </section>
   );
 }
-

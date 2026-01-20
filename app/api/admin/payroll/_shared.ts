@@ -1,5 +1,6 @@
 import { createRouteSupabaseClient } from '../../../../lib/supabase/server';
 import type { Tables } from '../../../../types/database';
+import { resolveUserRole } from '../../../../lib/auth/role';
 
 export const runtime = 'nodejs';
 
@@ -12,13 +13,9 @@ export const authorizeManager = async () => {
     return { role: null } as const;
   }
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-  const role =
-    (authData.user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (authData.user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
+  const role = await resolveUserRole(authData.user, defaultRole);
   if (!isManager(role)) {
     return { role: null } as const;
   }
   return { role } as const;
 };
-

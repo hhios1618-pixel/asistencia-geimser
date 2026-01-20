@@ -38,15 +38,15 @@ export default function AdminPayrollClient() {
       case 'salary':
         return { label: 'Registros salariales', description: 'Sueldo base por persona (fuente para la nómina).' };
       case 'periods':
-        return { label: 'Calendario de pagos', description: 'Periodos, rangos y estado de pago.' };
+        return { label: 'Calendario de pagos', description: 'Períodos, rangos y estado de pago.' };
       case 'runs':
-        return { label: 'Procesamiento', description: 'Calcula y valida corridas por periodo.' };
+        return { label: 'Procesamiento', description: 'Calcula y valida procesos por período.' };
       case 'variables':
         return { label: 'Bonos y comisiones', description: 'Variables por periodo: asignaciones y deducciones.' };
       case 'reports':
         return { label: 'Reportes', description: 'Exportables para finanzas y auditoría.' };
       default:
-        return { label: 'Procesamiento', description: 'Calcula y valida corridas por periodo.' };
+        return { label: 'Procesamiento', description: 'Calcula y valida procesos por período.' };
     }
   }, [activeTab]);
 

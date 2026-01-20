@@ -4,6 +4,7 @@ import LoginForm from './components/LoginForm';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColumn';
+import { getPersonRoleFromDb, resolveUserRole } from '../../lib/auth/role';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,10 +61,9 @@ export default async function LoginPage() {
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-    const role =
-      (user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-      (user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-      defaultRole;
+    const resolvedRole = await resolveUserRole(user, defaultRole);
+    const existingDbRole = await getPersonRoleFromDb(user.id);
+    const role = existingDbRole ?? resolvedRole;
 
     await ensurePeopleServiceColumn();
 
@@ -114,7 +114,7 @@ export default async function LoginPage() {
       console.error('[login] people bootstrap skipped', bootstrapError);
     }
 
-    redirect(role === 'ADMIN' ? '/admin' : role === 'SUPERVISOR' ? '/supervisor' : '/asistencia');
+    redirect(role === 'ADMIN' || role === 'SUPERVISOR' ? '/modo' : '/asistencia');
   }
 
   const currentYear = new Date().getFullYear();

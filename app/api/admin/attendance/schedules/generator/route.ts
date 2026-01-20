@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRouteSupabaseClient } from '../../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../../types/database';
+import { resolveUserRole } from '../../../../../../lib/auth/role';
 
 export const runtime = 'nodejs';
 
@@ -15,15 +16,11 @@ const authorize = async () => {
   }
 
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
-  const fallbackRole =
-    (authData.user.app_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    (authData.user.user_metadata?.role as Tables['people']['Row']['role'] | undefined) ??
-    defaultRole;
-
-  if (!isManager(fallbackRole)) {
+  const role = await resolveUserRole(authData.user, defaultRole);
+  if (!isManager(role)) {
     return { userId: authData.user.id as string, role: null } as const;
   }
-  return { userId: authData.user.id as string, role: fallbackRole } as const;
+  return { userId: authData.user.id as string, role } as const;
 };
 
 const schema = z.object({
