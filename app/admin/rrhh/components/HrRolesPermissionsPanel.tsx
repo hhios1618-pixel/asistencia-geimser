@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
 
 type Role = 'WORKER' | 'SUPERVISOR' | 'ADMIN' | 'DT_VIEWER';
 
@@ -27,7 +28,6 @@ export default function HrRolesPermissionsPanel() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -49,12 +49,6 @@ export default function HrRolesPermissionsPanel() {
   useEffect(() => {
     void load();
   }, []);
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return people;
-    return people.filter((p) => [p.name, p.email ?? '', p.service ?? '', p.role].join(' ').toLowerCase().includes(term));
-  }, [people, search]);
 
   const updatePerson = async (id: string, patch: Partial<Pick<Person, 'role' | 'is_active'>>) => {
     setSavingId(id);
@@ -79,6 +73,83 @@ export default function HrRolesPermissionsPanel() {
     }
   };
 
+  const columns: Column<Person>[] = [
+    {
+      header: 'Persona',
+      accessorKey: 'name',
+      sortable: true,
+      render: (p) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-200">{p.name}</span>
+          <span className="text-xs text-slate-500">{p.email ?? '—'}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Servicio',
+      accessorKey: 'service',
+      sortable: true,
+      render: (p) => <span className="text-slate-400">{p.service || '—'}</span>,
+    },
+    {
+      header: 'Rol',
+      accessorKey: 'role',
+      render: (person) => (
+        <select
+          value={person.role}
+          onChange={(e) => {
+            const nextRole = e.target.value as Role;
+            // Optimistic Update
+            setPeople(current => current.map(p => p.id === person.id ? { ...p, role: nextRole } : p));
+          }}
+          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none [&>option]:text-black"
+        >
+          {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
+            <option key={role} value={role}>
+              {ROLE_LABELS[role]}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      header: 'Activo',
+      accessorKey: 'is_active',
+      render: (person) => (
+        <label className="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={person.is_active}
+            onChange={(e) => {
+              const nextValue = e.target.checked;
+              // Optimistic Update
+              setPeople(current => current.map(p => p.id === person.id ? { ...p, is_active: nextValue } : p));
+            }}
+            className="rounded border-slate-600 bg-transparent text-blue-500 accent-blue-500"
+          />
+          {person.is_active ? 'Sí' : 'No'}
+        </label>
+      ),
+    },
+    {
+      header: 'Acción',
+      render: (person) => {
+        const isSaving = savingId === person.id;
+        // Check if there are unsaved changes is handled implicitly by the button action, 
+        // ideally we would track dirty state but for now direct save button.
+        return (
+          <button
+            onClick={() => updatePerson(person.id, { role: person.role, is_active: person.is_active })}
+            disabled={isSaving}
+            className="rounded-lg bg-blue-600/20 px-3 py-1.5 text-xs font-semibold text-blue-400 hover:bg-blue-600/30 transition disabled:opacity-50"
+          >
+            {isSaving ? 'Guardando...' : 'Guardar'}
+          </button>
+        );
+      }
+    }
+  ];
+
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader
@@ -87,118 +158,18 @@ export default function HrRolesPermissionsPanel() {
         description="Gestiona roles operativos por usuario. Los permisos granulares se habilitan por módulo."
       />
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
-      {success && <p className="text-sm text-emerald-600">{success}</p>}
+      {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
+      {success && <p className="text-sm font-semibold text-emerald-500">{success}</p>}
 
-      <div className="glass-panel rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.55)]">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">Directorio</p>
-            <p className="mt-1 text-xs text-slate-500">Actualiza rol y estado sin duplicar pantallas.</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Buscar</label>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Nombre, correo, servicio…"
-              className="w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm text-slate-700 shadow-sm md:w-[320px]"
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-          <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-left">Persona</th>
-                <th className="px-4 py-3 text-left">Servicio</th>
-                <th className="px-4 py-3 text-left">Rol</th>
-                <th className="px-4 py-3 text-left">Activo</th>
-                <th className="px-4 py-3 text-left">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-sm text-slate-400">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                filtered.map((person) => {
-                  const isSaving = savingId === person.id;
-                  return (
-                    <tr key={person.id} className="border-t border-slate-100">
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-semibold text-slate-800">{person.name}</p>
-                        <p className="text-xs text-slate-400">{person.email ?? '—'}</p>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{person.service ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={person.role}
-                          onChange={(e) => {
-                            const nextRole = e.target.value as Role;
-                            setPeople((current) =>
-                              current.map((p) => (p.id === person.id ? { ...p, role: nextRole } : p))
-                            );
-                          }}
-                          className="w-full rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-sm text-slate-700"
-                          aria-label={`Rol de ${person.name}`}
-                        >
-                          {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
-                            <option key={role} value={role}>
-                              {ROLE_LABELS[role]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={person.is_active}
-                            onChange={(e) => {
-                              const nextValue = e.target.checked;
-                              setPeople((current) =>
-                                current.map((p) => (p.id === person.id ? { ...p, is_active: nextValue } : p))
-                              );
-                            }}
-                          />
-                          {person.is_active ? 'Sí' : 'No'}
-                        </label>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() =>
-                            updatePerson(person.id, {
-                              role: person.role,
-                              is_active: person.is_active,
-                            })
-                          }
-                          className="rounded-full bg-black/90 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-black disabled:opacity-50"
-                        >
-                          {isSaving ? 'Guardando…' : 'Guardar'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-sm text-slate-400">
-                    Sin resultados.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        title="Directorio de Accesos"
+        subtitle="Actualiza rol y estado sin duplicar pantallas."
+        data={people}
+        columns={columns}
+        keyExtractor={p => p.id}
+        loading={loading}
+        searchPlaceholder="Buscar por nombre, correo o servicio..."
+      />
     </section>
   );
 }

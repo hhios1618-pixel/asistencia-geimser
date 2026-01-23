@@ -1,13 +1,15 @@
 import { redirect } from 'next/navigation';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import KpiCard from '../../components/ui/KpiCard';
 import QuickActionCard from '../../components/ui/QuickActionCard';
 import AlertStack from '../../components/ui/AlertStack';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { getAdminOverview, type AdminOverviewData } from '../../lib/reports/overview';
 import { createServerSupabaseClient } from '../../lib/supabase/server';
+import SystemAuditPanel from './components/SystemAuditPanel';
+import AdminHero from './components/AdminHero';
+import PayrollTimeline from './components/PayrollTimeline';
 import type { Tables } from '../../types/database';
-import { IconUserCheck, IconMapPin, IconUsers, IconReportAnalytics, IconBuilding, IconCashBanknote, IconBellRinging, IconCake } from '@tabler/icons-react';
+import { IconUserCheck, IconBuilding, IconCashBanknote, IconBellRinging, IconCake } from '@tabler/icons-react';
 import { runQuery } from '../../lib/db/postgres';
 import { resolveUserRole } from '../../lib/auth/role';
 
@@ -48,14 +50,6 @@ function buildAlertItems(data: AdminOverviewData): Parameters<typeof AlertStack>
     severity: site.total > 50 ? 'warning' : 'info',
   }));
 }
-
-const PAYROLL_STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Borrador',
-  CALCULATED: 'Calculada',
-  FINALIZED: 'Finalizada',
-  PAID: 'Pagada',
-  CANCELLED: 'Cancelada',
-};
 
 export default async function AdminHomePage() {
   const { user } = await authorizeAdmin();
@@ -119,7 +113,7 @@ export default async function AdminHomePage() {
 
   const payroll = payrollRows[0] ?? null;
   const payrollLabel = payroll?.label ?? (payroll ? `${payroll.start_date} → ${payroll.end_date}` : '—');
-  const payrollStatus = payroll?.status ? (PAYROLL_STATUS_LABELS[payroll.status] ?? payroll.status) : 'Sin procesos';
+  const payrollStatus = payroll?.status ?? 'DRAFT';
 
   const upcomingBirthdays = birthdaysRows[0]?.upcoming_birthdays ?? 0;
 
@@ -156,108 +150,69 @@ export default async function AdminHomePage() {
 
   return (
     <DashboardLayout
-      title="Panel corporativo"
-      description={`Bienvenido, ${user.user_metadata?.full_name ?? user.email}. Visión unificada de asistencia, RR.HH. y nómina.`}
-      breadcrumb={[{ label: 'Administración' }, { label: 'Resumen' }]}
-      actions={
-        <div className="flex gap-2">
-          <a
-            href="/asistencia"
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-[0_18px_55px_-40px_rgba(0,0,0,0.75)] transition hover:border-[rgba(0,229,255,0.35)] hover:bg-white/15 hover:text-white"
-          >
-            Ir a mi jornada
-          </a>
-        </div>
-      }
+      title=""
+      description=""
+      breadcrumb={[]}
     >
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="Colaboradores activos"
-          value={overview.totals.active_people}
-          hint="Totales corporativos"
-          icon={<IconUsers size={22} />}
-        />
-        <KpiCard
-          title="Sitios operativos"
-          value={overview.totals.total_sites}
-          hint="Todos los niveles"
-          icon={<IconMapPin size={22} />}
-        />
-        <KpiCard
-          title="Marcas 30 días"
-          value={overview.totals.marks_last_30}
-          hint="Entradas + salidas"
-          icon={<IconUserCheck size={22} />}
-        />
-        <KpiCard title="Fichajes activos" value={todayAttendance.active_checkins} hint="Hoy" icon={<IconUserCheck size={22} />} />
-      </section>
+      {/* 1. Hero Section (No Cards) */}
+      <AdminHero
+        userName={user.user_metadata?.full_name ?? user.email ?? 'Admin'}
+        stats={[
+          { label: 'Colaboradores', value: overview.totals.active_people, subtext: 'Activos en nómina' },
+          { label: 'Sitios', value: overview.totals.total_sites, subtext: 'Operativos hoy' },
+          { label: 'En Turno', value: todayAttendance.active_checkins, subtext: 'Tiempo real', trend: 'up', trendValue: `${todayAttendance.active_checkins} activos` },
+          { label: 'Ausencias', value: absencesToday, subtext: 'Sin marcar hoy', trend: 'down', trendValue: 'Atención' },
+        ]}
+      />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Ausencias del día" value={absencesToday} hint="Sin IN registrado" icon={<IconUsers size={22} />} />
-        <KpiCard title="Solicitudes pendientes" value={pendingRequests} hint="Aprobación requerida" icon={<IconReportAnalytics size={22} />} />
-        <KpiCard title="Estado de nómina" value={payrollStatus} hint={payrollLabel} icon={<IconCashBanknote size={22} />} />
-        <KpiCard title="Cumpleaños (30 días)" value={upcomingBirthdays} hint="Próximos" icon={<IconCake size={22} />} />
-      </section>
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* 2. Payroll Flow (Visual) */}
+        <PayrollTimeline status={payrollStatus} periodLabel={payrollLabel} />
 
-      <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6 shadow-[0_24px_80px_-52px_rgba(37,99,235,0.45)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Actividad semanal</p>
-              <h3 className="text-lg font-semibold text-slate-900">Tendencia de marcajes</h3>
-            </div>
-            <StatusBadge label="Últimos 7 días" variant="info" />
+        {/* 3. System Health (Compact) */}
+        <SystemAuditPanel />
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+        <div className="glass-panel p-8 rounded-[32px]">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-lg font-bold text-white">Tendencias de asistencia</h3>
+            <StatusBadge label="Semanal" variant="info" />
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {overview.marksByDay.map((mark) => (
-              <div key={mark.day} className="rounded-2xl border border-slate-100 bg-white/90 px-4 py-3 text-sm text-slate-600">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                  {new Intl.DateTimeFormat('es-CL', { weekday: 'short', day: 'numeric' }).format(new Date(mark.day))}
-                </p>
-                <p className="mt-2 text-lg font-semibold text-slate-900">{mark.total} marcas</p>
-                <div className="mt-2 text-xs text-slate-500">
-                  IN: {mark.in_total} · OUT: {mark.out_total}
+
+          {/* Simplified list for now, ideally a chart */}
+          <div className="space-y-4">
+            {overview.marksByDay.slice(0, 5).map((mark) => (
+              <div key={mark.day} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-colors cursor-default group">
+                <div className="flex items-center gap-4">
+                  <div className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+                  <span className="text-sm font-medium text-slate-300">
+                    {new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric' }).format(new Date(mark.day))}
+                  </span>
+                </div>
+                <div className="flex gap-6">
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Entradas</p>
+                    <p className="font-mono text-white">{mark.in_total}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Salidas</p>
+                    <p className="font-mono text-white">{mark.out_total}</p>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <AlertStack
-          title="Alertas recientes"
-          description="Eventos detectados en los últimos sitios marcados"
-          items={buildAlertItems(overview)}
-        />
-      </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {quickActions.map((action) => (
-          <QuickActionCard key={action.title} {...action} />
-        ))}
-      </section>
-
-      <section className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6 shadow-[0_24px_70px_-52px_rgba(15,23,42,0.45)]">
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Ingresos recientes</p>
-        <h3 className="text-lg font-semibold text-slate-900">Últimos colaboradores incorporados</h3>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {overview.recentPeople.map((person, index) => (
-            <div key={`${person.name}-${index}`} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/90 px-4 py-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600">
-                {person.name
-                  .split(' ')
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((part) => part[0]?.toUpperCase() ?? '')
-                  .join('') || 'PG'}
-              </span>
-              <div className="flex-1">
-                <p className="font-semibold text-slate-800">{person.name}</p>
-                <p className="text-xs text-slate-400">{ROLE_LABELS[person.role]}</p>
-              </div>
-              <StatusBadge label={new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'short' }).format(new Date(person.created_at))} variant="default" />
-            </div>
+        {/* 4. Quick Actions (Refined) */}
+        <div className="flex flex-col gap-4">
+          {quickActions.map((action) => (
+            <QuickActionCard key={action.title} {...action} />
           ))}
         </div>
-      </section>
+      </div>
+
     </DashboardLayout>
   );
 }

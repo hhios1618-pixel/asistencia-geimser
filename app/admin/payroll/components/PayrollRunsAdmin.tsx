@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
-import StatusBadge from '../../../../components/ui/StatusBadge';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
+import { IconCalculator, IconEye, IconTrash, IconMoneybag } from '@tabler/icons-react';
 
 type Period = { id: string; label: string | null; start_date: string; end_date: string; status: string };
 type Business = { id: string; name: string; is_active: boolean };
@@ -158,7 +159,7 @@ export default function PayrollRunsAdmin() {
       const body = (await response.json()) as { result: unknown };
       await load();
       await loadPayslips(runId);
-      setSuccess(`Cálculo completado. (${JSON.stringify(body.result)})`);
+      setSuccess(`Cálculo completado.`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -202,28 +203,69 @@ export default function PayrollRunsAdmin() {
     return { net, people };
   }, [payslips]);
 
+  const runColumns: Column<Run>[] = [
+    {
+      header: 'Período',
+      render: (item) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-slate-200">
+            {(item.period_label ? `${item.period_label} · ` : '') + `${item.start_date} → ${item.end_date}`}
+          </span>
+          <span className="text-[11px] text-slate-500">{new Date(item.created_at).toLocaleString('es-CL')}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Negocio',
+      accessorKey: 'business_name',
+      render: (item) => <span className="text-slate-400 text-xs">{item.business_name ?? 'Todos'}</span>,
+    },
+    {
+      header: 'Estado',
+      accessorKey: 'status',
+      render: (item) => {
+        const isCalculated = item.status === 'CALCULATED';
+        return (
+          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${isCalculated ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+            {item.status}
+          </span>
+        );
+      },
+    },
+  ];
+
+  const psColumns: Column<Payslip>[] = [
+    { header: 'Persona', accessorKey: 'person_name', sortable: true, render: (i) => <span className="text-slate-200 font-semibold">{i.person_name}</span> },
+    { header: 'Cargo', accessorKey: 'position_name', sortable: true, render: (i) => <span className="text-slate-400 text-xs">{i.position_name ?? '-'}</span> },
+    { header: 'Días', accessorKey: 'days_worked', render: (i) => <span className="text-slate-300">{i.days_worked}</span> },
+    { header: 'Bruto', accessorKey: 'gross', render: (i) => <span className="text-slate-400 font-mono text-xs">{formatClp(i.gross)}</span> },
+    { header: 'Deducciones', accessorKey: 'deductions', render: (i) => <span className="text-slate-400 font-mono text-xs">{formatClp(i.deductions)}</span> },
+    { header: 'Neto', accessorKey: 'net', render: (i) => <span className="text-emerald-400 font-mono font-bold text-xs">{formatClp(i.net)}</span> },
+  ];
+
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader
         overline="Nómina"
-        title="Procesos de nómina"
-        description="Crea un proceso por período (y opcionalmente por negocio) y calcula netos según días trabajados."
+        title="Procesos de Cálculo"
+        description="Genera y calcula las liquidaciones por período."
       />
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
-      {success && <p className="text-sm text-emerald-600">{success}</p>}
+      {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
+      {success && <p className="text-sm font-semibold text-emerald-500">{success}</p>}
 
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Período
+      {/* Control Panel */}
+      <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+        <div className="grid gap-4 md:grid-cols-3 items-end">
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Período</span>
             <select
               value={selectedPeriodId}
               onChange={(e) => setSelectedPeriodId(e.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition [&>option]:text-black"
               disabled={loading}
             >
-              <option value="">—</option>
+              <option value="">— Seleccionar —</option>
               {periods.map((p) => (
                 <option key={p.id} value={p.id}>
                   {(p.label ? `${p.label} · ` : '') + `${p.start_date} → ${p.end_date}`}
@@ -232,12 +274,12 @@ export default function PayrollRunsAdmin() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Negocio (opcional)
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Negocio (Opcional)</span>
             <select
               value={selectedBusinessId}
               onChange={(e) => setSelectedBusinessId(e.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition [&>option]:text-black"
               disabled={loading}
             >
               <option value="">Todos</option>
@@ -249,160 +291,80 @@ export default function PayrollRunsAdmin() {
             </select>
           </label>
 
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={createRun}
-              disabled={saving || !selectedPeriodId}
-              className="w-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-5 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(37,99,235,0.6)] transition hover:from-indigo-600 hover:to-blue-600 disabled:opacity-60"
-            >
-              Crear proceso
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={createRun}
+            disabled={saving || !selectedPeriodId}
+            className="rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 disabled:opacity-60 transition flex items-center justify-center gap-2"
+          >
+            <IconMoneybag size={20} />
+            Crear Proceso
+          </button>
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
-        <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-          <p className="text-sm font-semibold text-slate-800">Procesos</p>
-          <div className="mt-4 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-            <table className="w-full border-collapse text-xs">
-              <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left">Período</th>
-                  <th className="px-4 py-3 text-left">Negocio</th>
-                  <th className="px-4 py-3 text-left">Estado</th>
-                  <th className="px-4 py-3 text-left">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-6 text-sm text-slate-400">
-                      Cargando…
-                    </td>
-                  </tr>
-                )}
-                {!loading &&
-                  runs.map((run) => (
-                    <tr
-                      key={run.id}
-                      className={`border-t border-slate-100 hover:bg-blue-50/40 ${selectedRunId === run.id ? 'bg-blue-50/50' : ''}`}
-                    >
-                      <td className="px-4 py-3 text-slate-700">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-slate-800">
-                            {(run.period_label ? `${run.period_label} · ` : '') + `${run.start_date} → ${run.end_date}`}
-                          </span>
-                          <span className="text-[11px] text-slate-400">{new Date(run.created_at).toLocaleString('es-CL')}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{run.business_name ?? 'Todos'}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge label={run.status} variant={run.status === 'CALCULATED' ? 'success' : 'default'} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRunId(run.id)}
-                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            Ver
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => calculateRun(run.id)}
-                            disabled={saving}
-                            className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60"
-                          >
-                            Calcular
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteRun(run.id)}
-                            disabled={saving}
-                            className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {!loading && runs.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-400">
-                      Aún no hay procesos.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+      <div className="grid gap-6 xl:grid-cols-[1fr_1.5fr]">
+        <div className="flex flex-col gap-4">
+          <DataTable
+            title="Historial de Procesos"
+            data={runs}
+            columns={runColumns}
+            keyExtractor={(r) => r.id}
+            loading={loading}
+            searchPlaceholder="Buscar..."
+            actions={(run) => (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setSelectedRunId(run.id)}
+                  className={`p-2 rounded-lg transition ${selectedRunId === run.id ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  title="Ver Liquidaciones"
+                >
+                  <IconEye size={18} />
+                </button>
+                <button
+                  onClick={() => calculateRun(run.id)}
+                  className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition"
+                  title="Calcular"
+                >
+                  <IconCalculator size={18} />
+                </button>
+                <button
+                  onClick={() => deleteRun(run.id)}
+                  className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                  title="Eliminar"
+                >
+                  <IconTrash size={18} />
+                </button>
+              </div>
+            )}
+          />
         </div>
 
-        <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Liquidaciones</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {selectedRunId ? `Proceso ${selectedRunId.slice(0, 8)}… · Personas: ${totals.people} · Neto: ${formatClp(totals.net)}` : 'Selecciona un proceso.'}
-              </p>
+        <div className="flex flex-col gap-4">
+          {selectedRunId ? (
+            <DataTable
+              title="Liquidaciones Generadas"
+              subtitle={`Personas: ${totals.people} · Total Neto: ${formatClp(totals.net)}`}
+              data={payslips}
+              columns={psColumns}
+              keyExtractor={(p) => p.id}
+              loading={loadingPayslips}
+              searchPlaceholder="Buscar persona..."
+              headerActions={
+                <button
+                  onClick={() => loadPayslips(selectedRunId)}
+                  className="text-xs text-blue-400 hover:text-blue-300 underline"
+                >
+                  Actualizar
+                </button>
+              }
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 rounded-2xl border border-white/10 bg-[#0A0C10] text-slate-500">
+              <IconCalculator size={48} className="opacity-20 mb-4" />
+              <p>Selecciona un proceso para ver sus liquidaciones.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => (selectedRunId ? loadPayslips(selectedRunId) : null)}
-              disabled={!selectedRunId || loadingPayslips}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {loadingPayslips ? 'Actualizando…' : 'Actualizar'}
-            </button>
-          </div>
-
-          <div className="mt-4 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-            <table className="w-full border-collapse text-xs">
-              <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left">Persona</th>
-                  <th className="px-4 py-3 text-left">Negocio</th>
-                  <th className="px-4 py-3 text-left">Cargo</th>
-                  <th className="px-4 py-3 text-left">Días</th>
-                  <th className="px-4 py-3 text-left">Bruto</th>
-                  <th className="px-4 py-3 text-left">Desc.</th>
-                  <th className="px-4 py-3 text-left">Neto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingPayslips && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-6 text-sm text-slate-400">
-                      Cargando…
-                    </td>
-                  </tr>
-                )}
-                {!loadingPayslips &&
-                  payslips.map((ps) => (
-                    <tr key={ps.id} className="border-t border-slate-100 hover:bg-blue-50/40">
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-800">{ps.person_name}</td>
-                      <td className="px-4 py-3 text-slate-600">{ps.business_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{ps.position_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{ps.days_worked}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatClp(ps.gross)}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatClp(ps.deductions)}</td>
-                      <td className="px-4 py-3 text-slate-700">{formatClp(ps.net)}</td>
-                    </tr>
-                  ))}
-                {!loadingPayslips && payslips.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-400">
-                      {selectedRunId ? 'Aún no hay liquidaciones. Presiona “Calcular”.' : 'Selecciona un proceso.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          )}
         </div>
       </div>
     </section>

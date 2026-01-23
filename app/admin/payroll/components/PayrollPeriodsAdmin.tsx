@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
+import { IconEdit, IconTrash, IconPlus, IconCalendarTime } from '@tabler/icons-react';
 
 type Period = {
   id: string;
@@ -55,12 +57,14 @@ export default function PayrollPeriodsAdmin() {
     setEditing({ ...emptyPeriod, id: crypto.randomUUID(), status: 'OPEN' });
     setError(null);
     setSuccess(null);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
   const startEdit = (period: Period) => {
     setEditing(period);
     setError(null);
     setSuccess(null);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -118,152 +122,165 @@ export default function PayrollPeriodsAdmin() {
     }
   };
 
-  const sorted = useMemo(() => items, [items]);
+  const columns: Column<Period>[] = [
+    {
+      header: 'Etiqueta',
+      accessorKey: 'label',
+      sortable: true,
+      render: (item) => <span className="font-semibold text-slate-200">{item.label || '—'}</span>,
+    },
+    {
+      header: 'Inicio',
+      accessorKey: 'start_date',
+      sortable: true,
+      render: (item) => <span className="text-slate-400 font-mono text-xs">{item.start_date}</span>,
+    },
+    {
+      header: 'Fin',
+      accessorKey: 'end_date',
+      sortable: true,
+      render: (item) => <span className="text-slate-400 font-mono text-xs">{item.end_date}</span>,
+    },
+    {
+      header: 'Estado',
+      accessorKey: 'status',
+      render: (item) => {
+        const colors = {
+          OPEN: 'bg-emerald-500/10 text-emerald-400',
+          CLOSED: 'bg-slate-500/10 text-slate-400',
+          PAID: 'bg-blue-500/10 text-blue-400',
+        };
+        return (
+          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${colors[item.status]}`}>
+            {item.status}
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader overline="Nómina" title="Períodos" description="Define el rango de fechas para calcular días trabajados." />
 
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-800">Listado</p>
-          <button
-            type="button"
-            onClick={startNew}
-            className="rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(37,99,235,0.6)] transition hover:from-indigo-600 hover:to-blue-600"
-          >
-            Nuevo periodo
-          </button>
-        </div>
+      <div className="flex flex-col gap-4">
+        {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
+        {success && <p className="text-sm font-semibold text-emerald-500">{success}</p>}
 
-        {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
-        {success && <p className="mt-4 text-sm text-emerald-600">{success}</p>}
-
-        <div className="mt-4 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-          <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-left">Label</th>
-                <th className="px-4 py-3 text-left">Inicio</th>
-                <th className="px-4 py-3 text-left">Fin</th>
-                <th className="px-4 py-3 text-left">Estado</th>
-                <th className="px-4 py-3 text-left">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-sm text-slate-400">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                sorted.map((period) => (
-                  <tr key={period.id} className="border-t border-slate-100 hover:bg-blue-50/40">
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-800">{period.label ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{period.start_date}</td>
-                    <td className="px-4 py-3 text-slate-600">{period.end_date}</td>
-                    <td className="px-4 py-3 text-slate-600">{period.status}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(period)}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(period)}
-                          className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              {!loading && items.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                    Aún no hay períodos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          title="Ciclos de Nómina"
+          subtitle="Gestiona los períodos de pago."
+          data={items}
+          columns={columns}
+          keyExtractor={(item) => item.id}
+          loading={loading}
+          searchPlaceholder="Buscar por etiqueta..."
+          headerActions={
+            <button
+              onClick={startNew}
+              className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition shadow-lg shadow-blue-900/20"
+            >
+              <IconPlus size={18} />
+              Nuevo Período
+            </button>
+          }
+          actions={(item) => (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => startEdit(item)}
+                className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition"
+                title="Editar"
+              >
+                <IconEdit size={18} />
+              </button>
+              <button
+                onClick={() => handleDelete(item)}
+                className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                title="Eliminar"
+              >
+                <IconTrash size={18} />
+              </button>
+            </div>
+          )}
+        />
       </div>
 
-      <form onSubmit={submit} className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-800">{editing.id ? 'Editar periodo' : 'Crear periodo'}</p>
-          {editing.id && (
+      {/* Editor Form - Flat Design */}
+      {editing.id && (
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <IconCalendarTime className="text-blue-500" />
+              {items.some(p => p.id === editing.id) ? 'Editar Período' : 'Nuevo Período'}
+            </h3>
             <button
-              type="button"
               onClick={() => setEditing(emptyPeriod)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="text-sm text-slate-500 hover:text-white transition"
             >
               Cancelar
             </button>
-          )}
-        </div>
+          </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Label (opcional)
-            <input
-              value={editing.label ?? ''}
-              onChange={(e) => setEditing((prev) => ({ ...prev, label: e.target.value || null }))}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Estado
-            <select
-              value={editing.status}
-              onChange={(e) => setEditing((prev) => ({ ...prev, status: e.target.value as Period['status'] }))}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-            >
-              <option value="OPEN">OPEN</option>
-              <option value="CLOSED">CLOSED</option>
-              <option value="PAID">PAID</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Inicio
-            <input
-              type="date"
-              value={editing.start_date}
-              onChange={(e) => setEditing((prev) => ({ ...prev, start_date: e.target.value }))}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Fin
-            <input
-              type="date"
-              value={editing.end_date}
-              onChange={(e) => setEditing((prev) => ({ ...prev, end_date: e.target.value }))}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-              required
-            />
-          </label>
-        </div>
+          <form onSubmit={submit} className="grid gap-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Etiqueta (Opcional)</span>
+                <input
+                  value={editing.label ?? ''}
+                  onChange={(e) => setEditing((prev) => ({ ...prev, label: e.target.value || null }))}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition"
+                  placeholder="Ej. Enero 2026"
+                />
+              </label>
 
-        <div className="mt-5 flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60"
-          >
-            {saving ? 'Guardando…' : 'Guardar'}
-          </button>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estado</span>
+                <select
+                  value={editing.status}
+                  onChange={(e) => setEditing((prev) => ({ ...prev, status: e.target.value as Period['status'] }))}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition [&>option]:text-black"
+                >
+                  <option value="OPEN">OPEN</option>
+                  <option value="CLOSED">CLOSED</option>
+                  <option value="PAID">PAID</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fecha Inicio</span>
+                <input
+                  type="date"
+                  required
+                  value={editing.start_date}
+                  onChange={(e) => setEditing((prev) => ({ ...prev, start_date: e.target.value }))}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition [color-scheme:dark]"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fecha Fin</span>
+                <input
+                  type="date"
+                  required
+                  value={editing.end_date}
+                  onChange={(e) => setEditing((prev) => ({ ...prev, end_date: e.target.value }))}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition [color-scheme:dark]"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-white/10">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-full bg-blue-600 px-8 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 disabled:opacity-50 transition"
+              >
+                {saving ? 'Guardando...' : 'Guardar Período'}
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      )}
     </section>
   );
 }

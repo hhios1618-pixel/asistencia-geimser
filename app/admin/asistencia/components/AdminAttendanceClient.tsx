@@ -14,18 +14,183 @@ import {
   IconBellRinging,
   IconAlertTriangle,
   IconClipboardList,
+  IconCheck,
+  IconX,
 } from '@tabler/icons-react';
-import SitesAdmin from './SitesAdmin';
-import PeopleAdmin from './PeopleAdmin';
-import ModificationsInbox from './ModificationsInbox';
+import { SitesAdmin } from './SitesAdmin';
+import { PeopleAdmin } from './PeopleAdmin';
+// ModificationsInbox removed from imports to be inlined below
 import AuditLogViewer from './AuditLogViewer';
 import PoliciesManager from './PoliciesManager';
-import DTAccessPanel from './DTAccessPanel';
-import TurnosAdmin from './TurnosAdmin';
+import { DTAccessPanel } from './DTAccessPanel';
+import { TurnosAdmin } from './TurnosAdmin';
 import KpiCard from '../../../../components/ui/KpiCard';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import AlertsAdmin from './AlertsAdmin';
 import DailyControlPanel from './DailyControlPanel';
+// import { IconCheck, IconX } from '@tabler/icons-react'; // Consolidated above
+
+interface Modification {
+  id: string;
+  mark_id: string;
+  requester_id: string;
+  reason: string;
+  requested_delta: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  created_at: string;
+  attendance_marks?: {
+    event_ts: string;
+    event_type: 'IN' | 'OUT';
+    site_id: string;
+  } | null;
+}
+
+function ModificationsInboxInline() {
+  const [items, setItems] = useState<Modification[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/attendance/modifications?status=PENDING');
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError('Inicia sesión como administrador para revisar solicitudes pendientes.');
+        } else {
+          setError('No fue posible cargar solicitudes');
+        }
+        return;
+      }
+      const body = await response.json();
+      setItems(body.items);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const decide = async (id: string, status: 'APPROVED' | 'REJECTED') => {
+    const response = await fetch('/api/attendance/modifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    });
+    if (!response.ok) {
+      setError('No fue posible actualizar la solicitud');
+      return;
+    }
+    await load();
+  };
+
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+
+  return (
+    <div className="flex flex-col gap-4">
+      {error && <p className="text-sm font-semibold text-rose-500 mb-2">{error}</p>}
+
+      {/* DEBUG DATA VIEW */}
+      {/* <pre className="text-[10px] text-white bg-slate-900 p-2 rounded overflow-auto h-32">{JSON.stringify(items, null, 2)}</pre> */}
+
+      <div className="flex flex-col gap-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white">Solicitudes de Corrección</h3>
+            <p className="text-sm text-slate-400">Gestiona las solicitudes de ajuste de marcas de asistencia.</p>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A0C10] shadow-2xl">
+          {loading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-blue-500" />
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/5 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  <th className="px-6 py-4">Solicitante</th>
+                  <th className="px-6 py-4">Motivo</th>
+                  <th className="px-6 py-4">Marca Original</th>
+                  <th className="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {items.map((mod) => (
+                  <tr key={mod.id} className="group transition hover:bg-white/[0.03]">
+                    <td className="px-6 py-4 text-slate-300">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-200">{String(mod.requester_id)}</span>
+                        <span className="text-xs text-slate-500">{mod.created_at ? formatDate(mod.created_at) : '-'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      <div className="max-w-xs">
+                        <p className="text-sm text-slate-300 truncate" title={mod.reason}>{String(mod.reason)}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Delta: {String(mod.requested_delta)}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {mod.attendance_marks ? (
+                        <div className="flex flex-col text-xs">
+                          <span className={`font-semibold ${mod.attendance_marks.event_type === 'IN' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {mod.attendance_marks.event_type === 'IN' ? 'Entrada' : 'Salida'}
+                          </span>
+                          <span className="text-slate-500">{formatDate(mod.attendance_marks.event_ts)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-600 italic">No asociada</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          onClick={() => decide(mod.id, 'APPROVED')}
+                          className="flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition"
+                        >
+                          <IconCheck size={14} />
+                          <span>APROBAR</span>
+                        </button>
+                        <button
+                          onClick={() => decide(mod.id, 'REJECTED')}
+                          className="flex items-center gap-1 rounded-lg bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition"
+                        >
+                          <IconX size={14} />
+                          <span>RECHAZAR</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!loading && items.length === 0 && (
+                  <tr>
+                    <td colSpan={4}>
+                      <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                        <p>No hay solicitudes pendientes de revisión.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-t border-white/10 bg-white/[0.02] px-6 py-3 text-xs text-slate-500">
+            Mostrando {items.length} registro{items.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type OverviewResponse = {
   totals: {
@@ -50,25 +215,20 @@ const ROLE_LABELS: Record<'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER', strin
 };
 
 const SECTIONS = [
-  { id: 'overview', label: 'Resumen', description: 'Indicadores globales y actividad reciente', icon: IconLayoutDashboard },
-  { id: 'daily', label: 'Control diario', description: 'Asistencia por día, por persona', icon: IconClipboardList },
-  { id: 'people', label: 'Personas', description: 'Usuarios, roles y asignaciones', icon: IconUsers },
-  { id: 'sites', label: 'Sitios', description: 'Ubicaciones y geocercas', icon: IconMapPin },
-  { id: 'schedules', label: 'Turnos semanales', description: 'Planificación semanal y feriados', icon: IconCalendarStats },
-  { id: 'modifications', label: 'Correcciones', description: 'Solicitudes de ajuste de marcas', icon: IconClipboardCheck },
-  { id: 'alerts', label: 'Alertas', description: 'Consola central de incidencias', icon: IconBellRinging },
-  { id: 'audit', label: 'Auditoría', description: 'Registro detallado de eventos', icon: IconFileCertificate },
-  { id: 'policies', label: 'Políticas', description: 'Reglas de asistencia y tolerancias', icon: IconAdjustmentsFilled },
-  { id: 'dt', label: 'Acceso DT', description: 'Integraciones y entrega documental', icon: IconReportAnalytics },
+  { id: 'overview', label: 'Resumen', description: 'Indicadores globales', icon: IconLayoutDashboard },
+  { id: 'daily', label: 'Diario', description: 'Control de asistencia', icon: IconClipboardList },
+  { id: 'people', label: 'Personas', description: 'Gestión de usuarios', icon: IconUsers },
+  { id: 'sites', label: 'Sitios', description: 'Ubicaciones', icon: IconMapPin },
+  { id: 'schedules', label: 'Turnos', description: 'Planificación', icon: IconCalendarStats },
+  { id: 'modifications', label: 'Correcciones', description: 'Solicitudes', icon: IconClipboardCheck },
+  { id: 'alerts', label: 'Alertas', description: 'Incidencias', icon: IconBellRinging },
+  { id: 'audit', label: 'Auditoría', description: 'Trazabilidad', icon: IconFileCertificate },
+  { id: 'policies', label: 'Políticas', description: 'Normativas', icon: IconAdjustmentsFilled },
+  { id: 'dt', label: 'DT', description: 'Legal', icon: IconReportAnalytics },
 ];
 
 const getInitials = (name: string) =>
-  name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'PG';
+  name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'PG';
 
 const formatDate = (iso: string) =>
   new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
@@ -79,12 +239,12 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
       <div className="grid gap-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-40 animate-pulse rounded-3xl border border-white/80 bg-white/70" />
+            <div key={index} className="h-40 animate-pulse rounded-2xl bg-white/5 border border-white/10" />
           ))}
         </div>
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <div className="h-64 animate-pulse rounded-3xl border border-white/80 bg-white/70" />
-          <div className="h-64 animate-pulse rounded-3xl border border-white/80 bg-white/70" />
+          <div className="h-64 animate-pulse rounded-2xl bg-white/5 border border-white/10" />
+          <div className="h-64 animate-pulse rounded-2xl bg-white/5 border border-white/10" />
         </div>
       </div>
     );
@@ -92,16 +252,16 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
 
   if (error) {
     return (
-      <div className="glass-panel rounded-3xl border border-rose-200/70 bg-rose-50/80 p-5 text-sm text-rose-700">
+      <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm text-rose-400">
         <p className="font-semibold">No se pudo cargar el resumen corporativo.</p>
-        <p className="text-xs text-rose-500">Detalle: {error}</p>
+        <p className="text-xs opacity-80">Detalle: {error}</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="glass-panel rounded-3xl border border-white/70 bg-white/90 p-5 text-sm text-slate-500">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-500">
         No hay datos disponibles para mostrar.
       </div>
     );
@@ -109,72 +269,12 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
 
   const maxMarks = Math.max(...data.marksByDay.map((item) => item.total), 1);
   const totalEvents = data.eventDistribution.reduce((acc, item) => acc + item.total, 0);
-  const heatmapMax = Math.max(
-    1,
-    ...(data.heatmap ?? []).flatMap((row) => row.hours)
-  );
+  const heatmapMax = Math.max(1, ...(data.heatmap ?? []).flatMap((row) => row.hours));
 
   return (
-    <div className="grid gap-8">
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Visión general</p>
-          <h4 className="text-lg font-semibold text-slate-900">Mapa de calor (entradas)</h4>
-          <p className="mt-2 text-sm text-slate-500">Últimos 7 días · intensidad por hora (solo ENTRADA).</p>
+    <div className="flex flex-col gap-6">
 
-          <div className="mt-5 space-y-3">
-            {(data.heatmap ?? []).map((row) => (
-              <div key={row.day} className="flex items-center gap-3">
-                <span className="w-16 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  {new Intl.DateTimeFormat('es-CL', { weekday: 'short' }).format(new Date(row.day))}
-                </span>
-                <div className="grid flex-1 grid-cols-[repeat(24,minmax(0,1fr))] gap-1">
-                  {row.hours.map((value, index) => (
-                    <span
-                      key={`${row.day}-${index}`}
-                      title={`${index}:00 · ${value} IN`}
-                      className="h-3 rounded-sm border border-white/30"
-                      style={{
-                        backgroundColor: `rgba(0, 229, 255, ${Math.min(0.78, (value / heatmapMax) * 0.78)})`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-            {(data.heatmap ?? []).length === 0 && <p className="text-sm text-slate-400">Sin datos para graficar.</p>}
-          </div>
-        </div>
-
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Tiempo real</p>
-          <h4 className="text-lg font-semibold text-slate-900">Últimos fichajes</h4>
-          <div className="mt-4 space-y-3">
-            {(data.latestMarks ?? []).slice(0, 8).map((mark, index) => (
-              <div
-                key={`${mark.person}-${mark.event_ts}-${index}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-sm"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-800">{mark.person}</p>
-                  <p className="truncate text-xs text-slate-400">{mark.site ?? 'Sitio no registrado'}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <StatusBadge
-                    label={mark.event_type === 'IN' ? 'Entrada' : 'Salida'}
-                    variant={mark.event_type === 'IN' ? 'success' : 'warning'}
-                  />
-                  <span className="text-xs font-semibold text-slate-500">
-                    {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(new Date(mark.event_ts))}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {(data.latestMarks ?? []).length === 0 && <p className="text-sm text-slate-400">Sin eventos recientes.</p>}
-          </div>
-        </div>
-      </div>
-
+      {/* Top Cards - Clean, no glass effect, dark background */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="Colaboradores activos"
@@ -205,28 +305,91 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
-          <div className="flex items-center justify-between">
+      {/* Heatmap & Real-time - Flat Panels */}
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Actividad diaria</p>
-              <h4 className="text-lg font-semibold text-slate-900">Marcas últimos 7 días</h4>
+              <h4 className="text-base font-bold text-white">Mapa de calor (entradas)</h4>
+              <p className="text-xs text-slate-500">Intensidad por hora (últimos 7 días)</p>
             </div>
           </div>
-          <div className="mt-5 space-y-4">
+
+          <div className="space-y-4">
+            {(data.heatmap ?? []).map((row) => (
+              <div key={row.day} className="flex items-center gap-3">
+                <span className="w-10 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {new Intl.DateTimeFormat('es-CL', { weekday: 'short' }).format(new Date(row.day))}
+                </span>
+                <div className="grid flex-1 grid-cols-[repeat(24,minmax(0,1fr))] gap-1">
+                  {row.hours.map((value, index) => (
+                    <div
+                      key={`${row.day}-${index}`}
+                      title={`${index}:00 · ${value} IN`}
+                      className="h-6 rounded-sm bg-white/5 relative group cursor-help transition hover:scale-110"
+                    >
+                      {value > 0 && (
+                        <div
+                          className="absolute inset-0 rounded-sm bg-blue-500"
+                          style={{ opacity: Math.max(0.2, Math.min(1, value / heatmapMax)) }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {(data.heatmap ?? []).length === 0 && <p className="text-sm text-slate-500">Sin datos para graficar.</p>}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+          <h4 className="text-base font-bold text-white mb-6">Últimos fichajes</h4>
+          <div className="space-y-2">
+            {(data.latestMarks ?? []).slice(0, 8).map((mark, index) => (
+              <div
+                key={`${mark.person}-${mark.event_ts}-${index}`}
+                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-200">{mark.person}</p>
+                  <p className="truncate text-xs text-slate-500">{mark.site ?? 'Sitio no registrado'}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge
+                    label={mark.event_type === 'IN' ? 'Entrada' : 'Salida'}
+                    variant={mark.event_type === 'IN' ? 'success' : 'warning'}
+                  />
+                  <span className="text-xs font-mono text-slate-500">
+                    {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(new Date(mark.event_ts))}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {(data.latestMarks ?? []).length === 0 && <p className="text-sm text-slate-500">Sin eventos recientes.</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* Details - Flat Tables */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Daily Activity */}
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+          <h4 className="text-base font-bold text-white mb-6">Actividad Diaria</h4>
+          <div className="space-y-4">
             {data.marksByDay.map((item) => (
-              <div key={item.day}>
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>{new Intl.DateTimeFormat('es-CL', { weekday: 'short', day: 'numeric' }).format(new Date(item.day))}</span>
+              <div key={item.day} className="group">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                  <span className="font-semibold text-slate-300">{new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric' }).format(new Date(item.day))}</span>
                   <span>{item.total} marcas</span>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-100">
+                <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
                   <div
-                    className="h-2 rounded-full bg-gradient-to-r from-indigo-400 via-blue-500 to-sky-400"
+                    className="h-full bg-blue-500 transition-all duration-500"
                     style={{ width: `${(item.total / maxMarks) * 100}%` }}
                   />
                 </div>
-                <div className="mt-1 flex items-center gap-4 text-[11px] text-slate-400">
+                <div className="mt-1 flex gap-3 text-[10px] text-slate-600 opacity-0 group-hover:opacity-100 transition">
                   <span>IN: {item.in_total}</span>
                   <span>OUT: {item.out_total}</span>
                 </div>
@@ -234,73 +397,28 @@ function OverviewPanel({ data, loading, error }: { data: OverviewResponse | null
             ))}
           </div>
         </div>
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Distribución</p>
-          <h4 className="text-lg font-semibold text-slate-900">Eventos IN/OUT</h4>
-          <div className="mt-5 space-y-4">
-            {data.eventDistribution.map((item) => (
-              <div key={item.event_type}>
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>{item.event_type === 'IN' ? 'Entradas' : 'Salidas'}</span>
-                  <span>
-                    {item.total} ({Math.round((item.total / Math.max(totalEvents, 1)) * 100)}%)
-                  </span>
-                </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-100">
-                  <div
-                    className={`h-2 rounded-full ${
-                      item.event_type === 'IN' ? 'bg-emerald-400' : 'bg-amber-400'
-                    }`}
-                    style={{ width: `${(item.total / Math.max(totalEvents, 1)) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Sitios destacados</p>
-          <h4 className="text-lg font-semibold text-slate-900">Top 5 por actividad</h4>
-          <div className="mt-4 divide-y divide-slate-100">
+        {/* Top Sites */}
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+          <h4 className="text-base font-bold text-white mb-6">Sitios Más Activos</h4>
+          <div className="divide-y divide-white/5">
             {data.topSites.map((site, index) => (
-              <div key={`${site.site}-${index}`} className="flex items-center justify-between py-3">
+              <div key={`${site.site}-${index}`} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-100 text-sm font-semibold text-indigo-600">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-xs font-bold text-slate-400 border border-white/10">
                     {index + 1}
-                  </span>
+                  </div>
                   <div>
-                    <p className="font-semibold text-slate-800">{site.site}</p>
-                    <p className="text-xs text-slate-500">Marcas registradas</p>
+                    <p className="text-sm font-medium text-slate-300">{site.site}</p>
+                    <p className="text-[10px] text-slate-600 uppercase tracking-wider">Marcas registradas</p>
                   </div>
                 </div>
-                <StatusBadge label={`${site.total}`} variant="info" />
+                <span className="text-sm font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">
+                  {site.total}
+                </span>
               </div>
             ))}
-            {data.topSites.length === 0 && <p className="py-4 text-sm text-slate-400">No hay registros recientes.</p>}
-          </div>
-        </div>
-        <div className="glass-panel rounded-3xl border border-white/70 bg-white/95 p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Nuevos ingresos</p>
-          <h4 className="text-lg font-semibold text-slate-900">Últimos colaboradores</h4>
-          <div className="mt-4 space-y-3">
-            {data.recentPeople.map((person, index) => (
-              <div key={`${person.name}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-600">
-                    {getInitials(person.name)}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{person.name}</p>
-                    <p className="text-xs text-slate-400">{formatDate(person.created_at)}</p>
-                  </div>
-                </div>
-                <StatusBadge label={ROLE_LABELS[person.role]} variant="default" />
-              </div>
-            ))}
-            {data.recentPeople.length === 0 && <p className="text-sm text-slate-400">Sin nuevos registros.</p>}
+            {data.topSites.length === 0 && <p className="text-sm text-slate-500">No hay registros recientes.</p>}
           </div>
         </div>
       </div>
@@ -318,19 +436,11 @@ export function AdminAttendanceClient() {
   const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeTab === 'sites') {
-      router.replace('/admin/sitios');
-      return;
+    // Redirections or default handling
+    if (!SECTIONS.find(s => s.id === activeTab)) {
+      // Fallback handled by some function above but here we can ensure we load overview data if needed
     }
-    if (activeTab === 'schedules') {
-      router.replace('/admin/turnos');
-      return;
-    }
-    if (activeTab === 'alerts') {
-      router.replace('/admin/alertas');
-      return;
-    }
-  }, [activeTab, router]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'overview') {
@@ -345,7 +455,7 @@ export function AdminAttendanceClient() {
         const response = await fetch('/api/admin/attendance/reports/overview', { cache: 'no-store' });
         if (!response.ok) {
           const body = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(body.error ?? 'No fue posible obtener el resumen corporativo');
+          throw new Error(body.error ?? 'Error de carga');
         }
         const payload = (await response.json()) as OverviewResponse;
         if (!active) return;
@@ -361,50 +471,53 @@ export function AdminAttendanceClient() {
     };
 
     void fetchOverview();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [activeTab]);
 
-  const activeMeta = useMemo(() => SECTIONS.find((section) => section.id === activeTab) ?? SECTIONS[0], [activeTab]);
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'overview':
-        return <OverviewPanel data={overviewData} loading={overviewLoading} error={overviewError} />;
-      case 'daily':
-        return <DailyControlPanel />;
-      case 'people':
-        return <PeopleAdmin />;
-      case 'sites':
-        return <SitesAdmin />;
-      case 'schedules':
-        return <TurnosAdmin />;
-      case 'alerts':
-        return <AlertsAdmin />;
-      case 'modifications':
-        return <ModificationsInbox />;
-      case 'audit':
-        return <AuditLogViewer />;
-      case 'policies':
-        return <PoliciesManager />;
-      case 'dt':
-        return <DTAccessPanel />;
-      default:
-        return <OverviewPanel data={overviewData} loading={overviewLoading} error={overviewError} />;
+      case 'overview': return <OverviewPanel data={overviewData} loading={overviewLoading} error={overviewError} />;
+      case 'daily': return <DailyControlPanel />;
+      case 'people': return <PeopleAdmin />;
+      case 'sites': return <SitesAdmin />;
+      case 'schedules': return <TurnosAdmin />;
+      case 'alerts': return <AlertsAdmin />;
+      case 'modifications': return <ModificationsInboxInline />;
+      case 'audit': return <AuditLogViewer />;
+      case 'policies': return <PoliciesManager />;
+      case 'dt': return <DTAccessPanel />;
+      default: return <OverviewPanel data={overviewData} loading={overviewLoading} error={overviewError} />;
     }
   };
 
   return (
-    <section className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{activeMeta.label}</p>
-          <p className="mt-2 text-sm text-slate-300">{activeMeta.description}</p>
-        </div>
-      </header>
-      <div className="flex flex-col gap-8">{renderContent()}</div>
-    </section>
+    <div className="flex flex-col gap-6">
+      {/* Navigation - Flat & Minimal */}
+      <nav className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto no-scrollbar">
+        {SECTIONS.map((section) => {
+          const isActive = activeTab === section.id;
+          const Icon = section.icon;
+          return (
+            <button
+              key={section.id}
+              onClick={() => router.push(`/admin/asistencia?panel=${section.id}`)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${isActive
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-white/10'
+                }`}
+            >
+              <Icon size={16} />
+              {section.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="min-h-[600px] animate-in fade-in duration-300">
+        {renderContent()}
+      </div>
+    </div>
   );
 }
 

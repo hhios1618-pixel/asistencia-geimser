@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Tables } from '../../../types/database';
 import AlertsBanner from './AlertsBanner';
 import OfflineSyncTray from './OfflineSyncTray';
-import ShiftInfoCard from './ShiftInfoCard';
-import HistoryTable from './HistoryTable';
-import MarkAttendanceModal from './MarkAttendanceModal';
+import ActivityFeed from './ActivityFeed';
+import HoldToMark from './HoldToMark';
 import Link from 'next/link';
+import { IconBuildingSkyscraper, IconCake, IconChevronDown } from '@tabler/icons-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type HistoryItem = {
   id: string;
@@ -26,26 +27,17 @@ interface Props {
   birthdaysThisMonth: Array<{ name: string; service: string | null; birth_date: string }>;
 }
 
-const ROLE_LABELS: Record<Tables['people']['Row']['role'], string> = {
-  ADMIN: 'Administrador',
-  SUPERVISOR: 'Supervisor',
-  WORKER: 'Trabajador',
-  DT_VIEWER: 'DT Viewer',
-};
-
 export function AttendanceClient({ person, sites, schedule, birthdaysThisMonth }: Props) {
   const [lastEventType, setLastEventType] = useState<'IN' | 'OUT' | null>(null);
   const [lastEvent, setLastEvent] = useState<HistoryItem | null>(null);
   const [offlineRefreshKey, setOfflineRefreshKey] = useState(0);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-  const [markModalOpen, setMarkModalOpen] = useState(false);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(sites[0]?.id ?? null);
 
   useEffect(() => {
     const loadLastMark = async () => {
       const response = await fetch('/api/attendance/history?limit=1');
-      if (!response.ok) {
-        return;
-      }
+      if (!response.ok) return;
       const body = (await response.json()) as { items: HistoryItem[] };
       if (body.items.length > 0) {
         setLastEventType(body.items[0].event_type);
@@ -55,210 +47,134 @@ export function AttendanceClient({ person, sites, schedule, birthdaysThisMonth }
     void loadLastMark();
   }, []);
 
-  const lastEventSiteName = useMemo(() => {
-    if (!lastEvent?.site_id) {
-      return null;
-    }
-    return sites.find((site) => site.id === lastEvent.site_id)?.name ?? null;
-  }, [lastEvent?.site_id, sites]);
-
-  const nextShiftDescription = useMemo(() => {
-    if (!schedule) {
-      return 'No tienes turnos programados para hoy.';
-    }
-    const day = new Intl.DateTimeFormat('es-CL', { weekday: 'long' }).format(new Date());
-    return `${day} · ${schedule.start_time} – ${schedule.end_time} · Colación ${schedule.break_minutes} min`;
-  }, [schedule]);
-
-  const formatDateTime = (iso: string) =>
-    new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
+  const selectedSite = useMemo(() => sites.find(s => s.id === selectedSiteId) ?? null, [sites, selectedSiteId]);
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="glass-panel overflow-hidden rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_40px_120px_-70px_rgba(0,0,0,0.7)] sm:p-10">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_18%_30%,rgba(0,229,255,0.16),transparent_46%),radial-gradient(circle_at_86%_14%,rgba(255,43,214,0.12),transparent_46%)]" />
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bienvenido</p>
-                <h1 className="text-3xl font-semibold text-white sm:text-4xl">{person.name}</h1>
-                <p className="mt-2 text-sm text-slate-300">
-                  Rol {ROLE_LABELS[person.role]}. Revisa tu jornada, solicitudes y registros en un solo lugar.
-                </p>
-              </div>
-              <StatusSummary
-                lastEventType={lastEventType}
-                lastEvent={lastEvent}
-                siteName={lastEventSiteName}
-                formatDateTime={formatDateTime}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <InfoChip label="Sitios asignados" value={sites.length} />
-              <InfoChip label="Turno de hoy" value={nextShiftDescription} />
-              <div className="flex flex-col justify-between gap-3 rounded-2xl border border-[rgba(255,255,255,0.12)] bg-white/5 p-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)]">
-                <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Acción</p>
-                <button
-                  type="button"
-                  onClick={() => setMarkModalOpen(true)}
-                  className="inline-flex w-full items-center justify-between gap-3 rounded-2xl bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] px-4 py-3 text-sm font-semibold text-black shadow-[0_16px_40px_-28px_rgba(0,229,255,0.45)] transition hover:brightness-110"
-                >
-                  Marcar asistencia
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/30 text-xs font-semibold text-black">
-                    →
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-          <ShiftInfoCard schedule={schedule} currentDate={new Date()} />
-        </div>
-      </section>
-
+      {/* Alert Banner */}
       <AlertsBanner />
 
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.65)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">Accesos rápidos</p>
-          <h2 className="mt-2 text-lg font-semibold text-white">Tu operación del día</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Link
-              href="/asistencia/historial"
-              className="rounded-3xl border border-white/15 bg-white/10 p-5 text-left text-slate-100 transition hover:border-[rgba(0,229,255,0.28)] hover:bg-white/15"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">Mis marcas</p>
-              <p className="mt-2 text-base font-semibold text-white">Ver historial</p>
-              <p className="mt-2 text-sm text-slate-300">Filtra, exporta y revisa tus entradas/salidas.</p>
-            </Link>
-            <Link
-              href="/asistencia/solicitudes"
-              className="rounded-3xl border border-white/15 bg-white/10 p-5 text-left text-slate-100 transition hover:border-[rgba(255,43,214,0.28)] hover:bg-white/15"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-400">Mis solicitudes</p>
-              <p className="mt-2 text-base font-semibold text-white">Permisos y cambios</p>
-              <p className="mt-2 text-sm text-slate-300">Envía, revisa estados y comentarios.</p>
-            </Link>
+      <section className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
+
+        {/* Main Action Card */}
+        <div className="relative overflow-hidden rounded-[40px] border border-white/10 bg-[#0A0C10] p-6 shadow-2xl sm:p-10">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,rgba(0,229,255,0.1),transparent_50%)]" />
+
+          <div className="flex flex-col items-center">
+            <h1 className="mb-2 text-center text-3xl font-semibold text-white">Hola, {person.name.split(' ')[0]}</h1>
+            <p className="mb-8 text-center text-slate-400">
+              {schedule
+                ? `Tu turno hoy: ${schedule.start_time} - ${schedule.end_time}`
+                : 'No tienes turnos programados para hoy'}
+            </p>
+
+            {/* Site Selector */}
+            {sites.length > 1 && (
+              <div className="mb-4 relative">
+                <select
+                  value={selectedSiteId ?? ''}
+                  onChange={(e) => setSelectedSiteId(e.target.value)}
+                  className="appearance-none rounded-full border border-white/15 bg-white/5 py-2 pl-4 pr-10 text-sm font-medium text-white transition hover:bg-white/10 focus:border-blue-500 focus:outline-none"
+                >
+                  {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <IconChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              </div>
+            )}
+
+            {/* Hold to Mark Interaction */}
+            <div className="mb-8">
+              <HoldToMark
+                siteId={selectedSiteId}
+                siteName={selectedSite?.name ?? 'Sin sitio asignado'}
+                lastEventType={lastEventType}
+                onMarkSuccess={(mark) => {
+                  setLastEventType(mark.event_type);
+                  setLastEvent(mark);
+                  setHistoryRefreshKey(prev => prev + 1);
+                }}
+                onMarkQueued={() => setOfflineRefreshKey(prev => prev + 1)}
+              />
+            </div>
+
+            {/* Last Mark Info */}
+            <div className="rounded-2xl border border-white/5 bg-white/5 px-6 py-3 text-center">
+              <p className="text-xs uppercase tracking-widest text-slate-500">Último registro</p>
+              {lastEvent ? (
+                <div className="mt-1 flex items-center justify-center gap-2">
+                  <span className={`inline-block h-2 w-2 rounded-full ${lastEvent.event_type === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                  <span className="text-sm font-medium text-white">
+                    {lastEvent.event_type === 'IN' ? 'Entrada' : 'Salida'} • {new Intl.DateTimeFormat('es-CL', { timeStyle: 'short' }).format(new Date(lastEvent.event_ts))}
+                  </span>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-slate-400">Sin registros recientes</p>
+              )}
+            </div>
+
           </div>
         </div>
 
-        <div className="glass-panel rounded-[32px] border border-[rgba(255,255,255,0.12)] bg-white/5 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.65)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">Cultura</p>
-          <h2 className="mt-2 text-lg font-semibold text-white">Cumpleaños del mes</h2>
-          <p className="mt-2 text-sm text-slate-300">
-            {birthdaysThisMonth.length === 0
-              ? 'No hay cumpleaños registrados este mes.'
-              : `${birthdaysThisMonth.length} personas cumplen años este mes.`}
-          </p>
-          <div className="mt-5 space-y-2">
-            {birthdaysThisMonth.slice(0, 6).map((item, index) => (
-              <div
-                key={`${item.name}-${index}`}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-white">{item.name}</p>
-                  <p className="truncate text-xs text-slate-400">{item.service ?? 'Sin área'}</p>
-                </div>
-                <p className="text-xs font-semibold text-slate-300">
-                  {new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short' }).format(new Date(item.birth_date))}
-                </p>
-              </div>
-            ))}
+        {/* Sidebar / Info */}
+        <div className="flex flex-col gap-6">
+          {/* Quick Actions */}
+          <div className="glass-panel overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-6">
+            <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-slate-400">Accesos Directos</h3>
+            <div className="grid gap-3">
+              <Link href="/asistencia/solicitudes" className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10 hover:border-white/20">
+                <span className="font-medium text-slate-200">Mis Solicitudes</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition group-hover:scale-110">→</span>
+              </Link>
+              <Link href="/asistencia/documentos" className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10 hover:border-white/20">
+                <span className="font-medium text-slate-200">Mis Documentos</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition group-hover:scale-110">→</span>
+              </Link>
+            </div>
           </div>
+
+          {/* Birthdays */}
+          {birthdaysThisMonth.length > 0 && (
+            <div className="glass-panel overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <IconCake className="text-pink-400" size={20} />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Cumpleaños</h3>
+              </div>
+              <div className="space-y-3">
+                {birthdaysThisMonth.slice(0, 3).map((b, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-500/20 text-xs font-bold text-pink-400">
+                      {b.name.charAt(0)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-200">{b.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {new Date(b.birth_date).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
+      {/* Activity Feed */}
+      <section>
+        <ActivityFeed refreshKey={historyRefreshKey} />
+      </section>
+
+      {/* Offline Management */}
       <OfflineSyncTray
         refreshKey={offlineRefreshKey}
         onSynced={(result) => {
           setLastEventType(result.event_type);
-          setLastEvent({
-            id: result.id,
-            event_type: result.event_type,
-            event_ts: result.event_ts,
-            site_id: result.site_id,
-            hash_self: result.hash,
-            receipt_url: result.receipt_url ?? null,
-            receipt_signed_url: result.receipt_url ?? null,
-          });
+          setLastEvent(result);
           setHistoryRefreshKey((prev) => prev + 1);
         }}
-      />
-
-      <HistoryTable refreshKey={historyRefreshKey} />
-
-      <MarkAttendanceModal
-        open={markModalOpen}
-        onClose={() => setMarkModalOpen(false)}
-        sites={sites}
-        lastEventType={lastEventType}
-        onMarkSuccess={(mark) => {
-          setLastEventType(mark.event_type);
-          setLastEvent({
-            id: mark.id,
-            event_type: mark.event_type,
-            event_ts: mark.event_ts,
-            site_id: mark.site_id,
-            hash_self: mark.hash,
-            receipt_url: mark.receipt_url ?? null,
-            receipt_signed_url: mark.receipt_url ?? null,
-          });
-          setHistoryRefreshKey((prev) => prev + 1);
-        }}
-        onMarkQueued={() => setOfflineRefreshKey((prev) => prev + 1)}
       />
     </div>
   );
 }
 
 export default AttendanceClient;
-
-type StatusSummaryProps = {
-  lastEventType: 'IN' | 'OUT' | null;
-  lastEvent: HistoryItem | null;
-  siteName: string | null;
-  formatDateTime: (iso: string) => string;
-};
-
-const StatusSummary = ({ lastEventType, lastEvent, siteName, formatDateTime }: StatusSummaryProps) => (
-  <div className="grid gap-3 text-xs text-slate-300 sm:grid-cols-2 lg:grid-cols-3">
-    <InfoChip
-      label="Estado actual"
-      value={
-        lastEventType
-          ? lastEventType === 'IN'
-            ? 'En jornada'
-            : 'Fuera de jornada'
-          : 'Sin marcajes'
-      }
-      variant={lastEventType === 'IN' ? 'success' : lastEventType === 'OUT' ? 'default' : 'warning'}
-    />
-    <InfoChip
-      label="Último evento"
-      value={lastEvent ? formatDateTime(lastEvent.event_ts) : 'Aún no registras eventos'}
-    />
-    <InfoChip label="Sitio más reciente" value={siteName ?? 'Sin registro'} />
-  </div>
-);
-
-type InfoChipProps = {
-  label: string;
-  value: string | number;
-  variant?: 'default' | 'success' | 'warning';
-};
-
-const variantStyles: Record<Exclude<InfoChipProps['variant'], undefined>, string> = {
-  default: 'border-[rgba(255,255,255,0.12)] bg-white/5 text-slate-200',
-  success: 'border-[rgba(0,229,255,0.32)] bg-[rgba(0,229,255,0.08)] text-slate-100',
-  warning: 'border-[rgba(255,43,214,0.32)] bg-[rgba(255,43,214,0.08)] text-slate-100',
-};
-
-const InfoChip = ({ label, value, variant = 'default' }: InfoChipProps) => (
-  <div
-    className={`rounded-2xl border px-4 py-3 text-sm shadow-[0_18px_40px_-30px_rgba(0,0,0,0.45)] ${variantStyles[variant]}`}
-  >
-    <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">{label}</p>
-    <p className="mt-2 font-semibold">{value}</p>
-  </div>
-);

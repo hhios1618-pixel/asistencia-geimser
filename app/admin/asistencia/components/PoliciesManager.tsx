@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useBrowserSupabase } from '../../../../lib/hooks/useBrowserSupabase';
 import type { TableInsert, Tables } from '../../../../types/database';
-import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
+import { IconExternalLink, IconPlus } from '@tabler/icons-react';
 
 interface Policy {
   id: string;
@@ -13,10 +14,7 @@ interface Policy {
   [key: string]: string;
 }
 
-type PoliciesValue = {
-  policies: Policy[];
-};
-
+type PoliciesValue = { policies: Policy[]; };
 const KEY = 'policies_register';
 type SettingsRow = Tables['settings']['Row'];
 
@@ -28,29 +26,25 @@ export function PoliciesManager() {
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    const { data, error: fetchError } = await supabase
-      .from('settings')
-      .select('*')
-      .eq('key', KEY)
-      .maybeSingle();
+    setLoading(true);
+    const { data, error: fetchError } = await supabase.from('settings').select('*').eq('key', KEY).maybeSingle();
     if (fetchError && fetchError.code !== 'PGRST116') {
       setError(fetchError.message);
-      return;
-    }
-    if (data) {
+    } else if (data) {
       const record = data as SettingsRow;
       const value = record.value as PoliciesValue | null;
       setPolicies(value?.policies ?? []);
     }
+    setLoading(false);
   }, [supabase]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  const addPolicy = async () => {
+  const addPolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
     setSuccess(false);
     if (!title || !version || !url) {
@@ -58,10 +52,7 @@ export function PoliciesManager() {
       return;
     }
     const nextPolicies = [...policies, { id: crypto.randomUUID(), title, version, url }];
-    const upsertPayload = {
-      key: KEY,
-      value: { policies: nextPolicies },
-    } as unknown as TableInsert<'settings'>;
+    const upsertPayload = { key: KEY, value: { policies: nextPolicies } } as unknown as TableInsert<'settings'>;
 
     const { error: upsertError } = await supabase.from('settings').upsert(upsertPayload as never).select().single();
     if (upsertError) {
@@ -75,73 +66,72 @@ export function PoliciesManager() {
     setSuccess(true);
   };
 
+  const columns: Column<Policy>[] = [
+    { header: 'Título', accessorKey: 'title', render: (p) => <span className="font-semibold text-white">{p.title}</span> },
+    { header: 'Versión', accessorKey: 'version', render: (p) => <span className="text-slate-400">{p.version}</span> },
+    {
+      header: 'Documento',
+      accessorKey: 'url',
+      render: (p) => (
+        <a href={p.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-400 hover:text-blue-300">
+          <IconExternalLink size={14} /> Abrir
+        </a>
+      )
+    }
+  ];
+
   return (
-    <section className="flex flex-col gap-6">
-      <SectionHeader
-        overline="Cumplimiento"
-        title="Políticas y anexos"
-        description="Mantén a tu equipo informado con los documentos oficiales vigentes."
-      />
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Título</span>
+    <div className="flex flex-col gap-6">
+
+      {/* Simple Input Form */}
+      <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6 shadow-inner">
+        <h3 className="text-sm font-semibold text-white mb-4">Nueva Política</h3>
+        <form onSubmit={addPolicy} className="flex flex-wrap items-end gap-4">
+          <label className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+            <span className="text-xs font-medium text-slate-400">Título</span>
             <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              value={title} onChange={e => setTitle(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+              placeholder="Ej. Reglamento Interno"
             />
           </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Versión</span>
+          <label className="flex flex-col gap-1.5 w-32">
+            <span className="text-xs font-medium text-slate-400">Versión</span>
             <input
-              value={version}
-              onChange={(event) => setVersion(event.target.value)}
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              value={version} onChange={e => setVersion(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+              placeholder="v1.0"
             />
           </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">URL / Documento</span>
+          <label className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+            <span className="text-xs font-medium text-slate-400">URL del Documento</span>
             <input
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+              value={url} onChange={e => setUrl(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+              placeholder="https://..."
             />
           </label>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
-            type="button"
-            className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600"
-            onClick={addPolicy}
+            type="submit"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-500 transition h-[38px]"
           >
-            Registrar
+            <IconPlus size={16} /> Agregar
           </button>
-          {error && <p className="text-sm text-rose-500">{error}</p>}
-          {success && <p className="text-sm text-emerald-600">Guardado.</p>}
-        </div>
+        </form>
+        {error && <p className="mt-3 text-sm text-rose-500">{error}</p>}
+        {success && <p className="mt-3 text-sm text-emerald-400">Política agregada correctamente.</p>}
       </div>
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Documentos publicados</h3>
-        <ul className="mt-4 space-y-3 text-sm text-slate-600">
-          {policies.map((policy) => (
-            <li key={policy.id} className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 shadow-inner">
-              <p className="text-base font-semibold text-slate-900">{policy.title}</p>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Versión {policy.version}</p>
-              <a
-                href={policy.url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 underline"
-              >
-                Ver documento
-              </a>
-            </li>
-          ))}
-          {policies.length === 0 && <p className="text-sm text-slate-400">Sin políticas registradas.</p>}
-        </ul>
-      </div>
-    </section>
+
+      <DataTable
+        data={policies}
+        columns={columns}
+        title="Políticas Vigentes"
+        subtitle="Documentación oficial disponible para los colaboradores."
+        keyExtractor={p => p.id}
+        loading={loading}
+        emptyMessage="No hay políticas publicadas."
+      />
+    </div>
   );
 }
 

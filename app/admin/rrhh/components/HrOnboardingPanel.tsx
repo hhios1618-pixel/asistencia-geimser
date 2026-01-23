@@ -11,9 +11,9 @@ export default function HrOnboardingPanel() {
         description="Checklists de ingreso y egreso: documentos, equipo, accesos y formación."
       />
 
-      <div className="glass-panel rounded-[32px] border border-white/70 bg-white/95 p-8 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.55)]">
-        <p className="text-sm font-semibold text-slate-900">Checklists por rol</p>
-        <p className="mt-2 text-sm text-slate-500">
+      <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-8">
+        <p className="text-sm font-semibold text-white">Checklists por rol</p>
+        <p className="mt-2 text-sm text-slate-400">
           Aquí se centralizan tareas por etapa (ingreso/egreso), responsables y fechas objetivo. El diseño prioriza listas
           cortas, ejecución por lote y trazabilidad completa.
         </p>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useBrowserSupabase } from '../../../../lib/hooks/useBrowserSupabase';
 import type { Tables } from '../../../../types/database';
-import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
 
 export function AuditLogViewer() {
   const supabase = useBrowserSupabase();
@@ -20,9 +20,7 @@ export function AuditLogViewer() {
         .select('*')
         .order('ts', { ascending: false })
         .limit(50);
-      if (!active) {
-        return;
-      }
+      if (!active) return;
       if (fetchError) {
         setError(fetchError.message);
         setLoading(false);
@@ -32,77 +30,53 @@ export function AuditLogViewer() {
       setLoading(false);
     };
     void load();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [supabase]);
 
   const formatDate = (value: string) =>
     new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 
-  const skeletonRows = useMemo(() => Array.from({ length: 5 }), []);
+  const columns: Column<Tables['audit_events']['Row']>[] = [
+    {
+      header: 'Fecha',
+      accessorKey: 'ts',
+      render: (e) => <span className="text-xs text-slate-400 font-mono">{formatDate(e.ts)}</span>
+    },
+    {
+      header: 'Acción',
+      accessorKey: 'action',
+      render: (e) => <span className="text-sm font-semibold text-white">{e.action}</span>
+    },
+    {
+      header: 'Entidad',
+      accessorKey: 'entity',
+      render: (e) => <span className="text-xs text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded">{e.entity}</span>
+    },
+    {
+      header: 'Actor',
+      accessorKey: 'actor_id',
+      render: (e) => <span className="text-xs text-slate-500">{e.actor_id ?? '—'}</span>
+    },
+    {
+      header: 'Hash',
+      accessorKey: 'hash_chain',
+      render: (e) => <span className="text-[10px] text-slate-600 font-mono truncate max-w-[100px]" title={e.hash_chain ?? ''}>{e.hash_chain?.slice(0, 12)}...</span>
+    }
+  ];
 
   return (
-    <section className="flex flex-col gap-6">
-      <SectionHeader
-        overline="Auditoría"
-        title="Registro de eventos"
-        description="Consulta los últimos movimientos realizados por los distintos actores."
+    <div className="flex flex-col gap-4">
+      {error && <p className="text-rose-500 text-sm">{error}</p>}
+      <DataTable
+        title="Registro de Auditoría"
+        subtitle="Eventos recientes de seguridad y cambios en el sistema."
+        data={events}
+        columns={columns}
+        keyExtractor={e => e.id}
+        loading={loading}
+        emptyMessage="No hay registros de auditoría recientes."
       />
-      {error && <p className="text-sm text-rose-500">{error}</p>}
-      <div className="glass-panel max-h-[420px] overflow-auto rounded-3xl border border-white/60 bg-white/90">
-        <table className="w-full border-collapse text-xs">
-          <thead className="sticky top-0 bg-white/85 text-xs uppercase tracking-[0.3em] text-slate-500">
-            <tr>
-              <th className="px-4 py-3 text-left">Fecha</th>
-              <th className="px-4 py-3 text-left">Acción</th>
-              <th className="px-4 py-3 text-left">Entidad</th>
-              <th className="px-4 py-3 text-left">Actor</th>
-              <th className="px-4 py-3 text-left">Hash</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading &&
-              skeletonRows.map((_, index) => (
-                <tr key={index} className="animate-pulse">
-                  <td className="px-4 py-3">
-                    <div className="h-3 w-24 rounded bg-slate-100" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-3 w-32 rounded bg-slate-100" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-3 w-20 rounded bg-slate-100" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-3 w-16 rounded bg-slate-100" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-3 w-28 rounded bg-slate-100" />
-                  </td>
-                </tr>
-              ))}
-            {!loading &&
-              events.map((event) => (
-                <tr key={event.id} className="hover:bg-blue-50/40">
-                  <td className="px-4 py-3 text-slate-600">{formatDate(event.ts)}</td>
-                  <td className="px-4 py-3 text-slate-700">{event.action}</td>
-                  <td className="px-4 py-3 text-slate-500">{event.entity}</td>
-                  <td className="px-4 py-3 text-slate-500">{event.actor_id ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-400">{event.hash_chain?.slice(0, 16) ?? '—'}</td>
-                </tr>
-              ))}
-            {!loading && events.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                  No hay registros recientes.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    </div>
   );
 }
 

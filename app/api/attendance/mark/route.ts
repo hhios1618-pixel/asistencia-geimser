@@ -175,10 +175,10 @@ export async function POST(request: NextRequest) {
       clientTs: body.clientTs,
       geo: body.geo
         ? {
-            lat: body.geo.lat,
-            lng: body.geo.lng,
-            acc: body.geo.acc,
-          }
+          lat: body.geo.lat,
+          lng: body.geo.lng,
+          acc: body.geo.acc,
+        }
         : undefined,
       deviceId: body.deviceId,
       note: body.note,
@@ -297,6 +297,23 @@ export async function POST(request: NextRequest) {
       ip: request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
+
+    // [COMPLIANCE] Resolution 38 Exenta: Queue Email Receipt (High Availability)
+    if (person.email) {
+      // Use the queued sender which guarantees DB persistence before attempting send
+      import('../../../../lib/email/sender').then(({ queueReceiptEmail }) => {
+        queueReceiptEmail({
+          to: person.email!,
+          personName: person.name,
+          markId: markId,
+          eventType: body.eventType,
+          eventTs: eventTs,
+          hashSelf: hashSelf,
+          siteName: site.name,
+          receiptUrl: undefined,
+        });
+      });
+    }
 
     return respond(201, {
       id: markId,

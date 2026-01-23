@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
+import StatusBadge from '../../../../components/ui/StatusBadge';
+import { IconUserPlus, IconEdit, IconTrash } from '@tabler/icons-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
+// Types
 interface Site {
   id: string;
   name: string;
@@ -45,38 +49,25 @@ const ROLE_LABELS: Record<Person['role'], string> = {
   DT_VIEWER: 'DT Viewer',
 };
 
-const roleAccent: Record<Person['role'], string> = {
-  WORKER: 'from-emerald-500 to-teal-500 text-emerald-900',
-  SUPERVISOR: 'from-orange-400 to-amber-500 text-amber-900',
-  ADMIN: 'from-indigo-500 to-blue-500 text-indigo-900',
-  DT_VIEWER: 'from-slate-400 to-slate-500 text-slate-900',
-};
-
 const getInitials = (name: string) =>
-  name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'PG';
+  name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'PG';
 
 export function PeopleAdmin() {
   const [people, setPeople] = useState<Person[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Editor State
   const [editing, setEditing] = useState<Person>(emptyPerson);
   const [assignedSites, setAssignedSites] = useState<string[]>([]);
   const [assignedSupervisors, setAssignedSupervisors] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
   const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'ALL' | Person['role']>('ALL');
-  const [siteFilter, setSiteFilter] = useState<'ALL' | string>('ALL');
-  const [serviceFilter, setServiceFilter] = useState<'ALL' | string>('ALL');
 
+  // Load Data
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -85,87 +76,48 @@ export function PeopleAdmin() {
         fetch('/api/admin/attendance/people'),
         fetch('/api/admin/attendance/sites'),
       ]);
-      const peopleBody = (await peopleRes.json().catch(() => null)) as { items: Person[]; error?: string } | null;
-      const sitesBody = (await sitesRes.json().catch(() => null)) as { items: Site[]; error?: string } | null;
-      if (!peopleRes.ok || !peopleBody) {
-        throw new Error(peopleBody?.error ?? 'No fue posible cargar personas');
-      }
-      if (!sitesRes.ok || !sitesBody) {
-        throw new Error(sitesBody?.error ?? 'No fue posible cargar sitios');
-      }
+      const peopleBody = await peopleRes.json();
+      const sitesBody = await sitesRes.json();
+
+      if (!peopleRes.ok) throw new Error(peopleBody.error ?? 'Error cargando personas');
+      if (!sitesRes.ok) throw new Error(sitesBody.error ?? 'Error cargando sitios');
+
       setPeople(peopleBody.items);
       setSites(sitesBody.items);
-    } catch (loadError) {
-      setError((loadError as Error).message);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void loadData();
-  }, []);
+  useEffect(() => { void loadData(); }, []);
 
+  // Maps
   const siteNameById = useMemo(() => {
     const map = new Map<string, string>();
-    sites.forEach((site) => {
-      map.set(site.id, site.name);
-    });
+    sites.forEach(s => map.set(s.id, s.name));
     return map;
   }, [sites]);
 
-  const serviceOptions = useMemo(() => {
-    const unique = new Set<string>();
-    people.forEach((person) => {
-      if (person.service) {
-        unique.add(person.service);
-      }
-    });
-    return Array.from(unique).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [people]);
-
   const supervisorsById = useMemo(() => {
     const map = new Map<string, Person>();
-    people.forEach((person) => {
-      if (person.role === 'SUPERVISOR') {
-        map.set(person.id, person);
-      }
-    });
+    people.forEach(p => { if (p.role === 'SUPERVISOR') map.set(p.id, p); });
     return map;
   }, [people]);
 
-  const availableSupervisors = useMemo<AvailableSupervisor[]>(() => {
-    return people
-      .filter((person) => person.id !== editing.id && person.role === 'SUPERVISOR' && person.is_active)
-      .map((person) => ({
-        id: person.id,
-        name: person.name,
-        email: person.email ?? null,
-        service: person.service ?? null,
-        hasService: Boolean(person.service && person.service.trim().length > 0),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  }, [people, editing.id]);
+  const availableSupervisors = useMemo<AvailableSupervisor[]>(() =>
+    people.filter(p => p.id !== editing.id && p.role === 'SUPERVISOR' && p.is_active)
+      .map(p => ({
+        id: p.id, name: p.name, email: p.email, service: p.service, hasService: !!(p.service?.trim())
+      })).sort((a, b) => a.name.localeCompare(b.name)),
+    [people, editing.id]);
 
-  const canAssignSupervisors = editing.role === 'WORKER';
-
-  useEffect(() => {
-    if (!canAssignSupervisors && assignedSupervisors.length > 0) {
-      setAssignedSupervisors([]);
-    }
-  }, [canAssignSupervisors, assignedSupervisors.length]);
-
-  useEffect(() => {
-    setAssignedSupervisors((current) =>
-      current.filter((id) => availableSupervisors.some((supervisor) => supervisor.id === id))
-    );
-  }, [availableSupervisors]);
-
+  // Actions
   const startNew = () => {
     setEditing({ ...emptyPerson, id: crypto.randomUUID() });
     setAssignedSites([]);
     setAssignedSupervisors([]);
-    setError(null);
     setSuccessMessage(null);
     setCredentials(null);
     setPassword('');
@@ -173,27 +125,15 @@ export function PeopleAdmin() {
 
   const startEdit = (person: Person) => {
     setEditing(person);
-    setAssignedSites(person.people_sites?.map((ps) => ps.site_id) ?? []);
-    setAssignedSupervisors(person.supervisors?.map((record) => record.supervisor_id) ?? []);
-    setError(null);
+    setAssignedSites(person.people_sites?.map(ps => ps.site_id) ?? []);
+    setAssignedSupervisors(person.supervisors?.map(s => s.supervisor_id) ?? []);
     setSuccessMessage(null);
     setCredentials(null);
     setPassword('');
   };
 
-  const toggleAssignment = (siteId: string) => {
-    setAssignedSites((current) =>
-      current.includes(siteId) ? current.filter((id) => id !== siteId) : [...current, siteId]
-    );
-  };
-
-  const toggleSupervisor = (supervisorId: string) => {
-    setAssignedSupervisors((current) =>
-      current.includes(supervisorId)
-        ? current.filter((id) => id !== supervisorId)
-        : [...current, supervisorId]
-    );
-  };
+  const toggleAssignment = (id: string) => setAssignedSites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleSupervisor = (id: string) => setAssignedSupervisors(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleGeneratePassword = () => {
     const raw = crypto.randomUUID().replace(/-/g, '');
@@ -201,550 +141,286 @@ export function PeopleAdmin() {
   };
 
   const handleDelete = async (person: Person) => {
-    const confirmed = window.confirm(
-      `¿Eliminar a ${person.name}? Se revocará su acceso y se quitarán sus asignaciones de sitios.`
-    );
-    if (!confirmed) {
-      return;
-    }
+    if (!confirm(`¿Eliminar a ${person.name}?`)) return;
     setIsSubmitting(true);
-    setError(null);
-    setSuccessMessage(null);
     try {
-      const response = await fetch(`/api/admin/attendance/people?id=${person.id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? 'No fue posible eliminar a la persona');
-        return;
-      }
+      const res = await fetch(`/api/admin/attendance/people?id=${person.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Error al eliminar');
       await loadData();
-      setSuccessMessage(`Usuario ${person.name} eliminado correctamente.`);
-      if (editing.id === person.id) {
-        setEditing(emptyPerson);
-        setAssignedSites([]);
-        setAssignedSupervisors([]);
-        setPassword('');
-      }
-      setCredentials(null);
-    } catch (deleteError) {
-      setError((deleteError as Error).message);
+      setSuccessMessage(`Usuario ${person.name} eliminado.`);
+      if (editing.id === person.id) setEditing(emptyPerson);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setError(null);
     setSuccessMessage(null);
     setCredentials(null);
-    const isExisting = people.some((person) => person.id === editing.id);
+
+    const isExisting = people.some(p => p.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const trimmedName = editing.name.trim();
-    const trimmedEmail = editing.email?.trim() ?? '';
-    const trimmedService = editing.service?.trim() ?? '';
-    const trimmedRut = editing.rut?.trim() ?? '';
-
-    if (!trimmedName) {
-      setError('El nombre es obligatorio.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!trimmedEmail && !isExisting) {
-      setError('El correo es obligatorio para nuevos usuarios.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    const basePayload: Record<string, unknown> = {
-      name: trimmedName,
+    const payload: any = {
+      name: editing.name.trim(),
       role: editing.role,
       is_active: editing.is_active,
       siteIds: assignedSites,
     };
-    if (canAssignSupervisors) {
-      basePayload.supervisorIds = assignedSupervisors;
-    }
-
-    if (trimmedRut.length > 0) {
-      basePayload.rut = trimmedRut;
-    }
-    if (trimmedEmail.length > 0) {
-      basePayload.email = trimmedEmail;
-    }
-    if (trimmedService.length > 0) {
-      basePayload.service = trimmedService;
-    }
-    if (password.trim().length > 0) {
-      basePayload.password = password.trim();
-    }
-    if (isExisting) {
-      basePayload.id = editing.id;
-    }
+    if (editing.role === 'WORKER') payload.supervisorIds = assignedSupervisors;
+    if (editing.rut?.trim()) payload.rut = editing.rut.trim();
+    if (editing.email?.trim()) payload.email = editing.email.trim();
+    if (editing.service?.trim()) payload.service = editing.service.trim();
+    if (password.trim()) payload.password = password.trim();
+    if (isExisting) payload.id = editing.id;
 
     try {
-      const response = await fetch('/api/admin/attendance/people', {
+      const res = await fetch('/api/admin/attendance/people', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(basePayload),
+        body: JSON.stringify(payload),
       });
-      const body = (await response.json()) as {
-        error?: string;
-        details?: string;
-        item?: Person;
-        credentials?: { email: string; password: string };
-        passwordReset?: boolean;
-        message?: string;
-      };
-
-      if (!response.ok) {
-        setError(body.message ?? body.details ?? body.error ?? 'No fue posible guardar el trabajador');
-        return;
-      }
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.message || 'Error al guardar');
 
       await loadData();
       setEditing(emptyPerson);
-      setAssignedSites([]);
-      setAssignedSupervisors([]);
-      setPassword('');
-      setError(null);
-
-      if (!isExisting && body.credentials) {
+      if (body.credentials && !isExisting) {
         setCredentials(body.credentials);
-        setSuccessMessage('Persona creada correctamente. Comparte las credenciales temporales con el usuario.');
-      } else if (isExisting) {
-        setSuccessMessage(
-          body.passwordReset
-            ? 'Persona actualizada y contraseña restablecida.'
-            : 'Persona actualizada correctamente.'
-        );
+        setSuccessMessage('Usuario creado exitosamente.');
       } else {
-        setSuccessMessage('Persona creada correctamente.');
+        setSuccessMessage('Usuario guardado exitosamente.');
       }
-    } catch (requestError) {
-      setError((requestError as Error).message);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isEditingExisting = editing.id ? people.some((person) => person.id === editing.id) : false;
+  // Table Config
+  const columns: Column<Person>[] = [
+    {
+      header: 'Nombre',
+      sortable: true,
+      accessorKey: 'name',
+      render: (p) => (
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-400">
+            {getInitials(p.name)}
+          </span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-slate-200">{p.name}</span>
+            <span className="text-xs text-slate-500">{p.email || 'Sin correo'}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: 'Rol',
+      sortable: true,
+      accessorKey: 'role',
+      render: (p) => <StatusBadge label={ROLE_LABELS[p.role]} variant={p.role === 'WORKER' ? 'success' : 'default'} />
+    },
+    {
+      header: 'Servicio',
+      sortable: true,
+      accessorKey: 'service',
+      render: (p) => p.service || <span className="text-slate-600 italic">No asignado</span>
+    },
+    {
+      header: 'Sitios',
+      render: (p) => {
+        const list = p.people_sites?.map(ps => siteNameById.get(ps.site_id) ?? ps.site_id) ?? [];
+        if (list.length === 0) return <span className="text-slate-600 italic">--</span>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {list.slice(0, 2).map(s => (
+              <span key={s} className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-white/10 text-slate-300">{s}</span>
+            ))}
+            {list.length > 2 && <span className="rounded px-1.5 py-0.5 text-[10px] bg-white/5 text-slate-500">+{list.length - 2}</span>}
+          </div>
+        );
+      }
+    },
+    {
+      header: 'Estado',
+      accessorKey: 'is_active',
+      render: (p) => (
+        <span className={`inline-block h-2 w-2 rounded-full ${p.is_active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      )
+    }
+  ];
 
-  const filteredPeople = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    return people.filter((person) => {
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        person.name.toLowerCase().includes(normalizedSearch) ||
-        (person.email ?? '').toLowerCase().includes(normalizedSearch) ||
-        (person.rut ?? '').toLowerCase().includes(normalizedSearch) ||
-        (person.service ?? '').toLowerCase().includes(normalizedSearch);
-      const matchesRole = roleFilter === 'ALL' || person.role === roleFilter;
-      const matchesSite =
-        siteFilter === 'ALL' ||
-        person.people_sites?.some((assignment) => assignment.site_id === siteFilter);
-      const matchesService =
-        serviceFilter === 'ALL' ||
-        (person.service ?? '').toLowerCase() === serviceFilter.toLowerCase();
-      return matchesSearch && matchesRole && matchesSite && matchesService;
-    });
-  }, [people, searchTerm, roleFilter, siteFilter, serviceFilter]);
+  const actions = (p: Person) => (
+    <>
+      <button onClick={() => startEdit(p)} className="rounded p-2 text-blue-400 hover:bg-blue-500/10 transition" title="Editar">
+        <IconEdit size={18} />
+      </button>
+      <button onClick={() => handleDelete(p)} className="rounded p-2 text-rose-400 hover:bg-rose-500/10 transition" title="Eliminar">
+        <IconTrash size={18} />
+      </button>
+    </>
+  );
 
   return (
-    <section className="flex flex-col gap-6">
-      <SectionHeader
-        overline="Gestión"
-        title="Personas"
-        description="Gestiona colaboradores, roles y sus asignaciones de sitios."
-        actions={
+    <div className="flex flex-col gap-6">
+      <DataTable
+        title="Directorio de Personas"
+        subtitle="Gestiona accesos, roles y asignaciones."
+        data={people}
+        columns={columns}
+        keyExtractor={(p) => p.id}
+        actions={actions}
+        headerActions={
           <button
-            type="button"
-            className="rounded-full bg-[linear-gradient(135deg,rgba(124,200,255,0.9),rgba(90,156,255,0.85))] px-5 py-2 text-sm font-semibold text-[#05060c] shadow-[0_18px_55px_-40px_rgba(124,200,255,0.65)] transition hover:shadow-[0_24px_70px_-44px_rgba(124,200,255,0.75)]"
             onClick={startNew}
+            className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
           >
-            Nueva persona
+            <IconUserPlus size={18} />
+            <span>Nueva Persona</span>
           </button>
         }
+        loading={loading}
+        searchPlaceholder="Buscar por nombre, email o servicio..."
       />
-      <div className="glass-panel grid gap-3 rounded-3xl border border-white/60 bg-white/80 p-4 text-sm md:grid-cols-5">
-        <label className="flex flex-col gap-1">
-          Búsqueda
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Nombre, email o RUT"
-            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          Rol
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}
-            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+
+      {/* Editor Modal / Drawer */}
+      <AnimatePresence>
+        {editing.id && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
           >
-            <option value="ALL">Todos</option>
-            <option value="WORKER">Trabajador</option>
-            <option value="SUPERVISOR">Supervisor</option>
-            <option value="ADMIN">Administrador</option>
-            <option value="DT_VIEWER">DT Viewer</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          Sitio
-          <select
-            value={siteFilter}
-            onChange={(event) => setSiteFilter(event.target.value as typeof siteFilter)}
-            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-          >
-            <option value="ALL">Todos</option>
-            {sites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          Servicio
-          <select
-            value={serviceFilter}
-            onChange={(event) => setServiceFilter(event.target.value as 'ALL' | string)}
-            className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-          >
-            <option value="ALL">Todos</option>
-            {serviceOptions.map((service) => (
-              <option key={service} value={service}>
-                {service}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex items-end">
-          <p className="text-xs text-slate-500">
-            {filteredPeople.length} de {people.length} personas visibles
-          </p>
-        </div>
-      </div>
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90">
-        <div className="flex items-center justify-between border-b border-white/70 px-6 pb-4 pt-5">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Listado</p>
-            <h3 className="text-lg font-semibold text-slate-900">
-              {filteredPeople.length} persona{filteredPeople.length === 1 ? '' : 's'} visibles
-            </h3>
-          </div>
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-            {people.length} totales
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100 text-sm">
-            <thead className="bg-[rgba(8,10,16,0.88)] text-xs uppercase tracking-[0.3em] text-slate-400">
-              <tr>
-                <th className="sticky left-0 z-20 border-r border-white/10 bg-[rgba(8,10,16,0.98)] px-6 py-4 text-left shadow-[12px_0_24px_-20px_rgba(0,0,0,0.9)]">
-                  Nombre
-                </th>
-                <th className="px-4 py-4 text-left">Rol</th>
-                <th className="px-4 py-4 text-left">Servicio</th>
-                <th className="px-4 py-4 text-left">RUT</th>
-                <th className="px-4 py-4 text-left">Sitios asignados</th>
-                <th className="px-4 py-4 text-left">Supervisores</th>
-                <th className="px-4 py-4 text-left">Estado</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredPeople.map((person) => {
-                const assigned = person.people_sites?.map((ps) => siteNameById.get(ps.site_id) ?? ps.site_id) ?? [];
-                const supervisorLabels =
-                  person.supervisors?.map((record) => {
-                    if (record.name) {
-                      return record.name;
-                    }
-                    const fallback = supervisorsById.get(record.supervisor_id);
-                    return fallback?.name ?? record.supervisor_id;
-                  }) ?? [];
-                const roleLabel = ROLE_LABELS[person.role];
-                const gradient = roleAccent[person.role];
-                const isInactive = !person.is_active;
-                return (
-                  <tr key={person.id} className="transition hover:bg-white/5">
-                    <td className="sticky left-0 z-10 border-r border-white/10 bg-[rgba(8,10,16,0.98)] px-6 py-4 shadow-[12px_0_24px_-20px_rgba(0,0,0,0.9)]">
-                      <div className="flex items-center gap-4">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-blue-200 text-sm font-semibold text-blue-700">
-                          {getInitials(person.name)}
-                        </span>
-                        <div>
-                          <p className="font-semibold text-slate-900">{person.name}</p>
-                          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
-                            {person.email ?? 'Sin correo'}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex items-center rounded-full bg-gradient-to-r ${gradient} px-3 py-1 text-[11px] font-semibold uppercase tracking-wider`}
-                      >
-                        {roleLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-slate-600">{person.service ?? 'No registrado'}</td>
-                    <td className="px-4 py-4 text-slate-600">{person.rut ?? '—'}</td>
-                    <td className="px-4 py-4 text-slate-600">
-                      {assigned.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {assigned.map((label) => (
-                            <span
-                              key={label}
-                              className="rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1 text-[11px] font-semibold text-blue-700"
-                            >
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">Sin asignaciones</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-slate-600">
-                      {supervisorLabels.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {supervisorLabels.map((label) => (
-                            <span
-                              key={label}
-                              className="rounded-full border border-amber-100 bg-amber-50/80 px-3 py-1 text-[11px] font-semibold text-amber-700"
-                            >
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">Sin supervisor asignado</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
-                          isInactive
-                            ? 'border border-rose-200 bg-rose-50 text-rose-600'
-                            : 'border border-emerald-200 bg-emerald-50 text-emerald-600'
-                        }`}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${isInactive ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        {isInactive ? 'Inactivo' : 'Activo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          className="rounded-full border border-blue-200 bg-blue-50/80 px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-100"
-                          onClick={() => startEdit(person)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="rounded-full border border-rose-200 bg-rose-50/80 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 disabled:opacity-40"
-                          onClick={() => handleDelete(person)}
-                          disabled={isSubmitting}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {!loading && filteredPeople.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-6 py-10 text-center text-sm text-slate-400">
-                    No se encontraron personas con los filtros actuales. Ajusta la búsqueda o crea un nuevo registro.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {successMessage && (
-        <div className="glass-panel border border-emerald-200/70 bg-emerald-50/70 p-4 text-sm text-emerald-800">
-          <p>{successMessage}</p>
-          {credentials && (
-            <div className="mt-2 rounded-2xl border border-emerald-200 bg-white/90 p-3 text-xs text-emerald-900 shadow-inner">
-              <p>
-                <span className="font-semibold">Email:</span> {credentials.email}
-              </p>
-              <p>
-                <span className="font-semibold">Contraseña temporal:</span> {credentials.password}
-              </p>
-              <p className="mt-1 text-[11px] text-green-700">
-                Pide al usuario cambiar su contraseña después de iniciar sesión por primera vez.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-      {error && <p className="text-sm text-rose-500">{error}</p>}
-      {editing.id && (
-        <form onSubmit={submit} className="glass-panel grid gap-4 rounded-3xl border border-white/60 bg-white/90 p-6 md:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Nombre</span>
-            <input
-              required
-              value={editing.name}
-              onChange={(event) => setEditing({ ...editing, name: event.target.value })}
-              className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">RUT</span>
-            <input
-              value={editing.rut ?? ''}
-              onChange={(event) => setEditing({ ...editing, rut: event.target.value })}
-              className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Correo</span>
-            <input
-              type="email"
-              value={editing.email ?? ''}
-              onChange={(event) => setEditing({ ...editing, email: event.target.value })}
-              className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Servicio</span>
-            <input
-              required
-              value={editing.service ?? ''}
-              onChange={(event) => setEditing({ ...editing, service: event.target.value })}
-              placeholder="Ej. Operaciones, Ventas…"
-              className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Rol</span>
-            <select
-              value={editing.role}
-              onChange={(event) => setEditing({ ...editing, role: event.target.value as Person['role'] })}
-              className="rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
+            <motion.div
+              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] border border-white/10 bg-[#0A0C10] p-8 shadow-2xl"
             >
-              <option value="WORKER">Trabajador</option>
-              <option value="SUPERVISOR">Supervisor</option>
-              <option value="ADMIN">Administrador</option>
-              <option value="DT_VIEWER">DT Viewer</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-2 text-sm md:col-span-2">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Contraseña temporal</span>
-            <div className="flex flex-col gap-2 md:flex-row">
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={isEditingExisting ? 'Opcional' : 'Se generará automáticamente'}
-                className="w-full rounded-2xl border border-white/70 bg-white/80 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-              />
-              <button
-                type="button"
-                className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
-                onClick={handleGeneratePassword}
-              >
-                Generar
-              </button>
-            </div>
-            <span className="text-xs text-slate-500">
-              {isEditingExisting
-                ? 'Ingresa un valor para restablecer la contraseña.'
-                : 'Déjalo vacío para generar una contraseña aleatoria.'}
-            </span>
-          </label>
-          <div className="md:col-span-2">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Sitios asignados</p>
-            <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-              {sites.map((site) => (
-                <label key={site.id} className="flex items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-3 py-2 shadow-inner">
-                  <input
-                    type="checkbox"
-                    checked={assignedSites.includes(site.id)}
-                    onChange={() => toggleAssignment(site.id)}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400"
-                  />
-                  <span className="text-sm text-slate-600">{site.name}</span>
+              <h2 className="text-2xl font-bold text-white mb-6">
+                {people.some(p => p.id === editing.id) ? 'Editar Persona' : 'Nueva Persona'}
+              </h2>
+
+              {error && <p className="mb-4 rounded-xl bg-rose-500/10 p-3 text-sm text-rose-300 border border-rose-500/20">{error}</p>}
+
+              <form onSubmit={submit} className="grid gap-6 md:grid-cols-2">
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500">Nombre Completo</span>
+                  <input required value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none" />
                 </label>
-              ))}
-            </div>
-          </div>
-          {canAssignSupervisors && (
-            <div className="md:col-span-2">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Supervisores asignados</p>
-              {availableSupervisors.length > 0 ? (
-                <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                  {availableSupervisors.map((supervisor) => (
-                    <label
-                      key={supervisor.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 px-3 py-2 shadow-inner"
-                    >
-                      <span className="flex flex-col">
-                        <span className="text-sm text-slate-600">{supervisor.name}</span>
-                        <span className="text-xs text-slate-400">{supervisor.email ?? 'Sin correo'}</span>
-                        <span
-                          className={`text-[11px] ${
-                            supervisor.hasService ? 'text-slate-400' : 'text-amber-500'
-                          }`}
-                        >
-                          {supervisor.hasService ? supervisor.service : 'Sin servicio configurado'}
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={assignedSupervisors.includes(supervisor.id)}
-                        onChange={() => toggleSupervisor(supervisor.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-                      />
-                    </label>
-                  ))}
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500">RUT</span>
+                  <input value={editing.rut ?? ''} onChange={e => setEditing({ ...editing, rut: e.target.value })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none" />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500">Correo Electrónico</span>
+                  <input type="email" value={editing.email ?? ''} onChange={e => setEditing({ ...editing, email: e.target.value })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none" />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500">Servicio / Área</span>
+                  <input required value={editing.service ?? ''} onChange={e => setEditing({ ...editing, service: e.target.value })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none" />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500">Rol</span>
+                  <select value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value as any })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none">
+                    {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500">Contraseña</span>
+                  <div className="flex gap-2">
+                    <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Dejar en blanco para mantener" className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none" />
+                    <button type="button" onClick={handleGeneratePassword} className="rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-blue-400 hover:bg-white/10">Generar</button>
+                  </div>
+                </label>
+
+                {/* Sites */}
+                <div className="md:col-span-2">
+                  <span className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Sitios Asignados</span>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {sites.map(site => (
+                      <button
+                        key={site.id}
+                        type="button"
+                        onClick={() => toggleAssignment(site.id)}
+                        className={`rounded-xl border px-3 py-2 text-left text-xs font-medium transition ${assignedSites.includes(site.id) ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                      >
+                        {site.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-700">
-                  No hay supervisores activos registrados.
-                </p>
-              )}
+
+                {/* Supervisors */}
+                {editing.role === 'WORKER' && (
+                  <div className="md:col-span-2">
+                    <span className="text-xs uppercase tracking-wider text-slate-500 mb-2 block">Supervisores</span>
+                    {availableSupervisors.length === 0 && <p className="text-xs text-slate-500 italic">No hay supervisores disponibles.</p>}
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                      {availableSupervisors.map(sup => (
+                        <button
+                          key={sup.id}
+                          type="button"
+                          onClick={() => toggleSupervisor(sup.id)}
+                          className={`rounded-xl border px-3 py-2 text-left text-xs font-medium transition ${assignedSupervisors.includes(sup.id) ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                        >
+                          {sup.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="md:col-span-2 flex items-center justify-between border-t border-white/10 pt-6">
+                  <label className="flex items-center gap-2 text-slate-300">
+                    <input type="checkbox" checked={editing.is_active} onChange={e => setEditing({ ...editing, is_active: e.target.checked })} className="rounded bg-white/10 text-blue-500" />
+                    <span>Usuario Activo</span>
+                  </label>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setEditing(emptyPerson)} className="px-6 py-2 text-sm font-bold text-slate-400 hover:text-white transition">Cancelar</button>
+                    <button type="submit" disabled={isSubmitting} className="rounded-full bg-blue-600 px-8 py-2 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 disabled:opacity-50">
+                      {isSubmitting ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="fixed bottom-8 right-8 z-[60] w-96 rounded-2xl border border-emerald-500/30 bg-[#0A0C10] p-6 shadow-2xl backdrop-blur-md"
+          >
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-emerald-500/20 p-2 text-emerald-400">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-white">¡Éxito!</h4>
+                <p className="mt-1 text-sm text-slate-400">{successMessage}</p>
+                {credentials && (
+                  <div className="mt-3 rounded-xl bg-white/5 p-3 text-xs font-mono text-slate-300">
+                    <p>Email: <span className="text-white">{credentials.email}</span></p>
+                    <p>Clave: <span className="text-white">{credentials.password}</span></p>
+                    <p className="mt-1 text-[10px] text-emerald-400">Copia estos datos ahora.</p>
+                  </div>
+                )}
+                <button onClick={() => setSuccessMessage(null)} className="mt-4 text-xs font-bold text-slate-500 hover:text-white">Cerrar</button>
+              </div>
             </div>
-          )}
-          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={editing.is_active}
-                onChange={(event) => setEditing({ ...editing, is_active: event.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
-              />
-              Activo
-            </label>
-            <button
-              type="submit"
-              className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50"
-              disabled={isSubmitting}
-            >
-              Guardar
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-              onClick={() => setEditing(emptyPerson)}
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-    </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

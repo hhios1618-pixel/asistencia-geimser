@@ -1,8 +1,10 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { cn } from '../../lib/utils';
 import {
   IconGauge,
   IconUserCheck,
@@ -16,6 +18,7 @@ import {
   IconBuilding,
   IconCashBanknote,
   IconHelpCircle,
+  IconChevronRight,
 } from '@tabler/icons-react';
 
 export type NavSubItem = {
@@ -31,6 +34,7 @@ export type NavItem = {
   match?: (pathname: string) => boolean;
 };
 
+// ... Keep existing NAV constants definitions ...
 export const ADMIN_NAV: NavItem[] = [
   {
     label: 'Panel de control',
@@ -95,6 +99,161 @@ export const WORKER_NAV: NavItem[] = [
   { label: 'Notificaciones', href: '/asistencia/notificaciones', icon: IconBellRinging },
 ];
 
+const normalizePath = (href: string) => href.split('?')[0] ?? href;
+
+const getPanelParam = (href: string) => {
+  const match = href.match(/[?&]panel=([^&]+)/);
+  return match?.[1] ?? null;
+};
+
+// --- Framer Motion Components ---
+
+function NavItemComponent({
+  item,
+  isActive,
+  onClick,
+  isExpanded,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  onClick: () => void;
+  isExpanded: boolean;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Link
+        href={item.href}
+        onClick={onClick}
+        className={cn(
+          'group relative flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors duration-200 outline-none',
+          isActive ? 'text-white' : 'text-slate-400 hover:text-white'
+        )}
+      >
+        {isActive && (
+          <motion.div
+            layoutId="activeNavBackground"
+            className="absolute inset-0 rounded-[18px] border border-[rgba(255,255,255,0.14)] bg-white/10 shadow-[0_20px_60px_-30px_rgba(124,200,255,0.55)] ring-1 ring-inset ring-[rgba(255,255,255,0.12)]"
+            initial={false}
+            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+          />
+        )}
+
+        <span
+          className={cn(
+            'relative z-10 flex h-9 w-9 items-center justify-center rounded-[14px] transition-all duration-300',
+            isActive
+              ? 'bg-gradient-to-br from-[var(--accent)] to-[var(--accent-2)] text-black shadow-lg shadow-[var(--accent)]/40'
+              : 'bg-white/5 border border-white/5 shadow-inner group-hover:bg-white/10 group-hover:border-white/10'
+          )}
+        >
+          <Icon size={20} className={cn("transition-transform duration-300", isActive ? "scale-110" : "group-hover:scale-105")} />
+        </span>
+
+        <span className="relative z-10 truncate tracking-[0.01em] flex-1">{item.label}</span>
+
+        {item.subItems && (
+          <IconChevronRight
+            size={14}
+            className={cn(
+              "relative z-10 text-slate-500 transition-transform duration-300",
+              isExpanded ? "rotate-90" : "rotate-0"
+            )}
+          />
+        )}
+      </Link>
+
+      <AnimatePresence>
+        {isExpanded && item.subItems && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-1 pl-4 pb-2">
+              <div className="border-l border-white/10 pl-3 flex flex-col gap-1">
+                {item.subItems.map((sub) => (
+                  <NavSubItemComponent key={sub.href} item={sub} />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function NavSubItemComponent({ item }: { item: NavSubItem }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activePanel = searchParams?.get('panel');
+  const basePath = normalizePath(item.href);
+  const panel = getPanelParam(item.href);
+
+  const isActive = pathname === basePath && (panel ? activePanel === panel : !activePanel);
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200 outline-none",
+        isActive
+          ? "bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
+          : "text-slate-400 hover:text-white hover:bg-white/5"
+      )}
+    >
+      <span className={cn(
+        "h-1.5 w-1.5 rounded-full transition-all duration-300",
+        isActive ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" : "bg-white/20 group-hover:bg-white/40"
+      )} />
+      <span className="truncate">{item.label}</span>
+      {isActive && (
+        <motion.div
+          layoutId="activeSubNav"
+          className="absolute left-0 w-0.5 h-4 bg-[var(--accent)] rounded-r-full"
+        />
+      )}
+    </Link>
+  );
+}
+
+function SidebarContent({
+  pathname,
+  navItems,
+  onNavigate,
+}: {
+  pathname: string;
+  navItems: NavItem[];
+  onNavigate: () => void;
+}) {
+  return (
+    <LayoutGroup>
+      <div className="flex flex-col gap-2 p-3">
+        {navItems.map((item) => {
+          const basePath = normalizePath(item.href);
+          const isActive = pathname === basePath || pathname.startsWith(`${basePath}/`);
+          // Auto-expand if active or simplified check logic
+          return (
+            <NavItemComponent
+              key={item.href}
+              item={item}
+              isActive={isActive}
+              isExpanded={isActive} // Simplified: keep active section expanded
+              onClick={onNavigate}
+            />
+          );
+        })}
+      </div>
+    </LayoutGroup>
+  );
+}
+
+// --- Main Layout ---
+
 type DashboardLayoutProps = {
   title: string;
   description?: string;
@@ -104,107 +263,6 @@ type DashboardLayoutProps = {
   sidebarFooter?: React.ReactNode;
   children: React.ReactNode;
 };
-
-const baseNavStyles =
-  'group relative flex items-center gap-3 rounded-[18px] border border-transparent px-4 py-3 text-sm font-medium text-slate-200 transition-all duration-200 ease-out will-change-transform focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]/60';
-
-const normalizePath = (href: string) => href.split('?')[0] ?? href;
-
-const getPanelParam = (href: string) => {
-  const match = href.match(/[?&]panel=([^&]+)/);
-  return match?.[1] ?? null;
-};
-
-function SidebarNav({
-  pathname,
-  navItems,
-  onNavigate,
-}: {
-  pathname: string;
-  navItems: NavItem[];
-  onNavigate: () => void;
-}) {
-  const searchParams = useSearchParams();
-  const activePanel = searchParams?.get('panel');
-
-  const isActiveModule = (item: NavItem) => {
-    if (item.match) {
-      return item.match(pathname);
-    }
-    const basePath = normalizePath(item.href);
-    if (basePath === '/') return pathname === '/';
-    return pathname === basePath || pathname.startsWith(`${basePath}/`);
-  };
-
-  const activeModule = navItems.find(isActiveModule) ?? null;
-
-  const renderNavItem = (item: NavItem) => {
-    const active = isActiveModule(item);
-    const Icon = item.icon;
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={`${baseNavStyles} ${
-          active
-            ? 'border-[rgba(255,255,255,0.14)] bg-white/10 text-white shadow-[0_20px_60px_-30px_rgba(124,200,255,0.55)] ring-1 ring-inset ring-[rgba(255,255,255,0.12)]'
-            : 'border-transparent text-slate-400 hover:-translate-y-[1px] hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white hover:shadow-[0_18px_48px_-36px_rgba(0,0,0,0.45)]'
-        }`}
-        onClick={onNavigate}
-      >
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-[14px] transition-all duration-200 ease-out ${
-            active
-              ? 'border border-[rgba(255,255,255,0.12)] bg-[linear-gradient(135deg,rgba(124,200,255,0.35),rgba(94,234,212,0.25))] text-white shadow-[0_14px_34px_-18px_rgba(124,200,255,0.65)]'
-              : 'border border-[rgba(255,255,255,0.1)] bg-white/5 text-slate-400 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] group-hover:border-[rgba(255,255,255,0.16)] group-hover:bg-white/10 group-hover:text-white group-hover:shadow-[0_12px_32px_-22px_rgba(0,0,0,0.55)]'
-          }`}
-        >
-          <Icon size={20} className="transition-transform duration-200 ease-out group-hover:-translate-y-[2px]" />
-        </span>
-        <span className="tracking-[0.01em]">{item.label}</span>
-      </Link>
-    );
-  };
-
-  const renderSubItem = (item: NavSubItem) => {
-    const basePath = normalizePath(item.href);
-    const panel = getPanelParam(item.href);
-    const active = pathname === basePath && (panel ? activePanel === panel : !activePanel);
-
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={`group flex items-center gap-3 rounded-[16px] border px-4 py-2.5 text-sm transition ${
-          active
-            ? 'border-[rgba(0,229,255,0.35)] bg-[rgba(0,229,255,0.10)] text-white shadow-[0_16px_44px_-30px_rgba(0,229,255,0.45)]'
-            : 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white'
-        }`}
-        onClick={onNavigate}
-      >
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[var(--accent)]' : 'bg-white/20 group-hover:bg-white/35'}`}
-          aria-hidden
-        />
-        <span className="truncate">{item.label}</span>
-      </Link>
-    );
-  };
-
-  return (
-    <>
-      {navItems.map(renderNavItem)}
-      {activeModule?.subItems && activeModule.subItems.length > 0 && (
-        <div className="mt-4 border-t border-white/10 pt-4">
-          <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">
-            {activeModule.label}
-          </p>
-          <div className="flex flex-col gap-1">{activeModule.subItems.map(renderSubItem)}</div>
-        </div>
-      )}
-    </>
-  );
-}
 
 export function DashboardLayout({
   title,
@@ -218,125 +276,108 @@ export function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden bg-[var(--background)]">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[var(--background-gradient)]" aria-hidden />
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[var(--background)] font-sans text-slate-200 selection:bg-[var(--accent)]/30">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--background-gradient)] opacity-80" />
 
-      {sidebarOpen && (
-        <div
-          role="presentation"
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] transition-opacity md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {/* Mobile Backdrop */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="presentation"
+            className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      <div className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 pb-10 pt-6 sm:px-6 lg:px-10">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1800px] flex-col md:grid md:grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)]">
+
+        {/* Mobile Toggle */}
         <button
-          type="button"
-          onClick={() => setSidebarOpen((open) => !open)}
-          className="fixed right-5 top-5 z-40 flex h-11 w-11 items-center justify-center rounded-[18px] border border-[rgba(255,255,255,0.14)] bg-white/10 text-white shadow-[0_22px_48px_-28px_rgba(0,0,0,0.55)] backdrop-blur transition-transform duration-200 ease-out active:scale-[0.97] md:hidden"
-          aria-label="Abrir menú"
+          onClick={() => setSidebarOpen(true)}
+          className="fixed right-6 top-6 z-50 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-white shadow-2xl backdrop-blur-xl transition active:scale-95 md:hidden"
         >
-          <IconMenu2 className="text-white" />
+          <IconMenu2 />
         </button>
 
-        <div className="flex flex-1 flex-col gap-6 md:grid md:grid-cols-[280px_minmax(0,1fr)] md:items-start md:gap-10 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-14">
-          <aside
-            className={`glass-panel before:pointer-events-none before:absolute before:left-6 before:right-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(124,200,255,0.6),rgba(94,234,212,0.28),transparent)] before:opacity-90 before:content-[''] md:before:left-5 md:before:right-5 fixed left-4 right-4 top-4 z-40 flex max-h-[calc(100vh-2rem)] min-h-[calc(100vh-2rem)] w-[min(92vw,320px)] flex-col gap-8 overflow-hidden px-6 py-6 transition-[opacity,transform] duration-300 md:sticky md:left-auto md:right-auto md:top-6 md:max-h-[calc(100vh-3rem)] md:min-h-0 md:w-full md:max-w-none md:translate-x-0 md:self-start md:opacity-100 md:px-5 md:py-6 md:shadow-[0_32px_120px_-70px_rgba(0,0,0,0.65)] md:flex-shrink-0 lg:px-6 lg:py-7 ${
-              sidebarOpen
-                ? 'translate-x-0 opacity-100 pointer-events-auto md:translate-x-0 md:pointer-events-auto'
-                : '-translate-x-[calc(100%+2.75rem)] opacity-0 pointer-events-none md:opacity-100 md:translate-x-0 md:pointer-events-auto'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <Link
-                href={
-                  pathname.startsWith('/asistencia')
-                    ? '/asistencia'
-                    : pathname.startsWith('/supervisor')
-                      ? '/supervisor'
-                      : '/admin'
-                }
-                className="flex items-center gap-3 text-left transition-transform duration-200 hover:-translate-y-[1px]"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] text-lg font-semibold text-black shadow-[0_20px_50px_-28px_rgba(0,229,255,0.55)]">
-                  GT
-                </span>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-slate-300">G‑Trace</p>
-                  <p className="text-base font-semibold text-white">Recursos Humanos</p>
-                </div>
-              </Link>
-              <button
-                type="button"
-                className="md:hidden"
-                onClick={() => setSidebarOpen(false)}
-                aria-label="Cerrar menú"
-              >
-                <IconX className="text-slate-300" />
-              </button>
-            </div>
-            <nav
-              className="flex flex-1 flex-col gap-2 overflow-y-auto pb-6 pr-1 md:pb-1"
-              aria-label="Navegación principal"
-            >
-              <Suspense fallback={<>{navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`${baseNavStyles} ${
-                    (item.match ? item.match(pathname) : pathname === normalizePath(item.href) || pathname.startsWith(`${normalizePath(item.href)}/`))
-                      ? 'border-[rgba(255,255,255,0.14)] bg-white/10 text-white ring-1 ring-inset ring-[rgba(255,255,255,0.12)]'
-                      : 'border-transparent text-slate-400 hover:border-[rgba(255,255,255,0.12)] hover:bg-white/5 hover:text-white'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <span className="tracking-[0.01em]">{item.label}</span>
-                </Link>
-              ))}</>}>
-                <SidebarNav pathname={pathname} navItems={navItems} onNavigate={() => setSidebarOpen(false)} />
-              </Suspense>
-            </nav>
+        {/* Sidebar */}
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px] flex-col bg-[#05060A]/95 backdrop-blur-xl border-r border-white/5 transition-transform duration-300 md:relative md:flex md:w-full md:max-w-none md:translate-x-0 md:bg-transparent md:backdrop-blur-none md:border-r-0",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          <div className="sticky top-0 z-20 flex items-center justify-between p-6 md:p-8">
+            <Link href="/" className="group flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_20px_var(--accent-soft)] transition-transform duration-500 group-hover:rotate-180">
+                <div className="h-4 w-4 rounded-full bg-black/80" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight text-white">G-Trace</h1>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Enterprise</p>
+              </div>
+            </Link>
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden text-slate-400">
+              <IconX />
+            </button>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto scroll-stable px-4 md:px-5">
+            <SidebarContent pathname={pathname} navItems={navItems} onNavigate={() => setSidebarOpen(false)} />
+          </nav>
+
+          <div className="p-6 md:p-8">
             {sidebarFooter ?? (
-              <div className="rounded-[18px] border border-[rgba(255,255,255,0.14)] bg-[linear-gradient(150deg,rgba(124,200,255,0.12),rgba(94,234,212,0.08),rgba(255,255,255,0.04))] p-4 text-sm text-slate-100 shadow-[0_24px_55px_-32px_rgba(0,0,0,0.55)]">
-                <p className="text-xs uppercase tracking-[0.28em] text-[var(--accent)]/90">Estado</p>
-                <p className="mt-2 font-semibold text-white">Operación estable</p>
-                <p className="text-xs text-slate-400">Sin incidentes críticos reportados.</p>
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-4">
+                <div className="absolute top-0 right-0 p-2 opacity-50"><IconHelpCircle size={16} className="text-[var(--accent)]" /></div>
+                <p className="text-xs font-medium text-[var(--accent)]">Sistema Operativo</p>
+                <p className="mt-1 text-xs text-slate-400">v2.4.0 (Stable)</p>
               </div>
             )}
-          </aside>
-
-          <div className="flex flex-1 flex-col gap-6 md:pt-2">
-            <header className="glass-panel relative mx-auto w-full max-w-[1440px] rounded-[34px] px-6 py-7 shadow-[0_32px_100px_-65px_rgba(0,0,0,0.6)] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-[3px] before:rounded-full before:bg-[linear-gradient(90deg,rgba(124,200,255,0.6),rgba(139,92,246,0.32),transparent)] before:content-[''] sm:px-9 md:py-8 lg:px-12">
-              <div className="flex flex-wrap items-start justify-between gap-6 text-slate-200">
-                <div className="min-w-[240px] flex-1">
-                  {breadcrumb && breadcrumb.length > 0 && (
-                    <nav className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                      {breadcrumb.map((item, index) => (
-                        <span key={`${item.label}-${index}`} className="flex items-center gap-2">
-                          {item.href ? (
-                            <Link href={item.href} className="text-slate-500 hover:text-[var(--accent)]">
-                              {item.label}
-                            </Link>
-                          ) : (
-                            <span>{item.label}</span>
-                          )}
-                          {index < breadcrumb.length - 1 && <span className="text-slate-300">/</span>}
-                        </span>
-                      ))}
-                    </nav>
-                  )}
-                  <h1 className="text-[28px] font-semibold leading-tight text-white md:text-[32px]">{title}</h1>
-                  {description && <p className="mt-2 text-sm text-slate-400">{description}</p>}
-                </div>
-                {actions && <div className="flex flex-wrap gap-3">{actions}</div>}
-              </div>
-            </header>
-
-            <main className="relative flex-1">
-              <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10 pb-20">{children}</div>
-            </main>
           </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex min-w-0 flex-col">
+          <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-[#05060A]/80 px-6 py-4 backdrop-blur-xl md:px-10">
+            <div className="flex flex-col gap-1">
+              {breadcrumb && (
+                <nav className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest text-slate-500">
+                  {breadcrumb.map((item, i) => (
+                    <span key={i} className="flex items-center gap-2">
+                      {item.href ? <Link href={item.href} className="hover:text-[var(--accent)] transition-colors">{item.label}</Link> : item.label}
+                      {i < breadcrumb.length - 1 && <span className="opacity-30">/</span>}
+                    </span>
+                  ))}
+                </nav>
+              )}
+              <h2 className="text-xl font-bold text-white md:text-2xl">{title}</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              {actions}
+            </div>
+          </header>
+
+          <main className="flex-1 p-6 md:p-10">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
+              className="mx-auto w-full max-w-[1400px] flex flex-col gap-8"
+            >
+              {children}
+            </motion.div>
+          </main>
         </div>
       </div>
     </div>

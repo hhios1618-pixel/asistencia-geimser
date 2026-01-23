@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { IconEdit, IconX, IconDatabaseOff, IconBuildingStore, IconBriefcase } from '@tabler/icons-react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
 
 type Business = { id: string; name: string; is_active: boolean };
 type Position = { id: string; name: string; is_active: boolean };
@@ -59,12 +62,11 @@ export default function HrPeopleAdmin() {
   const [people, setPeople] = useState<PersonHr[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [editing, setEditing] = useState<PersonHr>(emptyPerson);
+  const [editing, setEditing] = useState<PersonHr | null>(null); // Null means no modal
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -76,22 +78,13 @@ export default function HrPeopleAdmin() {
         fetch('/api/admin/hr/positions', { cache: 'no-store' }),
       ]);
 
-      if (!peopleRes.ok) {
-        const body = (await peopleRes.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible cargar personas');
-      }
-      if (!businessesRes.ok) {
-        const body = (await businessesRes.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible cargar negocios');
-      }
-      if (!positionsRes.ok) {
-        const body = (await positionsRes.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible cargar cargos');
-      }
+      const peopleBody = await peopleRes.json();
+      const businessesBody = await businessesRes.json();
+      const positionsBody = await positionsRes.json();
 
-      const peopleBody = (await peopleRes.json()) as { items: PersonHr[] };
-      const businessesBody = (await businessesRes.json()) as { items: Business[] };
-      const positionsBody = (await positionsRes.json()) as { items: Position[] };
+      if (!peopleRes.ok) throw new Error(peopleBody.error);
+      if (!businessesRes.ok) throw new Error(businessesBody.error);
+      if (!positionsRes.ok) throw new Error(positionsBody.error);
 
       setPeople(peopleBody.items ?? []);
       setBusinesses(businessesBody.items ?? []);
@@ -103,30 +96,11 @@ export default function HrPeopleAdmin() {
     }
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return people;
-    return people.filter((p) => {
-      const haystack = [p.name, p.email ?? '', p.service ?? '', p.business_name ?? '', p.position_name ?? '']
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(term);
-    });
-  }, [people, search]);
-
-  const startEdit = (person: PersonHr) => {
-    setEditing(person);
-    setError(null);
-    setSuccess(null);
-  };
+  useEffect(() => { void load(); }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editing.id) return;
+    if (!editing?.id) return;
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -151,11 +125,12 @@ export default function HrPeopleAdmin() {
         }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? 'No fue posible guardar la ficha');
+        const body = await response.json();
+        throw new Error(body.error ?? 'Error al guardar');
       }
       await load();
-      setSuccess('Ficha actualizada.');
+      setSuccess('Ficha actualizada correctamente.');
+      setEditing(null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -173,243 +148,256 @@ export default function HrPeopleAdmin() {
     [positions]
   );
 
+  const columns: Column<PersonHr>[] = [
+    {
+      header: 'Colaborador',
+      accessorKey: 'name',
+      sortable: true,
+      render: (p) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-200">{p.name}</span>
+          <span className="text-xs text-slate-500">{p.email ?? '—'}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Negocio',
+      sortable: true,
+      accessorKey: 'business_name',
+      render: (p) => (
+        <div className="flex items-center gap-2">
+          <IconBuildingStore size={16} className="text-slate-500" />
+          <span>{p.business_name ?? <span className="text-slate-600 italic">Sin asignar</span>}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Cargo',
+      sortable: true,
+      accessorKey: 'position_name',
+      render: (p) => (
+        <div className="flex items-center gap-2">
+          <IconBriefcase size={16} className="text-slate-500" />
+          <span>{p.position_name ?? <span className="text-slate-600 italic">Sin asignar</span>}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Sueldo',
+      accessorKey: 'salary_monthly',
+      render: (p) => <span className="font-mono text-emerald-400">{formatClp(p.salary_monthly)}</span>,
+      className: 'text-right'
+    }
+  ];
+
+  const actions = (p: PersonHr) => (
+    <button
+      onClick={() => setEditing(p)}
+      className="rounded-lg p-2 text-blue-400 hover:bg-blue-500/10 transition"
+      title="Editar Ficha"
+    >
+      <IconEdit size={18} />
+    </button>
+  );
+
   return (
-    <section className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <SectionHeader
-        overline="Ficha"
-        title="Personas"
-        description="Edita negocio, cargo, sueldo base y datos de contacto. Esto impacta headcount y cálculo de payroll."
+        overline="RRHH"
+        title="Ficha Laboral"
+        description="Gestión de contratos, datos personales y asignaciones comerciales."
       />
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
-      {success && <p className="text-sm text-emerald-600">{success}</p>}
+      <DataTable
+        data={people}
+        columns={columns}
+        keyExtractor={p => p.id}
+        searchPlaceholder="Buscar por nombre, cargo, negocio..."
+        actions={actions}
+        loading={loading}
+      />
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Listado</p>
-              <p className="mt-1 text-xs text-slate-500">Selecciona una persona para editar su ficha.</p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Buscar</label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nombre, correo, negocio, cargo…"
-                className="w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm text-slate-700 shadow-sm md:w-[320px]"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-            <table className="w-full border-collapse text-xs">
-              <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left">Nombre</th>
-                  <th className="px-4 py-3 text-left">Negocio</th>
-                  <th className="px-4 py-3 text-left">Cargo</th>
-                  <th className="px-4 py-3 text-left">Sueldo base</th>
-                  <th className="px-4 py-3 text-left">Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-sm text-slate-400">
-                      Cargando…
-                    </td>
-                  </tr>
-                )}
-                {!loading &&
-                  filtered.map((person) => (
-                    <tr key={person.id} className="border-t border-slate-100 hover:bg-blue-50/40">
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-slate-800">{person.name}</span>
-                          <span className="text-[11px] text-slate-400">{person.email ?? '—'}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{person.business_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{person.position_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatClp(person.salary_monthly)}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(person)}
-                          className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 transition hover:border-[rgba(0,229,255,0.35)] hover:bg-white/15 hover:text-white"
-                        >
-                          Editar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                {!loading && filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                      Sin resultados.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <form onSubmit={submit} className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Ficha laboral</p>
-              <p className="mt-1 text-xs text-slate-500">{editing.id ? editing.name : 'Selecciona una persona.'}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setEditing(emptyPerson)}
-              className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 transition hover:border-[rgba(0,229,255,0.35)] hover:bg-white/15 hover:text-white"
+      {/* Editor Drawer */}
+      <AnimatePresence>
+        {editing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="h-full w-full max-w-2xl overflow-y-auto bg-[#0A0C10] border-l border-white/10 shadow-2xl"
             >
-              Limpiar
-            </button>
-          </div>
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0C10]/95 px-6 py-4 backdrop-blur">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Editar Ficha</h2>
+                  <p className="text-sm text-slate-400">{editing.name}</p>
+                </div>
+                <button onClick={() => setEditing(null)} className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white">
+                  <IconX size={20} />
+                </button>
+              </div>
 
-          <div className="mt-5 grid gap-4">
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Negocio
-              <select
-                value={editing.business_id ?? ''}
-                onChange={(e) => setEditing((prev) => ({ ...prev, business_id: e.target.value || null }))}
-                className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                disabled={!editing.id}
-              >
-                <option value="">—</option>
-                {activeBusinesses.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <form onSubmit={submit} className="p-6 space-y-8">
+                {/* Business & Position */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-blue-400">Asignación</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Negocio</span>
+                      <select
+                        value={editing.business_id ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, business_id: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="">— Sin Asignar —</option>
+                        {activeBusinesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Cargo</span>
+                      <select
+                        value={editing.position_id ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, position_id: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="">— Sin Asignar —</option>
+                        {activePositions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                </div>
 
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Cargo
-              <select
-                value={editing.position_id ?? ''}
-                onChange={(e) => setEditing((prev) => ({ ...prev, position_id: e.target.value || null }))}
-                className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                disabled={!editing.id}
-              >
-                <option value="">—</option>
-                {activePositions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                {/* Contract Details */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-emerald-400">Contrato</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Sueldo Base (CLP)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editing.salary_monthly ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, salary_monthly: e.target.value === '' ? null : Number(e.target.value) }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Tipo Contrato</span>
+                      <input
+                        value={editing.employment_type ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, employment_type: e.target.value || null }) : null)}
+                        placeholder="Ej. Indefinido"
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Fecha Ingreso</span>
+                      <input
+                        type="date"
+                        value={editing.hire_date ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, hire_date: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Fecha Término</span>
+                      <input
+                        type="date"
+                        value={editing.termination_date ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, termination_date: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                  </div>
+                </div>
 
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Sueldo base mensual (CLP)
-              <input
-                type="number"
-                min={0}
-                value={editing.salary_monthly ?? ''}
-                onChange={(e) =>
-                  setEditing((prev) => ({
-                    ...prev,
-                    salary_monthly: e.target.value === '' ? null : Number(e.target.value),
-                  }))
-                }
-                className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                disabled={!editing.id}
-              />
-            </label>
+                {/* Personal Info */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-purple-400">Datos Personales</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Fecha Nacimiento</span>
+                      <input
+                        type="date"
+                        value={editing.birth_date ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, birth_date: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2 sm:col-span-2">
+                      <span className="text-xs font-semibold text-slate-400">Dirección</span>
+                      <input
+                        value={editing.address_line1 ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, address_line1: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                        placeholder="Calle, número, depto..."
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Ciudad</span>
+                      <input
+                        value={editing.city ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, city: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold text-slate-400">Región</span>
+                      <input
+                        value={editing.region ?? ''}
+                        onChange={(e) => setEditing((prev) => prev ? ({ ...prev, region: e.target.value || null }) : null)}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                  </div>
+                </div>
 
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Tipo de contrato
-              <input
-                value={editing.employment_type ?? ''}
-                onChange={(e) => setEditing((prev) => ({ ...prev, employment_type: e.target.value || null }))}
-                className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                placeholder="Plazo fijo, indefinido…"
-                disabled={!editing.id}
-              />
-            </label>
+                {/* Error/Success Messages within form */}
+                {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                Fecha nacimiento
-                <input
-                  type="date"
-                  value={editing.birth_date ?? ''}
-                  onChange={(e) => setEditing((prev) => ({ ...prev, birth_date: e.target.value || null }))}
-                  className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                  disabled={!editing.id}
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                Fecha ingreso
-                <input
-                  type="date"
-                  value={editing.hire_date ?? ''}
-                  onChange={(e) => setEditing((prev) => ({ ...prev, hire_date: e.target.value || null }))}
-                  className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                  disabled={!editing.id}
-                />
-              </label>
+                {/* Footer Actions */}
+                <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(null)}
+                    className="px-6 py-2.5 text-sm font-semibold text-slate-400 hover:text-white"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="rounded-full bg-blue-600 px-8 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-500 disabled:opacity-50"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Global Success Notification */}
+      <AnimatePresence>
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] rounded-full border border-emerald-500/30 bg-[#0A0C10] px-6 py-3 shadow-2xl"
+          >
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+              <span className="text-sm font-medium text-white">{success}</span>
             </div>
-
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Dirección (línea 1)
-              <input
-                value={editing.address_line1 ?? ''}
-                onChange={(e) => setEditing((prev) => ({ ...prev, address_line1: e.target.value || null }))}
-                className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                disabled={!editing.id}
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Ciudad / Comuna
-              <input
-                value={editing.city ?? ''}
-                onChange={(e) => setEditing((prev) => ({ ...prev, city: e.target.value || null }))}
-                className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                disabled={!editing.id}
-              />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                Región
-                <input
-                  value={editing.region ?? ''}
-                  onChange={(e) => setEditing((prev) => ({ ...prev, region: e.target.value || null }))}
-                  className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                  disabled={!editing.id}
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                País
-                <input
-                  value={editing.country ?? ''}
-                  onChange={(e) => setEditing((prev) => ({ ...prev, country: e.target.value || null }))}
-                  className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-                  disabled={!editing.id}
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button
-              type="submit"
-              disabled={!editing.id || saving}
-              className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60"
-            >
-              {saving ? 'Guardando…' : 'Guardar ficha'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

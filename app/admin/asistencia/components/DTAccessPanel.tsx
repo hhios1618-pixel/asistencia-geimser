@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { IconLink, IconShieldLock } from '@tabler/icons-react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 
 interface DtScope {
@@ -24,10 +25,7 @@ export function DTAccessPanel() {
   const generate = async () => {
     setError(null);
     setGeneratedUrl(null);
-    if (!scope.from || !scope.to) {
-      setError('Especifica rango de fechas');
-      return;
-    }
+    if (!scope.from || !scope.to) { setError('Especifica rango de fechas'); return; }
     setGenerating(true);
     const response = await fetch('/api/admin/attendance/dt/access', {
       method: 'POST',
@@ -53,10 +51,7 @@ export function DTAccessPanel() {
   };
 
   const validate = async () => {
-    if (!token || !expires) {
-      setError('Completa token y expiración');
-      return;
-    }
+    if (!token || !expires) { setError('Completa token y expiración'); return; }
     setValidating(true);
     const response = await fetch(`/api/admin/attendance/dt/access?token=${token}&expires=${expires}`);
     setValidating(false);
@@ -72,114 +67,95 @@ export function DTAccessPanel() {
   const formattedDataset = useMemo(() => JSON.stringify(dataset, null, 2), [dataset]);
 
   return (
-    <section className="flex flex-col gap-6">
-      <SectionHeader
-        overline="Integraciones"
-        title="Acceso DT"
-        description="Emite enlaces temporales o valida tokens para entrega documental."
-      />
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Generar enlace</h3>
-        <div className="mt-4 grid gap-4 md:grid-cols-4">
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Desde</span>
-            <input
-              type="date"
-              value={scope.from}
-              onChange={(event) => setScope({ ...scope, from: event.target.value })}
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Hasta</span>
-            <input
-              type="date"
-              value={scope.to}
-              onChange={(event) => setScope({ ...scope, to: event.target.value })}
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Person IDs (coma)</span>
-            <input
-              value={scope.personIds?.join(',') ?? ''}
-              onChange={(event) =>
-                setScope({ ...scope, personIds: event.target.value ? event.target.value.split(',') : undefined })
-              }
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">Sites (coma)</span>
-            <input
-              value={scope.siteIds?.join(',') ?? ''}
-              onChange={(event) =>
-                setScope({ ...scope, siteIds: event.target.value ? event.target.value.split(',') : undefined })
-              }
-              className="rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
-          </label>
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Generator Panel */}
+      <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+            <IconLink size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Generar Enlace</h3>
+            <p className="text-sm text-slate-400">Crear acceso temporal para fiscalización.</p>
+          </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            Expira en minutos
-            <input
-              type="number"
-              min={5}
-              value={expiresInMinutes}
-              onChange={(event) => setExpires(Number(event.target.value))}
-              className="w-24 rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-            />
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-slate-400">Desde</span>
+              <input type="date" value={scope.from} onChange={e => setScope({ ...scope, from: e.target.value })}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none" />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-slate-400">Hasta</span>
+              <input type="date" value={scope.to} onChange={e => setScope({ ...scope, to: e.target.value })}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none" />
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-400">Person IDs (opcional, separadas por coma)</span>
+            <input value={scope.personIds?.join(',') ?? ''} onChange={e => setScope({ ...scope, personIds: e.target.value ? e.target.value.split(',') : undefined })}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none" placeholder="id1, id2..." />
           </label>
-          <button
-            type="button"
-            className="rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(59,130,246,0.75)] transition hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50"
-            onClick={generate}
-            disabled={generating}
-          >
-            {generating ? 'Generando…' : 'Generar enlace'}
-          </button>
+
+          <div className="flex items-end gap-3 pt-2">
+            <label className="flex flex-col gap-1.5 w-32">
+              <span className="text-xs font-medium text-slate-400">Expira (min)</span>
+              <input type="number" min={5} value={expiresInMinutes} onChange={e => setExpires(Number(e.target.value))}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none" />
+            </label>
+            <button onClick={generate} disabled={generating}
+              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-500 transition disabled:opacity-50">
+              {generating ? 'Generando...' : 'Generar Enlace'}
+            </button>
+          </div>
+
+          {generatedUrl && (
+            <div className="mt-4 rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-sm">
+              <p className="text-slate-300 mb-1">Enlace activo:</p>
+              <a href={generatedUrl} target="_blank" rel="noreferrer" className="text-blue-400 underline break-all font-mono text-xs">{generatedUrl}</a>
+            </div>
+          )}
         </div>
-        {generatedUrl && (
-          <p className="mt-3 text-sm text-slate-600">
-            Enlace generado:{' '}
-            <a href={generatedUrl} className="font-semibold text-blue-600 underline" target="_blank" rel="noreferrer">
-              {generatedUrl}
-            </a>
-          </p>
-        )}
       </div>
 
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Validar token</h3>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <input
-            placeholder="token"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-            className="flex-1 rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-          />
-          <input
-            placeholder="expires (epoch)"
-            value={expires}
-            onChange={(event) => setExpiresParam(event.target.value)}
-            className="flex-1 rounded-2xl border border-white/80 bg-white/70 p-3 text-sm shadow-inner focus:border-blue-300 focus:outline-none"
-          />
-          <button
-            type="button"
-            className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50"
-            onClick={validate}
-            disabled={validating}
-          >
-            {validating ? 'Validando…' : 'Validar'}
-          </button>
+      {/* Validator Panel */}
+      <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+            <IconShieldLock size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Validar Token</h3>
+            <p className="text-sm text-slate-400">Verificar integridad de datos entregados.</p>
+          </div>
         </div>
-        <pre className="mt-4 max-h-40 overflow-auto rounded-2xl bg-slate-900/90 p-3 text-xs text-emerald-200">
-          {formattedDataset}
-        </pre>
+
+        <div className="space-y-4">
+          <input placeholder="Pegar Token..." value={token} onChange={e => setToken(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" />
+          <input placeholder="Expires (epoch timestamp)..." value={expires} onChange={e => setExpiresParam(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" />
+
+          <button onClick={validate} disabled={validating}
+            className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-500 transition disabled:opacity-50">
+            {validating ? 'Verificando...' : 'Validar Datos'}
+          </button>
+
+          {dataset.length > 0 && (
+            <div className="mt-4 rounded-lg bg-slate-900 border border-white/10 p-3">
+              <pre className="text-[10px] text-emerald-400 font-mono overflow-auto max-h-48 scrollbar-thin scrollbar-thumb-white/20">
+                {formattedDataset}
+              </pre>
+            </div>
+          )}
+        </div>
       </div>
-      {error && <p className="text-sm text-rose-500">{error}</p>}
-    </section>
+
+      {error && <div className="lg:col-span-2 text-center text-rose-500 font-medium py-2">{error}</div>}
+    </div>
   );
 }
 

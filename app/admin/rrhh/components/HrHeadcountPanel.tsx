@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
-import StatusBadge from '../../../../components/ui/StatusBadge';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
+import { IconChartPie, IconCurrencyDollar } from '@tabler/icons-react';
 
 type HeadcountRow = {
   business_id: string | null;
@@ -51,71 +52,79 @@ export default function HrHeadcountPanel() {
     return { headcount, payroll };
   }, [items]);
 
+  const columns: Column<HeadcountRow>[] = [
+    {
+      header: 'Negocio',
+      accessorKey: 'business_name',
+      sortable: true,
+      render: (item) => <span className="font-semibold text-slate-200">{item.business_name || 'Sin Negocio'}</span>,
+    },
+    {
+      header: 'Cargo',
+      accessorKey: 'position_name',
+      sortable: true,
+      render: (item) => <span className="text-slate-400">{item.position_name || 'Sin Cargo'}</span>,
+    },
+    {
+      header: 'Activos',
+      accessorKey: 'headcount_active',
+      render: (item) => <span className="text-emerald-400 font-bold">{item.headcount_active}</span>,
+    },
+    {
+      header: 'Total Histórico',
+      accessorKey: 'headcount_total',
+      render: (item) => <span className="text-slate-500">{item.headcount_total}</span>,
+    },
+    {
+      header: 'Costo Mensual',
+      accessorKey: 'payroll_monthly_active',
+      render: (item) => <span className="text-slate-300 font-mono">{formatClp(item.payroll_monthly_active)}</span>,
+    },
+  ];
+
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader
         overline="Control"
         title="Headcount"
-        description="Dotación activa por negocio y cargo (calculado automáticamente desde personas)."
+        description="Dotación activa por negocio y cargo (calculado automáticamente)."
       />
 
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge label={`Activos: ${totals.headcount}`} variant="info" />
-            <StatusBadge label={`Costo mensual: ${formatClp(totals.payroll)}`} variant="default" />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-400">
+              <IconChartPie size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Dotación Activa</p>
+              <p className="text-2xl font-bold text-white">{totals.headcount}</p>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={load}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Actualizar
-          </button>
         </div>
-
-        {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
-
-        <div className="mt-5 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-          <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-left">Negocio</th>
-                <th className="px-4 py-3 text-left">Cargo</th>
-                <th className="px-4 py-3 text-left">Activos</th>
-                <th className="px-4 py-3 text-left">Total</th>
-                <th className="px-4 py-3 text-left">Costo mensual</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-sm text-slate-400">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                items.map((row, index) => (
-                  <tr key={`${row.business_id ?? 'none'}-${row.position_id ?? 'none'}-${index}`} className="border-t border-slate-100 hover:bg-blue-50/40">
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-800">{row.business_name ?? 'Sin negocio'}</td>
-                    <td className="px-4 py-3 text-slate-600">{row.position_name ?? 'Sin cargo'}</td>
-                    <td className="px-4 py-3 text-slate-600">{row.headcount_active}</td>
-                    <td className="px-4 py-3 text-slate-600">{row.headcount_total}</td>
-                    <td className="px-4 py-3 text-slate-600">{formatClp(row.payroll_monthly_active)}</td>
-                  </tr>
-                ))}
-              {!loading && items.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">
-                    Sin datos para mostrar.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
+              <IconCurrencyDollar size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Costo Mensual</p>
+              <p className="text-2xl font-bold text-white">{formatClp(totals.payroll)}</p>
+            </div>
+          </div>
         </div>
       </div>
+
+      {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
+
+      <DataTable
+        title="Detalle por Unidad"
+        data={items}
+        columns={columns}
+        keyExtractor={(item, idx) => `${item.business_id}-${item.position_id}-${idx}`}
+        loading={loading}
+        searchPlaceholder="Buscar por negocio o cargo..."
+      />
     </section>
   );
 }

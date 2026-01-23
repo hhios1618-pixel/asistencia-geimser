@@ -1,7 +1,17 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  IconUsers,
+  IconShieldLock,
+  IconCalendarStats,
+  IconChartBar,
+  IconClipboardCheck,
+  IconBuildingStore,
+  IconBadge,
+  IconChartPie,
+} from '@tabler/icons-react';
 import HrBusinessesAdmin from './HrBusinessesAdmin';
 import HrPositionsAdmin from './HrPositionsAdmin';
 import HrPeopleAdmin from './HrPeopleAdmin';
@@ -21,82 +31,62 @@ type SectionId =
   | 'positions'
   | 'headcount';
 
-const normalizePanel = (panel: string | null): SectionId => {
-  if (!panel) return 'employees';
-  switch (panel) {
-    case 'employees':
-    case 'roles':
-    case 'absences':
-    case 'performance':
-    case 'onboarding':
-    case 'businesses':
-    case 'positions':
-    case 'headcount':
-      return panel;
-    case 'people':
-      return 'employees';
-    default:
-      return 'employees';
-  }
-};
+const SECTIONS = [
+  { id: 'employees', label: 'Empleados', icon: IconUsers },
+  { id: 'roles', label: 'Roles', icon: IconShieldLock },
+  { id: 'businesses', label: 'Negocios', icon: IconBuildingStore },
+  { id: 'positions', label: 'Cargos', icon: IconBadge },
+  { id: 'headcount', label: 'Headcount', icon: IconChartPie },
+  { id: 'absences', label: 'Ausencias', icon: IconCalendarStats },
+  { id: 'performance', label: 'Desempeño', icon: IconChartBar },
+  { id: 'onboarding', label: 'Onboarding', icon: IconClipboardCheck },
+];
 
 export default function AdminHrClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = normalizePanel(searchParams?.get('panel') ?? null);
-
-  const activeMeta = useMemo(() => {
-    switch (activeTab) {
-      case 'employees':
-        return { label: 'Empleados', description: 'Directorio, ficha laboral y datos contractuales.' };
-      case 'roles':
-        return { label: 'Roles y permisos', description: 'Roles operativos y accesos básicos por perfil.' };
-      case 'absences':
-        return { label: 'Gestión de ausencias', description: 'Solicitudes, saldos y aprobaciones.' };
-      case 'performance':
-        return { label: 'Evaluaciones', description: 'Objetivos, ciclos de feedback y desempeño.' };
-      case 'onboarding':
-        return { label: 'Onboarding/Offboarding', description: 'Checklists de ingreso y egreso.' };
-      case 'businesses':
-        return { label: 'Negocios', description: 'Unidades/empresas y centros de costo.' };
-      case 'positions':
-        return { label: 'Cargos', description: 'Catálogo de cargos y niveles.' };
-      case 'headcount':
-        return { label: 'Headcount', description: 'Dotación y costo mensual por cargo.' };
-      default:
-        return { label: 'Empleados', description: 'Directorio, ficha laboral y datos contractuales.' };
-    }
-  }, [activeTab]);
+  const activeTab = (searchParams?.get('panel') ?? 'employees') as SectionId;
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'employees':
-        return <HrPeopleAdmin />;
-      case 'roles':
-        return <HrRolesPermissionsPanel />;
-      case 'absences':
-        return <HrAbsencesPanel />;
-      case 'performance':
-        return <HrPerformancePanel />;
-      case 'onboarding':
-        return <HrOnboardingPanel />;
-      case 'businesses':
-        return <HrBusinessesAdmin />;
-      case 'positions':
-        return <HrPositionsAdmin />;
-      case 'headcount':
-        return <HrHeadcountPanel />;
-      default:
-        return <HrPeopleAdmin />;
+      case 'employees': return <HrPeopleAdmin />;
+      case 'roles': return <HrRolesPermissionsPanel />;
+      case 'absences': return <HrAbsencesPanel />;
+      case 'performance': return <HrPerformancePanel />;
+      case 'onboarding': return <HrOnboardingPanel />;
+      case 'businesses': return <HrBusinessesAdmin />;
+      case 'positions': return <HrPositionsAdmin />;
+      case 'headcount': return <HrHeadcountPanel />;
+      default: return <HrPeopleAdmin />;
     }
   };
 
   return (
-    <section className="flex flex-col gap-6">
-      <header>
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{activeMeta.label}</p>
-        <p className="mt-2 text-sm text-slate-300">{activeMeta.description}</p>
-      </header>
-      <div className="flex flex-col gap-8">{renderContent()}</div>
-    </section>
+    <div className="flex flex-col gap-6">
+      {/* Navigation - Flat & Minimal */}
+      <nav className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto no-scrollbar">
+        {SECTIONS.map((section) => {
+          const isActive = activeTab === section.id;
+          const Icon = section.icon;
+          return (
+            <button
+              key={section.id}
+              onClick={() => router.push(`/admin/rrhh?panel=${section.id}`)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${isActive
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-white/10'
+                }`}
+            >
+              <Icon size={16} />
+              {section.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="min-h-[600px] animate-in fade-in duration-300">
+        {renderContent()}
+      </div>
+    </div>
   );
 }

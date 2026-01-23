@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
+import DataTable, { type Column } from '../../../../components/ui/DataTable';
+import { IconEdit, IconTrash, IconPlus, IconBadge } from '@tabler/icons-react';
 
 type Position = {
   id: string;
@@ -51,12 +53,14 @@ export default function HrPositionsAdmin() {
     setEditing({ ...emptyPosition, id: crypto.randomUUID() });
     setError(null);
     setSuccess(null);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
   const startEdit = (position: Position) => {
     setEditing(position);
     setError(null);
     setSuccess(null);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -110,138 +114,143 @@ export default function HrPositionsAdmin() {
     }
   };
 
-  const sorted = useMemo(
-    () => [...items].sort((a, b) => a.name.localeCompare(b.name, 'es')),
-    [items]
-  );
+  const columns: Column<Position>[] = [
+    {
+      header: 'Nombre',
+      accessorKey: 'name',
+      sortable: true,
+      render: (item) => <span className="font-semibold text-slate-200">{item.name}</span>,
+    },
+    {
+      header: 'Nivel',
+      accessorKey: 'level',
+      sortable: true,
+      render: (item) => <span className="text-slate-400">{item.level || '—'}</span>,
+    },
+    {
+      header: 'Estado',
+      accessorKey: 'is_active',
+      render: (item) => (
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${item.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'
+            }`}
+        >
+          {item.is_active ? 'Activo' : 'Inactivo'}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <section className="flex flex-col gap-6">
       <SectionHeader overline="Catálogo" title="Cargos" description="Define cargos para headcount y reportes de nómina." />
 
-      <div className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-800">Listado</p>
-          <button
-            type="button"
-            onClick={startNew}
-            className="rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(37,99,235,0.6)] transition hover:from-indigo-600 hover:to-blue-600"
-          >
-            Nuevo cargo
-          </button>
-        </div>
+      <div className="flex flex-col gap-4">
+        {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
+        {success && <p className="text-sm font-semibold text-emerald-500">{success}</p>}
 
-        {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
-        {success && <p className="mt-4 text-sm text-emerald-600">{success}</p>}
-
-        <div className="mt-4 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
-          <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 bg-white/90 text-xs uppercase tracking-[0.3em] text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-left">Nombre</th>
-                <th className="px-4 py-3 text-left">Nivel</th>
-                <th className="px-4 py-3 text-left">Activo</th>
-                <th className="px-4 py-3 text-left">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-6 text-sm text-slate-400">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                sorted.map((position) => (
-                  <tr key={position.id} className="border-t border-slate-100 hover:bg-blue-50/40">
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-800">{position.name}</td>
-                    <td className="px-4 py-3 text-slate-600">{position.level ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{position.is_active ? 'Sí' : 'No'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(position)}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(position)}
-                          className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              {!loading && sorted.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-400">
-                    Aún no hay cargos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          title="Listado de Cargos"
+          subtitle="Gestiona los roles y posiciones."
+          data={items}
+          columns={columns}
+          keyExtractor={(item) => item.id}
+          loading={loading}
+          searchPlaceholder="Buscar cargos..."
+          headerActions={
+            <button
+              onClick={startNew}
+              className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition shadow-lg shadow-blue-900/20"
+            >
+              <IconPlus size={18} />
+              Nuevo Cargo
+            </button>
+          }
+          actions={(item) => (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => startEdit(item)}
+                className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition"
+                title="Editar"
+              >
+                <IconEdit size={18} />
+              </button>
+              <button
+                onClick={() => handleDelete(item)}
+                className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                title="Eliminar"
+              >
+                <IconTrash size={18} />
+              </button>
+            </div>
+          )}
+        />
       </div>
 
-      <form onSubmit={submit} className="glass-panel rounded-3xl border border-white/60 bg-white/90 p-6">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-800">{editing.id ? 'Editar cargo' : 'Crear cargo'}</p>
-          {editing.id && (
+      {/* Editor Form - Flat Design */}
+      {editing.id && (
+        <div className="rounded-2xl border border-white/10 bg-[#0A0C10] p-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <IconBadge className="text-blue-500" />
+              {items.some(p => p.id === editing.id) ? 'Editar Cargo' : 'Nuevo Cargo'}
+            </h3>
             <button
-              type="button"
               onClick={() => setEditing(emptyPosition)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="text-sm text-slate-500 hover:text-white transition"
             >
               Cancelar
             </button>
-          )}
-        </div>
+          </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Nombre
-            <input
-              value={editing.name}
-              onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            Nivel (opcional)
-            <input
-              value={editing.level ?? ''}
-              onChange={(e) => setEditing((prev) => ({ ...prev, level: e.target.value || null }))}
-              className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-normal text-slate-700 shadow-sm"
-            />
-          </label>
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-sm text-slate-700 shadow-sm">
-            <input
-              type="checkbox"
-              checked={editing.is_active}
-              onChange={(e) => setEditing((prev) => ({ ...prev, is_active: e.target.checked }))}
-            />
-            Activo
-          </label>
-        </div>
+          <form onSubmit={submit} className="grid gap-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nombre</span>
+                <input
+                  required
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition"
+                  placeholder="Ej. Desarrollador Senior"
+                />
+              </label>
 
-        <div className="mt-5 flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_-18px_rgba(16,185,129,0.6)] transition hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60"
-          >
-            {saving ? 'Guardando…' : 'Guardar'}
-          </button>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nivel (Opcional)</span>
+                <input
+                  value={editing.level ?? ''}
+                  onChange={(e) => setEditing({ ...editing, level: e.target.value || null })}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none transition"
+                  placeholder="Ej. Senior / Semi-Senior"
+                />
+              </label>
+
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 w-full cursor-pointer hover:bg-white/10 transition">
+                  <input
+                    type="checkbox"
+                    checked={editing.is_active}
+                    onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })}
+                    className="h-5 w-5 rounded border-slate-600 bg-transparent text-blue-500 accent-blue-500"
+                  />
+                  <span className="text-sm font-medium text-white">Cargo Activo</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-white/10">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-full bg-blue-600 px-8 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 disabled:opacity-50 transition"
+              >
+                {saving ? 'Guardando...' : 'Guardar Cargo'}
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      )}
     </section>
   );
 }
