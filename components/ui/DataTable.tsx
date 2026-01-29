@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSearch, IconFilter, IconChevronDown, IconChevronUp, IconDatabaseOff } from '@tabler/icons-react';
+import { IconSearch, IconChevronDown, IconChevronUp, IconDatabaseOff } from '@tabler/icons-react';
 
 export interface Column<T> {
     header: string;
@@ -23,7 +23,7 @@ interface Action<T> {
 interface Props<T> {
     data: T[];
     columns: Column<T>[];
-    keyExtractor: (item: T) => string;
+    keyExtractor: (item: T, index: number) => string;
     searchable?: boolean;
     searchPlaceholder?: string;
     title?: string;
@@ -55,7 +55,7 @@ export function DataTable<T>({
         if (!searchTerm) return data;
         const lower = searchTerm.toLowerCase();
         return data.filter((item) =>
-            Object.values(item as any).some((val) =>
+            Object.values(item as Record<string, unknown>).some((val) =>
                 String(val).toLowerCase().includes(lower)
             )
         );
@@ -147,9 +147,9 @@ export function DataTable<T>({
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             <AnimatePresence>
-                                {sortedData.map((item) => (
+                                {sortedData.map((item, index) => (
                                     <motion.tr
-                                        key={keyExtractor(item)}
+                                        key={keyExtractor(item, index)}
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}

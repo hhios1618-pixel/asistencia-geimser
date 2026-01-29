@@ -15,9 +15,6 @@ type HistoryItem = {
   site_id: string;
   event_type: 'IN' | 'OUT';
   event_ts: string;
-  hash_self: string;
-  receipt_url: string | null;
-  receipt_signed_url: string | null;
 };
 
 interface Props {

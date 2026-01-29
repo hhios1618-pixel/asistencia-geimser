@@ -143,21 +143,21 @@ export default function ActivityFeed({ onReload, refreshKey }: Props) {
                                 />
                             </label>
                             <div className="flex flex-col gap-1">
-                                <span className="text-xs font-semibold text-slate-400">Tipo</span>
-                                <div className="flex rounded-xl border border-white/10 bg-black/20 p-1">
-                                    {['ALL', 'IN', 'OUT'].map((t) => (
+                                    <span className="text-xs font-semibold text-slate-400">Tipo</span>
+                                    <div className="flex rounded-xl border border-white/10 bg-black/20 p-1">
+                                    {(['ALL', 'IN', 'OUT'] as const).map((t) => (
                                         <button
                                             key={t}
-                                            onClick={() => setEventFilter(t as any)}
+                                            onClick={() => setEventFilter(t)}
                                             className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${eventFilter === t ? 'bg-white/20 text-white' : 'text-slate-500 hover:text-slate-300'
                                                 }`}
                                         >
                                             {t === 'ALL' ? 'Todos' : t}
                                         </button>
                                     ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

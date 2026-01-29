@@ -24,6 +24,19 @@ interface Person {
   supervisors?: { supervisor_id: string; name: string | null; email: string | null }[];
 }
 
+type UpsertPersonPayload = {
+  id?: string;
+  name: string;
+  rut?: string;
+  email?: string;
+  service?: string;
+  role: Person['role'];
+  is_active: boolean;
+  siteIds: string[];
+  supervisorIds?: string[];
+  password?: string;
+};
+
 type AvailableSupervisor = {
   id: string;
   name: string;
@@ -165,7 +178,7 @@ export function PeopleAdmin() {
 
     const isExisting = people.some(p => p.id === editing.id);
     const method = isExisting ? 'PATCH' : 'POST';
-    const payload: any = {
+    const payload: UpsertPersonPayload = {
       name: editing.name.trim(),
       role: editing.role,
       is_active: editing.is_active,
@@ -324,11 +337,15 @@ export function PeopleAdmin() {
                   <input required value={editing.service ?? ''} onChange={e => setEditing({ ...editing, service: e.target.value })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none" />
                 </label>
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-wider text-slate-500">Rol</span>
-                  <select value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value as any })} className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none">
-                    {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </label>
+	                  <span className="text-xs uppercase tracking-wider text-slate-500">Rol</span>
+	                  <select
+                      value={editing.role}
+                      onChange={(e) => setEditing({ ...editing, role: e.target.value as Person['role'] })}
+                      className="rounded-xl border border-white/10 bg-white/5 py-3 px-4 text-white focus:border-blue-500 focus:outline-none"
+                    >
+	                    {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+	                  </select>
+	                </label>
                 <label className="flex flex-col gap-2">
                   <span className="text-xs uppercase tracking-wider text-slate-500">Contraseña</span>
                   <div className="flex gap-2">

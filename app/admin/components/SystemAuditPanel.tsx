@@ -1,12 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { IconActivity, IconShieldCheck, IconCheck, IconX, IconServer, IconFileCertificate } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
+import { IconShieldCheck, IconCheck, IconX, IconServer, IconFileCertificate } from '@tabler/icons-react';
+
+type HealthResponse = {
+    status: string;
+    latency_ms?: number;
+    error?: string;
+};
+
+type IntegrityResponse = {
+    status: string;
+    results?: { total_marks?: number };
+    error?: string;
+};
 
 export default function SystemAuditPanel() {
-    const [health, setHealth] = useState<any>(null);
-    const [integrity, setIntegrity] = useState<any>(null);
+    const [health, setHealth] = useState<HealthResponse | null>(null);
+    const [integrity, setIntegrity] = useState<IntegrityResponse | null>(null);
     const [loading, setLoading] = useState<string | null>(null);
 
     const checkHealth = async () => {

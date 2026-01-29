@@ -1,6 +1,6 @@
 import DashboardLayout from '../../../components/layout/DashboardLayout';
 import LogoutButton from '../../asistencia/components/LogoutButton';
-import SitesAdmin from '../asistencia/components/SitesAdmin';
+import { SitesAdmin } from '../asistencia/components/SitesAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,4 +29,3 @@ export default function AdminSitesPage() {
     </DashboardLayout>
   );
 }
-

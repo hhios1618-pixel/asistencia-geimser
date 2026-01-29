@@ -158,9 +158,10 @@ export function TurnosAdmin() {
     setLoadingPeople(true);
     try {
       const res = await fetch('/api/admin/attendance/people');
-      const body = await res.json();
-      setPeople(body.items.map((i: any) => ({ id: i.id, name: i.name, service: i.service ?? null })));
-      if (!selectedPersonId && body.items[0]) setSelectedPersonId(body.items[0].id);
+      const body = (await res.json()) as { items?: Array<{ id: string; name: string; service?: string | null }> };
+      const items = body.items ?? [];
+      setPeople(items.map((i) => ({ id: i.id, name: i.name, service: i.service ?? null })));
+      if (!selectedPersonId && items[0]) setSelectedPersonId(items[0].id);
     } catch (e) { setError('Error al cargar personas'); } finally { setLoadingPeople(false); }
   }, [selectedPersonId]);
 
@@ -186,9 +187,11 @@ export function TurnosAdmin() {
       setHolidaysLoading(true);
       try {
         const res = await fetch(`https://apis.digital.gob.cl/fl/feriados/${year}`);
-        const data = await res.json();
+        const data = (await res.json()) as unknown;
         const map = new Map<string, string>();
-        data.forEach((i: any) => map.set(i.fecha, i.nombre));
+        if (Array.isArray(data)) {
+          (data as Array<{ fecha: string; nombre: string }>).forEach((i) => map.set(i.fecha, i.nombre));
+        }
         holidaysCacheRef.current.set(year, map);
         setHolidayNames(map);
       } catch (e) { setHolidayNames(new Map()); } finally { setHolidaysLoading(false); }
@@ -222,7 +225,7 @@ export function TurnosAdmin() {
     setSaving(true); setSuccess(null); setError(null);
     try {
       const existing = { ...scheduleMap };
-      const ops: Promise<any>[] = [];
+      const ops: Promise<Response>[] = [];
       weekDays.forEach(d => {
         const payload = { person_id: selectedPersonId, day_of_week: d.dayOfWeek, start_time: d.start, end_time: d.end, break_minutes: d.breakMinutes };
         const e = existing[d.dayOfWeek];
@@ -248,16 +251,16 @@ export function TurnosAdmin() {
     <div className="flex flex-col gap-6 font-sans">
       {/* Tab Selectors - Minimalist */}
       <div className="flex items-center gap-1 border-b border-white/10 pb-1">
-        {[
-          { id: 'manual', label: 'Editor Manual' },
+        {([
+          { id: 'manual', label: 'Editor Manual', icon: null },
           { id: 'bulk', label: 'Carga Masiva', icon: IconCloudUpload },
           { id: 'ai', label: 'Asistente IA', icon: IconWand },
-        ].map((tab) => {
+        ] as const).map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTurnTab(tab.id as any)}
+              onClick={() => setActiveTurnTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${activeTurnTab === tab.id
                   ? 'border-b-2 border-blue-500 text-blue-400'
                   : 'text-slate-500 hover:text-slate-300'

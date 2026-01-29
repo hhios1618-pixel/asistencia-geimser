@@ -391,6 +391,45 @@ export interface Database {
         Update: never;
         Relationships: never[];
       };
+      receipt_queue: {
+        Row: {
+          id: string;
+          mark_id: string;
+          person_email: string;
+          person_name: string;
+          event_type: 'IN' | 'OUT';
+          event_ts: string;
+          hash_self: string;
+          site_name: string;
+          status: 'PENDING' | 'FAILED' | 'SENT';
+          attempts: number;
+          last_attempt_at: string | null;
+          error_log: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          mark_id: string;
+          person_email: string;
+          person_name: string;
+          event_type: 'IN' | 'OUT';
+          event_ts: string;
+          hash_self: string;
+          site_name: string;
+          status?: 'PENDING' | 'FAILED' | 'SENT';
+          attempts?: number;
+          last_attempt_at?: string | null;
+          error_log?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: 'PENDING' | 'FAILED' | 'SENT';
+          attempts?: number;
+          last_attempt_at?: string | null;
+          error_log?: string | null;
+        };
+        Relationships: never[];
+      };
     };
     Views: Record<string, never>;
     Functions: {

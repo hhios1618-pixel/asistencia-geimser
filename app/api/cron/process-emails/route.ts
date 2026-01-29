@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
                     error_log: JSON.stringify(sendError),
                     last_attempt_at: new Date().toISOString(),
                     attempts: item.attempts + 1
-                } as never).eq('id', item.id);
+                }).eq('id', item.id);
                 results.failed++;
                 results.errors.push(`Item ${item.id}: ${JSON.stringify(sendError)}`);
             } else {
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
                     error_log: null,
                     last_attempt_at: new Date().toISOString(),
                     attempts: item.attempts + 1
-                } as never).eq('id', item.id);
+                }).eq('id', item.id);
                 results.succeeded++;
             }
 
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
                 error_log: (err as Error).message,
                 last_attempt_at: new Date().toISOString(),
                 attempts: item.attempts + 1
-            } as never).eq('id', item.id);
+            }).eq('id', item.id);
             results.failed++;
             results.errors.push(`Item ${item.id}: ${(err as Error).message}`);
         }

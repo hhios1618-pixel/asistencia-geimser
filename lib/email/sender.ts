@@ -37,7 +37,7 @@ export async function queueReceiptEmail(params: SendReceiptParams) {
             hash_self: params.hashSelf,
             site_name: params.siteName,
             status: 'PENDING'
-        } as never)
+        })
         .select('id')
         .single();
 
@@ -80,7 +80,7 @@ export async function queueReceiptEmail(params: SendReceiptParams) {
                 error_log: JSON.stringify(sendError),
                 last_attempt_at: new Date().toISOString(),
                 attempts: 1
-            } as never).eq('id', queueItem.id);
+            }).eq('id', queueItem.id);
         } else {
             console.log('[EMAIL] Receipt sent successfully for', queueItem.id);
             // Mark as SENT
@@ -88,7 +88,7 @@ export async function queueReceiptEmail(params: SendReceiptParams) {
                 status: 'SENT',
                 last_attempt_at: new Date().toISOString(),
                 attempts: 1
-            } as never).eq('id', queueItem.id);
+            }).eq('id', queueItem.id);
         }
 
     } catch (error) {
@@ -98,6 +98,6 @@ export async function queueReceiptEmail(params: SendReceiptParams) {
             error_log: (error as Error).message,
             last_attempt_at: new Date().toISOString(),
             attempts: 1
-        } as never).eq('id', queueItem.id);
+        }).eq('id', queueItem.id);
     }
 }
