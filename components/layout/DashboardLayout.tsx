@@ -49,6 +49,7 @@ export const ADMIN_NAV: NavItem[] = [
     subItems: [
       { label: 'Visión general', href: '/admin/asistencia?panel=overview' },
       { label: 'Control diario', href: '/admin/asistencia?panel=daily' },
+      { label: 'Usuarios', href: '/admin/asistencia?panel=people' },
       { label: 'Correcciones', href: '/admin/asistencia?panel=modifications' },
       { label: 'Políticas', href: '/admin/asistencia?panel=policies' },
       { label: 'Auditoría', href: '/admin/asistencia?panel=audit' },
