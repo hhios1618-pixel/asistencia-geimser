@@ -55,6 +55,7 @@ export const ADMIN_NAV: NavItem[] = [
       { label: 'Auditoría', href: '/admin/asistencia?panel=audit' },
     ],
   },
+  { label: 'Usuarios', href: '/admin/usuarios', icon: IconUsers },
   {
     label: 'Gestión de RR.HH.',
     href: '/admin/rrhh?panel=employees',
