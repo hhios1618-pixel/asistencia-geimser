@@ -25,6 +25,11 @@ type ImportResult = {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(value.trim());
 
+const looksLikeRutComparable = (rutFull: string | null | undefined) => {
+  const normalized = normalizeRutComparable(rutFull);
+  return Boolean(normalized && normalized.length >= 8);
+};
+
 const randomPassword = () => {
   const raw = crypto.randomUUID().replace(/-/g, '');
   return `${raw.slice(0, 10)}Aa1`;
@@ -213,6 +218,7 @@ export async function POST(request: NextRequest) {
     const doSyncUsers = String(form.get('sync_users') ?? 'true') !== 'false';
     const doSyncTeams = String(form.get('sync_teams') ?? 'true') !== 'false';
     const doSyncHrMasters = String(form.get('sync_hr_masters') ?? 'true') !== 'false';
+    const replaceAll = String(form.get('replace_all') ?? 'true') !== 'false';
 
     const warnings: string[] = [];
 
@@ -222,10 +228,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'NO_ROWS' }, { status: 400 });
     }
 
+    const validRutCount = items.filter((r) => looksLikeRutComparable(r.rut_full)).length;
+    if (validRutCount < Math.ceil(items.length * 0.6)) {
+      return NextResponse.json(
+        {
+          error: 'INVALID_TEMPLATE',
+          message:
+            'El archivo no contiene RUTs válidos (parece una exportación distinta o columnas corridas). Descarga la plantilla y exporta el Excel con RUT + NombreCompleto.',
+        },
+        { status: 400 }
+      );
+    }
+
     await ensureHrCollaboratorsSheetTable();
 
     // Upsert sheet rows
     await withTransaction(async (client) => {
+      if (replaceAll) {
+        await client.query('truncate table public.hr_collaborators_sheet');
+      }
       for (const row of items) {
         await client.query(
           `insert into public.hr_collaborators_sheet (
@@ -301,7 +322,7 @@ export async function POST(request: NextRequest) {
           correo_gmail_corporativo,
           correo_cliente,
           updated_at
-	        ) values (
+        ) values (
 	          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
 	          $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
 	          $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,

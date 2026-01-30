@@ -392,3 +392,14 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true, imported: items.length }, { status: 201 });
 }
+
+export async function DELETE() {
+  const { role } = await authorizeManager();
+  if (!role) {
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  await ensureHrCollaboratorsSheetTable();
+  await runQuery('truncate table public.hr_collaborators_sheet');
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

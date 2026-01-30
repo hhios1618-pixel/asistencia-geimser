@@ -66,6 +66,7 @@ export default function CollaboratorsSheetClient() {
   const [syncUsers, setSyncUsers] = useState(true);
   const [syncTeams, setSyncTeams] = useState(true);
   const [syncMasters, setSyncMasters] = useState(true);
+  const [replaceAll, setReplaceAll] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importFeedback, setImportFeedback] = useState<ImportFeedback>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +178,7 @@ export default function CollaboratorsSheetClient() {
       form.append('sync_users', String(syncUsers));
       form.append('sync_teams', String(syncTeams));
       form.append('sync_hr_masters', String(syncMasters));
+      form.append('replace_all', String(replaceAll));
 
       const res = await fetch('/api/admin/hr/collaborators-sheet/import', {
         method: 'POST',
@@ -211,6 +213,8 @@ export default function CollaboratorsSheetClient() {
                 ? 'Archivo demasiado grande para importar. Exporta como CSV o divide la planilla.'
             : raw === 'FORBIDDEN'
               ? 'No tienes permisos para importar.'
+              : raw === 'INVALID_TEMPLATE'
+                ? details || 'El archivo no tiene el formato esperado (RUT/columnas).'
               : raw === 'IMPORT_FAILED'
                 ? details || 'Falló la importación en el servidor. Revisa el formato del archivo.'
                 : raw;
@@ -257,6 +261,27 @@ export default function CollaboratorsSheetClient() {
       >
         <IconDownload size={16} />
         Descargar plantilla
+      </button>
+      <button
+        onClick={async () => {
+          setError(null);
+          setSuccess(null);
+          setImportFeedback({ kind: 'idle' });
+          if (!confirm('¿Seguro? Esto borrará toda la planilla RR.HH. cargada.')) return;
+          try {
+            const res = await fetch('/api/admin/hr/collaborators-sheet', { method: 'DELETE' });
+            const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+            if (!res.ok) throw new Error(body.error ?? 'No fue posible limpiar la planilla');
+            setSuccess('Planilla limpiada. Ahora puedes importar nuevamente.');
+            await load();
+          } catch (e) {
+            setError((e as Error).message);
+          }
+        }}
+        className="flex items-center gap-2 rounded-full border border-rose-500/25 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+      >
+        <IconX size={16} />
+        Limpiar planilla
       </button>
       <button
         onClick={() => {
@@ -411,6 +436,28 @@ export default function CollaboratorsSheetClient() {
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <p className="text-sm font-semibold text-white">Opciones</p>
                   <div className="mt-3 space-y-3">
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-slate-200">Reemplazar planilla</span>
+                        <span className="text-xs text-slate-500">Borra la planilla actual y carga desde cero.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReplaceAll((v) => !v)}
+                        className={`inline-flex h-8 w-14 items-center rounded-full border transition ${
+                          replaceAll ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-white/5 border-white/10'
+                        }`}
+                        aria-pressed={replaceAll}
+                        title={replaceAll ? 'Activo' : 'Inactivo'}
+                      >
+                        <span
+                          className={`ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full transition ${
+                            replaceAll ? 'translate-x-6 bg-emerald-400 text-black' : 'translate-x-0 bg-slate-400 text-black'
+                          }`}
+                        />
+                      </button>
+                    </label>
+
                     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-slate-200">Sincronizar usuarios</span>
