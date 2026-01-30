@@ -15,6 +15,9 @@ import {
   IconBuilding,
   IconX,
   IconFileSpreadsheet,
+  IconPencil,
+  IconPlus,
+  IconDeviceFloppy,
 } from '@tabler/icons-react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 import KpiCard from '../../../../components/ui/KpiCard';
@@ -55,6 +58,24 @@ type ImportFeedback =
   | { kind: 'error'; message: string }
   | { kind: 'success'; message: string; warnings: string[] };
 
+const DATE_KEYS = new Set([
+  'fecha_fin_licencia',
+  'fecha_nacimiento',
+  'fecha_alta',
+  'fecha_baja',
+  'fecha_contrato',
+  'termino_contrato',
+  'registro_contrato_dt',
+  'renovacion1_contrato',
+  'termino_renovacion1_contrato',
+  'anexo_confidencialidad',
+  'anexo_horario',
+  'anexo_cambio_renta',
+  'pacto_hhee',
+]);
+
+const NUMBER_KEYS = new Set(['jornada_laboral', 'antiguedad_dias', 'cargas_familiares', 'sueldo_bruto', 'gratificacion', 'movilizacion', 'colacion']);
+
 export default function CollaboratorsSheetClient() {
   const searchParams = useSearchParams();
   const rutToOpenRef = useRef<string | null>(null);
@@ -72,6 +93,9 @@ export default function CollaboratorsSheetClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selected, setSelected] = useState<Row | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const rut = (searchParams?.get('rut') ?? '').trim();
@@ -110,6 +134,11 @@ export default function CollaboratorsSheetClient() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!selected) return;
+    setDraft(selected);
+  }, [selected]);
+
   const columns = useMemo<Column<Row>[]>(() => {
     const fmtDate = (iso: unknown) =>
       typeof iso === 'string' && iso
@@ -147,6 +176,73 @@ export default function CollaboratorsSheetClient() {
       { header: 'Término', accessorKey: 'termino_contrato', sortable: true, render: (r) => fmtDate(r.termino_contrato) },
     ];
   }, []);
+
+  const openEditor = (row?: Row) => {
+    const base = (row ?? {
+      rut_full: '',
+      nombre_completo: null,
+      empresa: null,
+      area: null,
+      estado: 'Activo',
+      sub_estado: 'Activo',
+      cliente: null,
+      servicio: null,
+      campania: null,
+      cargo: null,
+      supervisor: null,
+      coordinador: null,
+      correo_corporativo: null,
+      correo_cliente: null,
+      fecha_contrato: null,
+      termino_contrato: null,
+    }) as Row;
+    setSelected(base);
+    setDraft(base);
+    setEditing(true);
+  };
+
+  const saveDraft = async () => {
+    const rut = String(draft.rut_full ?? '').trim();
+    if (!rut) {
+      setError('RUT es obligatorio para guardar.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const updates: Record<string, string | number | boolean | null> = {};
+      for (const [k, v] of Object.entries(draft)) {
+        if (k === 'rut_full' || k === 'created_at' || k === 'updated_at') continue;
+        if (v == null) {
+          updates[k] = null;
+          continue;
+        }
+        if (typeof v === 'number') {
+          updates[k] = v;
+          continue;
+        }
+        const s = String(v).trim();
+        updates[k] = s.length ? s : null;
+      }
+
+      const res = await fetch('/api/admin/hr/collaborators-sheet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rut_full: rut, updates }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(body.error ?? 'No fue posible guardar cambios');
+      setSuccess('Cambios guardados.');
+      setEditing(false);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const downloadTemplate = async () => {
     setError(null);
@@ -263,6 +359,13 @@ export default function CollaboratorsSheetClient() {
         Descargar plantilla
       </button>
       <button
+        onClick={() => openEditor()}
+        className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/15"
+      >
+        <IconPlus size={16} />
+        Nuevo
+      </button>
+      <button
         onClick={async () => {
           setError(null);
           setSuccess(null);
@@ -328,12 +431,23 @@ export default function CollaboratorsSheetClient() {
         keyExtractor={(row) => String(row.rut_full)}
         loading={loading}
         actions={(row) => (
-          <button
-            onClick={() => setSelected(row)}
-            className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 transition"
-          >
-            Ver
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setEditing(false);
+                setSelected(row);
+              }}
+              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 transition"
+            >
+              Ver
+            </button>
+            <button
+              onClick={() => openEditor(row)}
+              className="rounded-lg bg-blue-600/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 transition"
+            >
+              Editar
+            </button>
+          </div>
         )}
         searchPlaceholder="Buscar por nombre, RUT, cliente, cargo…"
       />
@@ -581,22 +695,61 @@ export default function CollaboratorsSheetClient() {
                   <h2 className="text-xl font-bold text-white">Ficha</h2>
                   <p className="text-sm text-slate-400">{selected.nombre_completo ?? selected.rut_full}</p>
                 </div>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white"
-                >
-                  <IconX size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {!editing ? (
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10 hover:text-white transition"
+                    >
+                      <IconPencil size={16} />
+                      Editar
+                    </button>
+                  ) : (
+                    <button
+                      onClick={saveDraft}
+                      disabled={saving}
+                      className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50 transition"
+                    >
+                      <IconDeviceFloppy size={16} />
+                      {saving ? 'Guardando…' : 'Guardar'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelected(null);
+                      setEditing(false);
+                    }}
+                    className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white"
+                    title="Cerrar"
+                  >
+                    <IconX size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="p-6">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {Object.entries(selected)
+                  {Object.entries(editing ? draft : selected)
                     .filter(([k]) => !['created_at', 'updated_at'].includes(k))
                     .map(([key, value]) => (
                       <div key={key} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">{key}</p>
-                        <p className="mt-2 text-sm text-white break-words">{String(value ?? '—')}</p>
+                        {!editing || key === 'rut_full' ? (
+                          <p className="mt-2 text-sm text-white break-words">{String(value ?? '—')}</p>
+                        ) : (
+                          <input
+                            value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
+                            onChange={(e) =>
+                              setDraft((prev) => ({
+                                ...prev,
+                                [key]: e.target.value,
+                              }))
+                            }
+                            placeholder="—"
+                            type={DATE_KEYS.has(key) ? 'date' : NUMBER_KEYS.has(key) ? 'number' : 'text'}
+                            className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none"
+                          />
+                        )}
                       </div>
                     ))}
                 </div>

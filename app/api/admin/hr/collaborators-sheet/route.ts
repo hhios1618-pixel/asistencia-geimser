@@ -14,6 +14,11 @@ const importSchema = z.object({
   tsv: z.string().min(1),
 });
 
+const upsertSchema = z.object({
+  rut_full: z.string().min(3),
+  updates: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}),
+});
+
 const dayMs = 24 * 60 * 60 * 1000;
 
 const computeKpis = (items: CollaboratorSheetRow[]) => {
@@ -391,6 +396,169 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, imported: items.length }, { status: 201 });
+}
+
+const TEXT_COLUMNS = new Set([
+  'rut_base',
+  'rut_dv',
+  'ficha_numero',
+  'nombre_completo',
+  'empresa',
+  'area',
+  'estado',
+  'sub_estado',
+  'tipo_contrato',
+  'cliente',
+  'servicio',
+  'campania',
+  'cargo',
+  'supervisor',
+  'coordinador',
+  'sub_gerente',
+  'genero',
+  'estado_civil',
+  'nacionalidad',
+  'correo_personal',
+  'telefono_celular',
+  'telefono_fijo',
+  'direccion',
+  'comuna',
+  'ciudad',
+  'nivel_educacional',
+  'especialidad',
+  'contacto_emergencia',
+  'parentesco_emergencia',
+  'telefono_emergencia',
+  'alergias',
+  'motivo_baja',
+  'tipo_remuneracion',
+  'centro_costo_id',
+  'centro_costo_descripcion',
+  'rol',
+  'banco_transferencia',
+  'tipo_cuenta_transferencia',
+  'numero_cuenta',
+  'salud',
+  'afp',
+  'renovacion_indefinido',
+  'sindicato',
+  'demanda',
+  'notebook',
+  'llaves_oficina_cerr_superior',
+  'llaves_oficina_cerr_inferior',
+  'correo_corporativo',
+  'correo_gmail_corporativo',
+  'correo_cliente',
+]);
+
+const DATE_COLUMNS = new Set([
+  'fecha_fin_licencia',
+  'fecha_nacimiento',
+  'fecha_alta',
+  'fecha_baja',
+  'fecha_contrato',
+  'termino_contrato',
+  'registro_contrato_dt',
+  'renovacion1_contrato',
+  'termino_renovacion1_contrato',
+  'anexo_confidencialidad',
+  'anexo_horario',
+  'anexo_cambio_renta',
+  'pacto_hhee',
+]);
+
+const INT_COLUMNS = new Set(['jornada_laboral', 'antiguedad_dias', 'cargas_familiares']);
+const NUM_COLUMNS = new Set(['sueldo_bruto', 'gratificacion', 'movilizacion', 'colacion']);
+
+const parseIsoDate = (value: unknown) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
+};
+
+const parseInt32 = (value: unknown) => {
+  if (value == null) return null;
+  const raw = typeof value === 'number' ? String(value) : String(value);
+  const digits = raw.replace(/[^\d-]/g, '');
+  if (!digits) return null;
+  const n = Number.parseInt(digits, 10);
+  if (!Number.isFinite(n)) return null;
+  if (n > 2147483647 || n < -2147483648) return null;
+  return n;
+};
+
+const parseNumber = (value: unknown) => {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const digits = raw.replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number.parseFloat(digits);
+  return Number.isFinite(n) ? n : null;
+};
+
+export async function PATCH(request: NextRequest) {
+  const { role } = await authorizeManager();
+  if (!role) {
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  const payload = await request.json().catch(() => null);
+  const parsed = upsertSchema.safeParse(payload);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'INVALID_BODY' }, { status: 400 });
+  }
+
+  await ensureHrCollaboratorsSheetTable();
+
+  const rutFull = parsed.data.rut_full.trim();
+  const updates = parsed.data.updates ?? {};
+
+  const values: unknown[] = [rutFull];
+
+  const insertCols: string[] = ['rut_full'];
+  const insertVals: string[] = ['$1'];
+  const conflictSets: string[] = [];
+
+  let paramIndex = 2;
+  for (const [key, raw] of Object.entries(updates)) {
+    if (key === 'rut_full' || key === 'created_at' || key === 'updated_at') continue;
+
+    let parsedValue: unknown = null;
+    if (DATE_COLUMNS.has(key)) {
+      parsedValue = typeof raw === 'string' ? parseIsoDate(raw) : null;
+    } else if (INT_COLUMNS.has(key)) {
+      parsedValue = parseInt32(raw);
+    } else if (NUM_COLUMNS.has(key)) {
+      parsedValue = parseNumber(raw);
+    } else if (TEXT_COLUMNS.has(key)) {
+      const s = typeof raw === 'string' ? raw.trim() : raw == null ? '' : String(raw).trim();
+      parsedValue = s ? s : null;
+    } else {
+      // Unknown column; ignore
+      continue;
+    }
+
+    values.push(parsedValue);
+    insertCols.push(key);
+    insertVals.push(`$${paramIndex}`);
+    conflictSets.push(`${key} = excluded.${key}`);
+    paramIndex += 1;
+  }
+
+  // Always bump updated_at
+  const sql = `
+    insert into public.hr_collaborators_sheet (${insertCols.join(', ')}, updated_at)
+    values (${insertVals.join(', ')}, now())
+    on conflict (rut_full) do update set
+      ${conflictSets.length ? conflictSets.join(', ') + ',' : ''}
+      updated_at = now()
+  `;
+
+  await runQuery(sql, values);
+
+  return NextResponse.json({ ok: true }, { status: 200 });
 }
 
 export async function DELETE() {
