@@ -227,24 +227,62 @@ export function TurnosAdmin() {
       const existing = { ...scheduleMap };
       const ops: Promise<Response>[] = [];
       weekDays.forEach(d => {
-        const payload = { person_id: selectedPersonId, day_of_week: d.dayOfWeek, start_time: d.start, end_time: d.end, break_minutes: d.breakMinutes };
+        const payload = {
+          person_id: selectedPersonId,
+          day_of_week: d.dayOfWeek,
+          start_time: normalizeTime(d.start),
+          end_time: normalizeTime(d.end),
+          break_minutes: Number.isFinite(d.breakMinutes as unknown as number) ? Number(d.breakMinutes) : DEFAULT_BREAK_MINUTES,
+        };
         const e = existing[d.dayOfWeek];
         if (d.enabled) {
-          if (e) ops.push(fetch('/api/admin/attendance/schedules', { method: 'PATCH', body: JSON.stringify({ id: e.id, ...payload }) }));
-          else ops.push(fetch('/api/admin/attendance/schedules', { method: 'POST', body: JSON.stringify(payload) }));
+          if (e) {
+            ops.push(fetch('/api/admin/attendance/schedules', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: e.id, ...payload }),
+            }));
+          } else {
+            ops.push(fetch('/api/admin/attendance/schedules', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            }));
+          }
         } else if (e) {
           ops.push(fetch(`/api/admin/attendance/schedules?id=${e.id}`, { method: 'DELETE' }));
         }
       });
-      await Promise.all(ops);
+      const responses = await Promise.all(ops);
+      const failed = responses.find((r) => !r.ok) ?? null;
+      if (failed) {
+        const body = (await failed.json().catch(() => ({}))) as { error?: string; details?: string };
+        throw new Error(body.details ?? body.error ?? `Error HTTP ${failed.status}`);
+      }
       await loadSchedules(selectedPersonId);
       setSuccess('Turno semanal guardado.');
-    } catch (e) { setError('Error al guardar'); } finally { setSaving(false); }
+    } catch (e) {
+      setError((e as Error).message || 'Error al guardar');
+    } finally { setSaving(false); }
   };
 
   // Handler helpers
-  const handleToggleDay = (d: number, v: boolean) => setDaySettings(p => ({ ...p, [d]: { ...p[d], enabled: v } }));
-  const handleTimeChange = (d: number, f: string, v: string) => setDaySettings(p => ({ ...p, [d]: { ...p[d], [f]: v } }));
+  const handleToggleDay = (d: number, v: boolean) =>
+    setDaySettings((prev) => {
+      const current = prev[d] ?? { ...DEFAULT_DAY_SETTING };
+      return { ...prev, [d]: { ...current, enabled: v } };
+    });
+
+  const handleTimeChange = (d: number, field: 'start' | 'end' | 'breakMinutes', value: string) =>
+    setDaySettings((prev) => {
+      const current = prev[d] ?? { ...DEFAULT_DAY_SETTING };
+      if (field === 'breakMinutes') {
+        const n = Number.parseInt(value, 10);
+        const safe = Number.isFinite(n) ? Math.max(0, Math.min(600, n)) : current.breakMinutes;
+        return { ...prev, [d]: { ...current, breakMinutes: safe } };
+      }
+      return { ...prev, [d]: { ...current, [field]: normalizeTime(value) } };
+    });
 
 
   return (
