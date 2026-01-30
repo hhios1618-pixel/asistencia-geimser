@@ -16,7 +16,7 @@ import { resolveUserRole } from '../../lib/auth/role';
 export const dynamic = 'force-dynamic';
 
 const ROLE_LABELS: Record<Tables['people']['Row']['role'], string> = {
-  WORKER: 'Trabajador',
+  WORKER: 'Colaborador',
   ADMIN: 'Administrador',
   SUPERVISOR: 'Supervisor',
   DT_VIEWER: 'DT Viewer',
@@ -119,9 +119,9 @@ export default async function AdminHomePage() {
 
   const quickActions = [
     {
-      title: 'Añadir empleado',
-      description: 'Incorpora y edita ficha laboral.',
-      href: '/admin/rrhh?panel=employees',
+      title: 'Añadir colaborador',
+      description: 'Crea usuarios y asigna rol, sitio y servicio.',
+      href: '/admin/usuarios?create=1',
       icon: <IconUserCheck size={20} />,
       accent: 'cyan' as const,
     },
@@ -156,7 +156,7 @@ export default async function AdminHomePage() {
     >
       {/* 1. Hero Section (No Cards) */}
       <AdminHero
-        userName={user.user_metadata?.full_name ?? user.email ?? 'Admin'}
+        userName={(user.user_metadata?.name as string | undefined) ?? (user.user_metadata?.full_name as string | undefined) ?? user.email ?? 'Admin'}
         stats={[
           { label: 'Colaboradores', value: overview.totals.active_people, subtext: 'Activos en nómina' },
           { label: 'Sitios', value: overview.totals.total_sites, subtext: 'Operativos hoy' },

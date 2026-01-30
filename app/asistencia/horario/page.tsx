@@ -28,7 +28,7 @@ export default async function WorkerSchedulePage() {
     <DashboardLayout
       title="Mi horario"
       description="Tu planificación semanal y descansos asociados."
-      breadcrumb={[{ label: 'Empleado' }, { label: 'Mi horario' }]}
+      breadcrumb={[{ label: 'Colaborador' }, { label: 'Mi horario' }]}
       navItems={WORKER_NAV}
     >
       <section className="glass-panel rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.55)]">
@@ -69,4 +69,3 @@ export default async function WorkerSchedulePage() {
     </DashboardLayout>
   );
 }
-

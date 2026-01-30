@@ -67,7 +67,7 @@ export default async function ModeSelectPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-slate-300">G‑Trace</p>
               <h1 className="text-3xl font-semibold text-white">Elige tu modo de ingreso</h1>
               <p className="max-w-2xl text-sm text-slate-300">
-                Tu usuario tiene permisos de administración. Puedes entrar al panel corporativo o ver la app como empleado.
+                Tu usuario tiene permisos de administración. Puedes entrar al panel corporativo o ver la app como colaborador.
               </p>
             </div>
             <div className="hidden sm:block">
@@ -92,7 +92,7 @@ export default async function ModeSelectPage() {
             />
           )}
           <ModeCard
-            title="Empleado"
+            title="Colaborador"
             description="Mi horario, mi asistencia, mis solicitudes y notificaciones."
             href="/asistencia"
           />
@@ -105,4 +105,3 @@ export default async function ModeSelectPage() {
     </main>
   );
 }
-

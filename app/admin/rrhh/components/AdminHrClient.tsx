@@ -32,7 +32,7 @@ type SectionId =
   | 'headcount';
 
 const SECTIONS = [
-  { id: 'employees', label: 'Empleados', icon: IconUsers },
+  { id: 'employees', label: 'Colaboradores', icon: IconUsers },
   { id: 'roles', label: 'Roles', icon: IconShieldLock },
   { id: 'businesses', label: 'Negocios', icon: IconBuildingStore },
   { id: 'positions', label: 'Cargos', icon: IconBadge },

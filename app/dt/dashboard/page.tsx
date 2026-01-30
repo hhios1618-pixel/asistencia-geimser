@@ -73,7 +73,7 @@ export default function DtDashboardPage() {
 
             <div className="mb-8 grid gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-3">
                 <div className="md:col-span-1">
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">RUT Trabajador (Opcional)</label>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">RUT Colaborador (Opcional)</label>
                     <input
                         type="text"
                         value={rut}

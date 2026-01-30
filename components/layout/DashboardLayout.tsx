@@ -49,7 +49,6 @@ export const ADMIN_NAV: NavItem[] = [
     subItems: [
       { label: 'Visión general', href: '/admin/asistencia?panel=overview' },
       { label: 'Control diario', href: '/admin/asistencia?panel=daily' },
-      { label: 'Usuarios', href: '/admin/asistencia?panel=people' },
       { label: 'Correcciones', href: '/admin/asistencia?panel=modifications' },
       { label: 'Políticas', href: '/admin/asistencia?panel=policies' },
       { label: 'Auditoría', href: '/admin/asistencia?panel=audit' },
@@ -61,7 +60,7 @@ export const ADMIN_NAV: NavItem[] = [
     href: '/admin/rrhh?panel=employees',
     icon: IconBuilding,
     subItems: [
-      { label: 'Empleados', href: '/admin/rrhh?panel=employees' },
+      { label: 'Colaboradores', href: '/admin/rrhh?panel=employees' },
       { label: 'Usuarios', href: '/admin/usuarios' },
       { label: 'Roles y permisos', href: '/admin/rrhh?panel=roles' },
       { label: 'Gestión de ausencias', href: '/admin/rrhh?panel=absences' },

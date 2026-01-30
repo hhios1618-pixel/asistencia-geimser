@@ -59,7 +59,7 @@ export default function PayrollSalaryRecordsPanel() {
       <SectionHeader
         overline="Nómina"
         title="Registros salariales"
-        description="Revisa el sueldo base por persona. La ficha se edita desde “Empleados”."
+        description="Revisa el sueldo base por persona. La ficha se edita desde “Colaboradores”."
       />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -129,4 +129,3 @@ export default function PayrollSalaryRecordsPanel() {
     </section>
   );
 }
-

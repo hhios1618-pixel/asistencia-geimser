@@ -18,7 +18,6 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { SitesAdmin } from './SitesAdmin';
-import { PeopleAdmin } from './PeopleAdmin';
 // ModificationsInbox removed from imports to be inlined below
 import AuditLogViewer from './AuditLogViewer';
 import PoliciesManager from './PoliciesManager';
@@ -208,7 +207,7 @@ type OverviewResponse = {
 };
 
 const ROLE_LABELS: Record<'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER', string> = {
-  WORKER: 'Trabajador',
+  WORKER: 'Colaborador',
   ADMIN: 'Administrador',
   SUPERVISOR: 'Supervisor',
   DT_VIEWER: 'DT Viewer',
@@ -217,7 +216,6 @@ const ROLE_LABELS: Record<'WORKER' | 'ADMIN' | 'SUPERVISOR' | 'DT_VIEWER', strin
 const SECTIONS = [
   { id: 'overview', label: 'Resumen', description: 'Indicadores globales', icon: IconLayoutDashboard },
   { id: 'daily', label: 'Diario', description: 'Control de asistencia', icon: IconClipboardList },
-  { id: 'people', label: 'Personas', description: 'Gestión de usuarios', icon: IconUsers },
   { id: 'sites', label: 'Sitios', description: 'Ubicaciones', icon: IconMapPin },
   { id: 'schedules', label: 'Turnos', description: 'Planificación', icon: IconCalendarStats },
   { id: 'modifications', label: 'Correcciones', description: 'Solicitudes', icon: IconClipboardCheck },
@@ -436,11 +434,10 @@ export function AdminAttendanceClient() {
   const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Redirections or default handling
-    if (!SECTIONS.find(s => s.id === activeTab)) {
-      // Fallback handled by some function above but here we can ensure we load overview data if needed
+    if (rawPanel === 'people') {
+      router.replace('/admin/usuarios');
     }
-  }, [activeTab]);
+  }, [rawPanel, router]);
 
   useEffect(() => {
     if (activeTab !== 'overview') {
@@ -479,7 +476,6 @@ export function AdminAttendanceClient() {
     switch (activeTab) {
       case 'overview': return <OverviewPanel data={overviewData} loading={overviewLoading} error={overviewError} />;
       case 'daily': return <DailyControlPanel />;
-      case 'people': return <PeopleAdmin />;
       case 'sites': return <SitesAdmin />;
       case 'schedules': return <TurnosAdmin />;
       case 'alerts': return <AlertsAdmin />;

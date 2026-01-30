@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { createRouteSupabaseClient, getServiceSupabase } from '../../../../../lib/supabase/server';
 import type { Tables } from '../../../../../types/database';
-import { runQuery } from '../../../../../lib/db/postgres';
+import { runQuery, withTransaction } from '../../../../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../../../../lib/db/ensurePeopleServiceColumn';
 import { resolveUserRole } from '../../../../../lib/auth/role';
 
@@ -35,6 +35,8 @@ const updateSchema = personSchema.partial().extend({ id: z.string().uuid() });
 const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' || role === 'SUPERVISOR';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const generateTemporaryPassword = (): string => {
   let raw = randomBytes(12).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
@@ -234,6 +236,18 @@ const isMissingTeamAssignments = (error: unknown): error is { code: string } =>
   'code' in error &&
   (error as { code?: string }).code === '42P01';
 
+const isMissingRelation = (error: unknown): error is { code: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: string }).code === '42P01';
+
+const isForeignKeyViolation = (error: unknown): error is { code: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: string }).code === '23503';
+
 const PEOPLE_WITH_SUPERVISORS_SELECT = `
 select p.*,
         coalesce(
@@ -300,14 +314,17 @@ const selectPeopleRows = async (suffix: string, params: unknown[]): Promise<DbPe
 export async function GET() {
   const { user } = await authorize();
   if (!user) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
   try {
     const rows = await selectPeopleRows(' order by p.created_at', []);
-    return NextResponse.json({ items: rows });
+    return NextResponse.json({ items: rows }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('[admin_people] fetch failed', error);
-    return NextResponse.json({ error: 'PEOPLE_FETCH_FAILED' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'PEOPLE_FETCH_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 }
 
@@ -663,6 +680,7 @@ export async function DELETE(request: NextRequest) {
   if (!id) {
     return NextResponse.json({ error: 'ID_REQUIRED' }, { status: 400 });
   }
+  const force = ['1', 'true', 'yes'].includes((request.nextUrl.searchParams.get('force') ?? '').toLowerCase());
 
   const service = getServiceSupabase();
 
@@ -674,11 +692,62 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  await runQuery('delete from public.people_sites where person_id = $1', [id]);
-
   try {
-    await runQuery('delete from public.people where id = $1', [id]);
+    await withTransaction(async (client) => {
+      await client.query('delete from public.people_sites where person_id = $1', [id]);
+
+      try {
+        await client.query('delete from public.team_assignments where supervisor_id = $1 or member_id = $1', [id]);
+      } catch (error) {
+        if (!isMissingRelation(error)) {
+          throw error;
+        }
+      }
+
+      if (force) {
+        try {
+          await client.query('delete from public.attendance_modifications where requester_id = $1 or resolver_id = $1', [
+            id,
+          ]);
+          await client.query(
+            `delete from public.attendance_modifications
+             where mark_id in (select id from public.attendance_marks where person_id = $1)`,
+            [id]
+          );
+          await client.query('delete from public.attendance_marks where person_id = $1', [id]);
+        } catch (error) {
+          if (!isMissingRelation(error)) {
+            throw error;
+          }
+        }
+
+        try {
+          await client.query('delete from public.payroll_payslips where person_id = $1', [id]);
+        } catch (error) {
+          if (!isMissingRelation(error)) {
+            throw error;
+          }
+        }
+      }
+
+      await client.query('delete from public.people where id = $1', [id]);
+    });
   } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      try {
+        await runQuery('update public.people set is_active = false where id = $1', [id]);
+      } catch (updateError) {
+        return NextResponse.json(
+          { error: 'SOFT_DELETE_FAILED', details: (updateError as Error).message },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        soft_deleted: true,
+        message: 'No fue posible eliminar porque existe historial asociado. El usuario quedó desactivado.',
+      });
+    }
     return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

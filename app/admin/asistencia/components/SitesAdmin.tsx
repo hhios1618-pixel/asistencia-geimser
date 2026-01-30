@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconMapPin, IconX, IconEdit, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconMapPin, IconX, IconEdit, IconTrash, IconPlus, IconCheck } from '@tabler/icons-react';
 import DataTable, { type Column } from '../../../../components/ui/DataTable';
 
 interface Site {
@@ -42,8 +42,8 @@ export function SitesAdmin() {
   const fetchSites = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/admin/attendance/sites');
-      const body = await response.json();
+      const response = await fetch('/api/admin/attendance/sites', { cache: 'no-store' });
+      const body = await response.json().catch(() => ({}));
       setSites(body.items ?? []);
     } catch (err) {
       console.error(err);
@@ -129,6 +129,57 @@ export function SitesAdmin() {
     }
   };
 
+  const handleToggleActive = async (site: Site) => {
+    const next = !site.is_active;
+    const verb = next ? 'activar' : 'desactivar';
+    if (!confirm(`¿Quieres ${verb} el sitio "${site.name}"?`)) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch('/api/admin/attendance/sites', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: site.id, is_active: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? body.details ?? 'No fue posible actualizar el sitio');
+      await fetchSites();
+      setSuccess(`Sitio "${site.name}" ${next ? 'activado' : 'desactivado'}.`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (site: Site) => {
+    if (
+      !confirm(
+        `¿Eliminar el sitio "${site.name}"?\n\nSi tiene historial asociado, se desactivará automáticamente.`
+      )
+    )
+      return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/admin/attendance/sites?id=${site.id}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? body.details ?? 'No fue posible eliminar el sitio');
+      await fetchSites();
+      if (body?.soft_deleted) {
+        setSuccess(`Sitio "${site.name}" desactivado (tiene historial asociado).`);
+      } else {
+        setSuccess(`Sitio "${site.name}" eliminado.`);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const columns: Column<Site>[] = [
     {
       header: 'Nombre',
@@ -207,6 +258,24 @@ export function SitesAdmin() {
               title="Editar"
             >
               <IconEdit size={18} />
+            </button>
+            <button
+              onClick={() => handleToggleActive(site)}
+              className={`p-2 rounded-lg transition ${
+                site.is_active ? 'text-amber-400 hover:bg-amber-500/10' : 'text-emerald-400 hover:bg-emerald-500/10'
+              }`}
+              title={site.is_active ? 'Desactivar' : 'Activar'}
+              disabled={saving}
+            >
+              {site.is_active ? <IconX size={18} /> : <IconCheck size={18} />}
+            </button>
+            <button
+              onClick={() => handleDelete(site)}
+              className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+              title="Eliminar"
+              disabled={saving}
+            >
+              <IconTrash size={18} />
             </button>
           </div>
         )}

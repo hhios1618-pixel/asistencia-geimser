@@ -16,7 +16,7 @@ type Person = {
 };
 
 const ROLE_LABELS: Record<Role, string> = {
-  WORKER: 'Empleado',
+  WORKER: 'Colaborador',
   SUPERVISOR: 'Supervisor',
   ADMIN: 'Administrador',
   DT_VIEWER: 'DT Viewer',
@@ -173,4 +173,3 @@ export default function HrRolesPermissionsPanel() {
     </section>
   );
 }
-

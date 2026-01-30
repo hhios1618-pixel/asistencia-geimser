@@ -6,11 +6,10 @@ export default function WorkerNotificationsPage() {
     <DashboardLayout
       title="Notificaciones"
       description="Aprobaciones, alertas y cambios relevantes para tu jornada."
-      breadcrumb={[{ label: 'Empleado' }, { label: 'Notificaciones' }]}
+      breadcrumb={[{ label: 'Colaborador' }, { label: 'Notificaciones' }]}
       navItems={WORKER_NAV}
     >
       <AlertList />
     </DashboardLayout>
   );
 }
-

@@ -38,7 +38,7 @@ const buildPdfBuffer = ({ mark, person, site, hashChain }: ReceiptContext): Prom
       .text('Recibo de Marca de Asistencia', { align: 'center' })
       .moveDown();
 
-    doc.fontSize(12).text(`Trabajador: ${person.name} (${person.rut ?? 'sin RUT'})`);
+    doc.fontSize(12).text(`Colaborador: ${person.name} (${person.rut ?? 'sin RUT'})`);
     doc.text(`Correo: ${person.email ?? 'no registrado'}`);
     doc.text(`Sitio: ${site.name}`);
     doc.text(`Ubicación: ${site.lat.toFixed(6)}, ${site.lng.toFixed(6)}`);

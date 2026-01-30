@@ -47,6 +47,7 @@ export default async function AsistenciaPage() {
 
   if (!person) {
     const fallbackName =
+      (user.user_metadata?.name as string | undefined) ??
       (user.user_metadata?.full_name as string | undefined) ??
       user.email?.split('@')[0]?.replace(/\./g, ' ') ??
       'Colaborador';

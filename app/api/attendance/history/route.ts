@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
 
     if (!personProfile) {
       const fallbackName =
+        (authData.user.user_metadata?.name as string | undefined) ??
         (authData.user.user_metadata?.full_name as string | undefined) ??
         authData.user.email?.split('@')[0]?.replace(/\./g, ' ') ??
         'Colaborador';

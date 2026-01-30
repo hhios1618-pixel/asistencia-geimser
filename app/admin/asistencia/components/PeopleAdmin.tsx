@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DataTable, { type Column } from '../../../../components/ui/DataTable';
 import StatusBadge from '../../../../components/ui/StatusBadge';
-import { IconUserPlus, IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconUserPlus, IconEdit, IconTrash, IconUserCheck, IconUserOff } from '@tabler/icons-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // Types
@@ -56,7 +57,7 @@ const emptyPerson: Person = {
 };
 
 const ROLE_LABELS: Record<Person['role'], string> = {
-  WORKER: 'Trabajador',
+  WORKER: 'Colaborador',
   SUPERVISOR: 'Supervisor',
   ADMIN: 'Administrador',
   DT_VIEWER: 'DT Viewer',
@@ -66,6 +67,8 @@ const getInitials = (name: string) =>
   name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'PG';
 
 export function PeopleAdmin() {
+  const searchParams = useSearchParams();
+  const handledCreateParamRef = useRef(false);
   const [people, setPeople] = useState<Person[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(false);
@@ -86,8 +89,8 @@ export function PeopleAdmin() {
     setError(null);
     try {
       const [peopleRes, sitesRes] = await Promise.all([
-        fetch('/api/admin/attendance/people'),
-        fetch('/api/admin/attendance/sites'),
+        fetch('/api/admin/attendance/people', { cache: 'no-store' }),
+        fetch('/api/admin/attendance/sites', { cache: 'no-store' }),
       ]);
       const peopleBody = await peopleRes.json();
       const sitesBody = await sitesRes.json();
@@ -136,6 +139,19 @@ export function PeopleAdmin() {
     setPassword('');
   };
 
+  useEffect(() => {
+    const raw = (searchParams?.get('create') ?? searchParams?.get('new') ?? '').toLowerCase();
+    const shouldCreate = ['1', 'true', 'yes'].includes(raw);
+    if (!shouldCreate || handledCreateParamRef.current) return;
+    handledCreateParamRef.current = true;
+    startNew();
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('create');
+    url.searchParams.delete('new');
+    window.history.replaceState({}, '', url.toString());
+  }, [searchParams]);
+
   const startEdit = (person: Person) => {
     setEditing(person);
     setAssignedSites(person.people_sites?.map(ps => ps.site_id) ?? []);
@@ -154,14 +170,66 @@ export function PeopleAdmin() {
   };
 
   const handleDelete = async (person: Person) => {
-    if (!confirm(`¿Eliminar a ${person.name}?`)) return;
+    if (!confirm(`¿Eliminar a ${person.name}?\n\nSi tiene historial asociado, se desactivará automáticamente.`)) return;
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/admin/attendance/people?id=${person.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Error al eliminar');
-      await loadData();
-      setSuccessMessage(`Usuario ${person.name} eliminado.`);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.message ?? body?.error ?? 'Error al eliminar');
+      }
+      if (body?.soft_deleted) {
+        const wantsForce = confirm(
+          `No se pudo eliminar porque existe historial asociado.\n\n` +
+            `Se desactivó el usuario.\n\n` +
+            `¿Eliminar definitivamente? (Borra historial de asistencia/nómina asociado a este usuario).`
+        );
+        if (wantsForce) {
+          const forceRes = await fetch(`/api/admin/attendance/people?id=${person.id}&force=1`, { method: 'DELETE' });
+          const forceBody = await forceRes.json().catch(() => ({}));
+          if (!forceRes.ok) {
+            throw new Error(forceBody?.message ?? forceBody?.error ?? 'No fue posible eliminar definitivamente');
+          }
+          await loadData();
+          if (forceBody?.soft_deleted) {
+            setSuccessMessage(`Usuario ${person.name} desactivado (sigue existiendo historial asociado).`);
+          } else {
+            setSuccessMessage(`Usuario ${person.name} eliminado definitivamente.`);
+          }
+        } else {
+          await loadData();
+          setSuccessMessage(`Usuario ${person.name} desactivado (tiene historial asociado).`);
+        }
+      } else {
+        await loadData();
+        setSuccessMessage(`Usuario ${person.name} eliminado.`);
+      }
       if (editing.id === person.id) setEditing(emptyPerson);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (person: Person) => {
+    const nextValue = !person.is_active;
+    const verb = nextValue ? 'activar' : 'desactivar';
+    if (!confirm(`¿Quieres ${verb} a ${person.name}?`)) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/attendance/people', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: person.id, is_active: nextValue }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.message ?? body?.error ?? 'No fue posible actualizar el estado');
+      }
+      await loadData();
+      setSuccessMessage(`Usuario ${person.name} ${nextValue ? 'activado' : 'desactivado'}.`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -273,6 +341,14 @@ export function PeopleAdmin() {
     <>
       <button onClick={() => startEdit(p)} className="rounded p-2 text-blue-400 hover:bg-blue-500/10 transition" title="Editar">
         <IconEdit size={18} />
+      </button>
+      <button
+        onClick={() => handleToggleActive(p)}
+        className={`rounded p-2 transition ${p.is_active ? 'text-amber-400 hover:bg-amber-500/10' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
+        title={p.is_active ? 'Desactivar' : 'Activar'}
+        disabled={isSubmitting}
+      >
+        {p.is_active ? <IconUserOff size={18} /> : <IconUserCheck size={18} />}
       </button>
       <button onClick={() => handleDelete(p)} className="rounded p-2 text-rose-400 hover:bg-rose-500/10 transition" title="Eliminar">
         <IconTrash size={18} />

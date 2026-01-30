@@ -238,13 +238,13 @@ const TREES: DecisionTree[] = [
   {
     id: 'supervisor-missing-worker',
     role: 'SUPERVISOR',
-    title: 'No veo a un trabajador en mi equipo',
+    title: 'No veo a un colaborador en mi equipo',
     description: 'No aparece en Equipo o no puedo gestionarlo.',
     start: 'q1',
     nodes: {
       q1: {
         id: 'q1',
-        question: '¿Ese trabajador tiene rol “Trabajador” (no Admin/Supervisor)?',
+        question: '¿Ese colaborador tiene rol “Colaborador” (no Admin/Supervisor)?',
         options: [
           { label: 'Sí', next: 'q2' },
           {
@@ -253,7 +253,7 @@ const TREES: DecisionTree[] = [
               title: 'Revisar rol',
               steps: [
                 'Pide a un Admin que revise el rol de la persona.',
-                { text: 'Abrir Personas', href: '/admin/asistencia?panel=people' },
+                { text: 'Abrir Usuarios', href: '/admin/usuarios' },
               ],
             },
           },
@@ -269,8 +269,8 @@ const TREES: DecisionTree[] = [
             result: {
               title: 'Asignación pendiente',
               steps: [
-                'Pide a un Admin que asigne el trabajador a tu equipo.',
-                { text: 'Abrir Personas', href: '/admin/asistencia?panel=people' },
+                'Pide a un Admin que asigne el colaborador a tu equipo.',
+                { text: 'Abrir Usuarios', href: '/admin/usuarios' },
               ],
             },
           },
@@ -278,7 +278,7 @@ const TREES: DecisionTree[] = [
       },
       q3: {
         id: 'q3',
-        question: '¿El trabajador está “Activo”?',
+        question: '¿El colaborador está “Activo”?',
         options: [
           {
             label: 'Sí',
@@ -297,7 +297,7 @@ const TREES: DecisionTree[] = [
               title: 'Activar usuario',
               steps: [
                 'Pide a un Admin activar el usuario.',
-                { text: 'Abrir Personas', href: '/admin/asistencia?panel=people' },
+                { text: 'Abrir Usuarios', href: '/admin/usuarios' },
               ],
             },
           },
@@ -308,13 +308,13 @@ const TREES: DecisionTree[] = [
   {
     id: 'admin-create-worker',
     role: 'ADMIN',
-    title: 'Crear un trabajador',
+    title: 'Crear un colaborador',
     description: 'Alta y configuración mínima para operar.',
     start: 'q1',
     nodes: {
       q1: {
         id: 'q1',
-        question: '¿La persona ya existe en “Personas”?',
+        question: '¿La persona ya existe en “Usuarios”?',
         options: [
           { label: 'Sí', next: 'q2' },
           { label: 'No', next: 'q3' },
@@ -331,7 +331,7 @@ const TREES: DecisionTree[] = [
               steps: [
                 'Asigna sitio(s) si tu operación usa geocercas.',
                 'Si es Supervisor, asígnale equipo.',
-                { text: 'Abrir Personas', href: '/admin/asistencia?panel=people' },
+                { text: 'Abrir Usuarios', href: '/admin/usuarios' },
               ],
             },
           },
@@ -341,7 +341,7 @@ const TREES: DecisionTree[] = [
               title: 'Ajustar estado/rol',
               steps: [
                 'Edita la persona y deja rol + estado correcto.',
-                { text: 'Abrir Personas', href: '/admin/asistencia?panel=people' },
+                { text: 'Abrir Usuarios', href: '/admin/usuarios' },
               ],
             },
           },
@@ -356,7 +356,7 @@ const TREES: DecisionTree[] = [
             result: {
               title: 'Crear y asignar',
               steps: [
-                { text: 'Abrir Personas', href: '/admin/asistencia?panel=people' },
+                { text: 'Abrir Usuarios', href: '/admin/usuarios?create=1' },
                 'Presiona “Nueva persona”.',
                 'Completa datos y guarda.',
                 'Asigna sitio(s) si aplica.',
@@ -526,7 +526,7 @@ function TroubleshootingWizard({ role }: { role: Role }) {
                       : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10'
                   }`}
                 >
-                  {r === 'WORKER' ? 'Trabajador' : r === 'SUPERVISOR' ? 'Supervisor' : 'Admin'}
+                  {r === 'WORKER' ? 'Colaborador' : r === 'SUPERVISOR' ? 'Supervisor' : 'Admin'}
                 </button>
               ))}
             </div>
@@ -710,7 +710,7 @@ export default function AyudaPage() {
               <li>Gestionar solicitudes según el flujo interno.</li>
             </ul>
           </Card>
-          <Card title="Trabajador (marca y revisa)">
+          <Card title="Colaborador (marca y revisa)">
             <p className="text-slate-400">Uso diario.</p>
             <ul className="list-disc space-y-2 pl-5">
               <li>Marcar entrada y salida.</li>
@@ -727,13 +727,12 @@ export default function AyudaPage() {
         />
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Card title="Crear un trabajador (Admin)">
+          <Card title="Crear un colaborador (Admin)">
             <Step n={1}>
-              Entra a <span className="font-semibold text-slate-700">Administración → Asistencia</span>.
+              Entra a <span className="font-semibold text-slate-700">Administración → Usuarios</span>.
             </Step>
             <Step n={2}>
-              Ve a <span className="font-semibold text-slate-700">Personas</span> y presiona{' '}
-              <span className="font-semibold text-slate-700">Nueva persona</span>.
+              Presiona <span className="font-semibold text-slate-700">Nueva persona</span>.
             </Step>
             <Step n={3}>
               Completa los datos básicos (nombre, correo, rol) y guarda.
@@ -743,7 +742,7 @@ export default function AyudaPage() {
             </Step>
           </Card>
 
-          <Card title="Cómo debe marcar un trabajador">
+          <Card title="Cómo debe marcar un colaborador">
             <Step n={1}>
               En <span className="font-semibold text-slate-700">Mi jornada</span>, presiona <span className="font-semibold text-slate-700">Marcar entrada</span>.
             </Step>

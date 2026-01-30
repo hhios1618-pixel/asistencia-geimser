@@ -30,6 +30,8 @@ const siteUpdateSchema = siteSchema.partial().extend({ id: z.string().uuid() });
 const isManager = (role: Tables['people']['Row']['role']) => role === 'ADMIN' || role === 'SUPERVISOR';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type TableTarget = { schema: 'public' | 'asistencia'; name: string; qualified: string };
 
@@ -40,6 +42,12 @@ type PgErrorLike = {
   hint?: string;
   constraint?: string;
 };
+
+const isForeignKeyViolation = (error: unknown): error is { code: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: string }).code === '23503';
 
 const formatDbError = (error: unknown) => {
   if (!error || typeof error !== 'object') {
@@ -146,7 +154,7 @@ const authorize = async () => {
 export async function GET() {
   const { person } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
   await ensureAddressColumn();
   const sites = await getSitesTarget();
@@ -156,7 +164,7 @@ export async function GET() {
     lat: typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat)),
     lng: typeof row.lng === 'number' ? row.lng : parseFloat(String(row.lng)),
   }));
-  return NextResponse.json({ items: parsed });
+  return NextResponse.json({ items: parsed }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: NextRequest) {
@@ -253,6 +261,19 @@ export async function DELETE(request: NextRequest) {
     await runQuery(`delete from ${peopleSites.qualified} where site_id = $1`, [id]);
     await runQuery(`delete from ${sites.qualified} where id = $1`, [id]);
   } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      try {
+        const sites = await getSitesTarget();
+        await runQuery(`update ${sites.qualified} set is_active = false where id = $1`, [id]);
+      } catch (updateError) {
+        return NextResponse.json({ error: 'SOFT_DELETE_FAILED', details: formatDbError(updateError) }, { status: 500 });
+      }
+      return NextResponse.json({
+        ok: true,
+        soft_deleted: true,
+        message: 'No fue posible eliminar porque existe historial asociado. El sitio quedó desactivado.',
+      });
+    }
     return NextResponse.json({ error: 'DELETE_FAILED', details: formatDbError(error) }, { status: 500 });
   }
 
