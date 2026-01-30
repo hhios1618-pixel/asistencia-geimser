@@ -23,6 +23,8 @@ type ImportResult = {
   warnings: string[];
 };
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(value.trim());
+
 const randomPassword = () => {
   const raw = crypto.randomUUID().replace(/-/g, '');
   return `${raw.slice(0, 10)}Aa1`;
@@ -504,14 +506,17 @@ export async function POST(request: NextRequest) {
         }
 
         for (const row of items) {
-          const email =
-            (row.correo_corporativo ?? '').trim().toLowerCase() ||
-            (row.correo_gmail_corporativo ?? '').trim().toLowerCase() ||
-            (row.correo_personal ?? '').trim().toLowerCase() ||
-            '';
-          if (!email) continue;
+          const corporate = (row.correo_corporativo ?? '').trim().toLowerCase();
+          const gmailCorp = (row.correo_gmail_corporativo ?? '').trim().toLowerCase();
+          const personal = (row.correo_personal ?? '').trim().toLowerCase();
+          const email = [corporate, gmailCorp, personal].find((e) => e && isValidEmail(e)) ?? '';
 
           const fullName = (row.nombre_completo ?? '').trim();
+          if (!email) {
+            warnings.push(`Sin correo válido para ${fullName || row.rut_full} (${row.rut_full}).`);
+            continue;
+          }
+
           const roleForAuth = adminNames.has(fullName.toLowerCase())
             ? 'ADMIN'
             : supervisorNames.has(fullName.toLowerCase())

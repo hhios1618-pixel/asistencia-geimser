@@ -98,19 +98,58 @@ export const parseCollaboratorsTsv = (tsv: string): CollaboratorSheetRow[] => {
   const lines = normalized.split('\n').filter((line) => line.trim().length > 0);
   if (lines.length < 2) return [];
 
-  const headerCells = lines[0].split('\t').map((c) => c.trim());
   const expected = COLLABORATORS_SHEET_HEADERS;
+  const expectedNorm = expected.map((h) => normalizeHeader(h));
+  const expectedNormSet = new Set(expectedNorm);
 
-  // Accept either exact template header or a data-only paste (without header).
-  const hasHeader =
-    headerCells.length >= expected.length &&
-    expected.every((h, idx) => normalizeHeader(headerCells[idx]) === normalizeHeader(h));
-  const dataLines = hasHeader ? lines.slice(1) : lines;
+  // Files often include title rows or leading notes. Find the most likely header row in first N lines.
+  const scanN = Math.min(12, lines.length);
+  let headerIndex: number | null = null;
+  let bestScore = 0;
+  for (let i = 0; i < scanN; i += 1) {
+    const cells = lines[i]!.split('\t').map((c) => c.trim());
+    const norms = cells.map((c) => normalizeHeader(c));
+    const score = norms.filter((n) => expectedNormSet.has(n)).length;
+    const hasRut = norms.includes(normalizeHeader(expected[0]));
+    const hasNombre = norms.includes(normalizeHeader('NombreCompleto'));
+    if (hasRut && hasNombre && score > bestScore) {
+      bestScore = score;
+      headerIndex = i;
+    }
+  }
+
+  // If we didn't find a strong header row, we still allow headerless imports.
+  const hasHeader = headerIndex != null && bestScore >= 6;
+  const headerCells = hasHeader ? lines[headerIndex!]!.split('\t').map((c) => c.trim()) : [];
+
+  // Build a best-effort mapping expectedIndex -> actualIndex using header names (tolerates reordering / extra cols).
+  const headerMap = new Map<number, number>();
+  if (hasHeader) {
+    const headerNorms = headerCells.map((c) => normalizeHeader(c));
+    let cursor = 0;
+    for (let expectedIdx = 0; expectedIdx < expectedNorm.length; expectedIdx += 1) {
+      const want = expectedNorm[expectedIdx]!;
+      let found = -1;
+      for (let j = cursor; j < headerNorms.length; j += 1) {
+        if (headerNorms[j] === want) {
+          found = j;
+          break;
+        }
+      }
+      if (found >= 0) {
+        headerMap.set(expectedIdx, found);
+        cursor = found + 1;
+      }
+    }
+  }
+
+  const dataLines = hasHeader ? lines.slice(headerIndex! + 1) : lines;
 
   const rows: CollaboratorSheetRow[] = [];
   for (const line of dataLines) {
     const cells = line.split('\t');
-    const rutFull = normalizeCell(cells[0]);
+    const getCell = (idx: number) => cells[headerMap.get(idx) ?? idx];
+    const rutFull = normalizeCell(getCell(0));
     if (rutFull && normalizeHeader(rutFull) === normalizeHeader(expected[0])) {
       // Header-like row slipped in; skip.
       continue;
@@ -119,76 +158,76 @@ export const parseCollaboratorsTsv = (tsv: string): CollaboratorSheetRow[] => {
 
     const row: CollaboratorSheetRow = {
       rut_full: rutFull,
-      rut_base: normalizeCell(cells[1]),
-      rut_dv: normalizeCell(cells[2]),
-      ficha_numero: normalizeCell(cells[3]),
-      nombre_completo: normalizeCell(cells[4]),
-      empresa: normalizeCell(cells[5]),
-      area: normalizeCell(cells[6]),
-      estado: normalizeCell(cells[7]),
-      sub_estado: normalizeCell(cells[8]),
-      fecha_fin_licencia: parseDateToIso(normalizeCell(cells[9])),
-      tipo_contrato: normalizeCell(cells[10]),
-      jornada_laboral: parseIntOrNull(normalizeCell(cells[11])),
-      cliente: normalizeCell(cells[12]),
-      servicio: normalizeCell(cells[13]),
-      campania: normalizeCell(cells[14]),
-      cargo: normalizeCell(cells[15]),
-      supervisor: normalizeCell(cells[16]),
-      coordinador: normalizeCell(cells[17]),
-      sub_gerente: normalizeCell(cells[18]),
-      genero: normalizeCell(cells[19]),
-      fecha_nacimiento: parseDateToIso(normalizeCell(cells[20])),
-      estado_civil: normalizeCell(cells[21]),
-      nacionalidad: normalizeCell(cells[22]),
-      correo_personal: normalizeCell(cells[23]),
-      telefono_celular: normalizeCell(cells[24]),
-      telefono_fijo: normalizeCell(cells[25]),
-      direccion: normalizeCell(cells[26]),
-      comuna: normalizeCell(cells[27]),
-      ciudad: normalizeCell(cells[28]),
-      nivel_educacional: normalizeCell(cells[29]),
-      especialidad: normalizeCell(cells[30]),
-      contacto_emergencia: normalizeCell(cells[31]),
-      parentesco_emergencia: normalizeCell(cells[32]),
-      telefono_emergencia: normalizeCell(cells[33]),
-      alergias: normalizeCell(cells[34]),
-      fecha_alta: parseDateToIso(normalizeCell(cells[35])),
-      fecha_baja: parseDateToIso(normalizeCell(cells[36])),
-      antiguedad_dias: parseIntOrNull(normalizeCell(cells[37])),
-      motivo_baja: normalizeCell(cells[38]),
-      tipo_remuneracion: normalizeCell(cells[39]),
-      centro_costo_id: normalizeCell(cells[40]),
-      centro_costo_descripcion: normalizeCell(cells[41]),
-      rol: normalizeCell(cells[42]),
-      banco_transferencia: normalizeCell(cells[43]),
-      tipo_cuenta_transferencia: normalizeCell(cells[44]),
-      numero_cuenta: normalizeCell(cells[45]),
-      cargas_familiares: parseIntOrNull(normalizeCell(cells[46])),
-      salud: normalizeCell(cells[47]),
-      afp: normalizeCell(cells[48]),
-      fecha_contrato: parseDateToIso(normalizeCell(cells[49])),
-      termino_contrato: parseDateToIso(normalizeCell(cells[50])),
-      registro_contrato_dt: parseDateToIso(normalizeCell(cells[51])),
-      renovacion1_contrato: parseDateToIso(normalizeCell(cells[52])),
-      termino_renovacion1_contrato: parseDateToIso(normalizeCell(cells[53])),
-      renovacion_indefinido: normalizeCell(cells[54]),
-      sueldo_bruto: parseMoneyOrNull(normalizeCell(cells[55])),
-      gratificacion: parsePercentOrNull(normalizeCell(cells[56])),
-      movilizacion: parseMoneyOrNull(normalizeCell(cells[57])),
-      colacion: parseMoneyOrNull(normalizeCell(cells[58])),
-      anexo_confidencialidad: parseDateToIso(normalizeCell(cells[59])),
-      anexo_horario: parseDateToIso(normalizeCell(cells[60])),
-      anexo_cambio_renta: parseDateToIso(normalizeCell(cells[61])),
-      pacto_hhee: parseDateToIso(normalizeCell(cells[62])),
-      sindicato: normalizeCell(cells[63]),
-      demanda: normalizeCell(cells[64]),
-      notebook: normalizeCell(cells[65]),
-      llaves_oficina_cerr_superior: normalizeCell(cells[66]),
-      llaves_oficina_cerr_inferior: normalizeCell(cells[67]),
-      correo_corporativo: normalizeCell(cells[68]),
-      correo_gmail_corporativo: normalizeCell(cells[69]),
-      correo_cliente: normalizeCell(cells[70]),
+      rut_base: normalizeCell(getCell(1)),
+      rut_dv: normalizeCell(getCell(2)),
+      ficha_numero: normalizeCell(getCell(3)),
+      nombre_completo: normalizeCell(getCell(4)),
+      empresa: normalizeCell(getCell(5)),
+      area: normalizeCell(getCell(6)),
+      estado: normalizeCell(getCell(7)),
+      sub_estado: normalizeCell(getCell(8)),
+      fecha_fin_licencia: parseDateToIso(normalizeCell(getCell(9))),
+      tipo_contrato: normalizeCell(getCell(10)),
+      jornada_laboral: parseIntOrNull(normalizeCell(getCell(11))),
+      cliente: normalizeCell(getCell(12)),
+      servicio: normalizeCell(getCell(13)),
+      campania: normalizeCell(getCell(14)),
+      cargo: normalizeCell(getCell(15)),
+      supervisor: normalizeCell(getCell(16)),
+      coordinador: normalizeCell(getCell(17)),
+      sub_gerente: normalizeCell(getCell(18)),
+      genero: normalizeCell(getCell(19)),
+      fecha_nacimiento: parseDateToIso(normalizeCell(getCell(20))),
+      estado_civil: normalizeCell(getCell(21)),
+      nacionalidad: normalizeCell(getCell(22)),
+      correo_personal: normalizeCell(getCell(23)),
+      telefono_celular: normalizeCell(getCell(24)),
+      telefono_fijo: normalizeCell(getCell(25)),
+      direccion: normalizeCell(getCell(26)),
+      comuna: normalizeCell(getCell(27)),
+      ciudad: normalizeCell(getCell(28)),
+      nivel_educacional: normalizeCell(getCell(29)),
+      especialidad: normalizeCell(getCell(30)),
+      contacto_emergencia: normalizeCell(getCell(31)),
+      parentesco_emergencia: normalizeCell(getCell(32)),
+      telefono_emergencia: normalizeCell(getCell(33)),
+      alergias: normalizeCell(getCell(34)),
+      fecha_alta: parseDateToIso(normalizeCell(getCell(35))),
+      fecha_baja: parseDateToIso(normalizeCell(getCell(36))),
+      antiguedad_dias: parseIntOrNull(normalizeCell(getCell(37))),
+      motivo_baja: normalizeCell(getCell(38)),
+      tipo_remuneracion: normalizeCell(getCell(39)),
+      centro_costo_id: normalizeCell(getCell(40)),
+      centro_costo_descripcion: normalizeCell(getCell(41)),
+      rol: normalizeCell(getCell(42)),
+      banco_transferencia: normalizeCell(getCell(43)),
+      tipo_cuenta_transferencia: normalizeCell(getCell(44)),
+      numero_cuenta: normalizeCell(getCell(45)),
+      cargas_familiares: parseIntOrNull(normalizeCell(getCell(46))),
+      salud: normalizeCell(getCell(47)),
+      afp: normalizeCell(getCell(48)),
+      fecha_contrato: parseDateToIso(normalizeCell(getCell(49))),
+      termino_contrato: parseDateToIso(normalizeCell(getCell(50))),
+      registro_contrato_dt: parseDateToIso(normalizeCell(getCell(51))),
+      renovacion1_contrato: parseDateToIso(normalizeCell(getCell(52))),
+      termino_renovacion1_contrato: parseDateToIso(normalizeCell(getCell(53))),
+      renovacion_indefinido: normalizeCell(getCell(54)),
+      sueldo_bruto: parseMoneyOrNull(normalizeCell(getCell(55))),
+      gratificacion: parsePercentOrNull(normalizeCell(getCell(56))),
+      movilizacion: parseMoneyOrNull(normalizeCell(getCell(57))),
+      colacion: parseMoneyOrNull(normalizeCell(getCell(58))),
+      anexo_confidencialidad: parseDateToIso(normalizeCell(getCell(59))),
+      anexo_horario: parseDateToIso(normalizeCell(getCell(60))),
+      anexo_cambio_renta: parseDateToIso(normalizeCell(getCell(61))),
+      pacto_hhee: parseDateToIso(normalizeCell(getCell(62))),
+      sindicato: normalizeCell(getCell(63)),
+      demanda: normalizeCell(getCell(64)),
+      notebook: normalizeCell(getCell(65)),
+      llaves_oficina_cerr_superior: normalizeCell(getCell(66)),
+      llaves_oficina_cerr_inferior: normalizeCell(getCell(67)),
+      correo_corporativo: normalizeCell(getCell(68)),
+      correo_gmail_corporativo: normalizeCell(getCell(69)),
+      correo_cliente: normalizeCell(getCell(70)),
     };
 
     rows.push(row);
