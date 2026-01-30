@@ -66,7 +66,10 @@ const parseIntOrNull = (raw: string | null): number | null => {
   const digits = raw.replace(/[^\d-]/g, '');
   if (!digits) return null;
   const n = Number.parseInt(digits, 10);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) return null;
+  // Postgres `integer` is 32-bit signed
+  if (n > 2147483647 || n < -2147483648) return null;
+  return n;
 };
 
 const parseMoneyOrNull = (raw: string | null): number | null => {
