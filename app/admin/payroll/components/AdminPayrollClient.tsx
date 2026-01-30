@@ -36,7 +36,7 @@ export default function AdminPayrollClient() {
   const activeMeta = useMemo(() => {
     switch (activeTab) {
       case 'salary':
-        return { label: 'Registros salariales', description: 'Sueldo base por persona (fuente para la nómina).' };
+        return { label: 'Remuneraciones', description: 'Fuente: planilla RR.HH. (sueldo, centro de costo y datos bancarios).' };
       case 'periods':
         return { label: 'Calendario de pagos', description: 'Períodos, rangos y estado de pago.' };
       case 'runs':

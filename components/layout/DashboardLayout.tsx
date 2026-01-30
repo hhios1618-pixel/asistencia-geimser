@@ -69,12 +69,13 @@ export const ADMIN_NAV: NavItem[] = [
       { label: 'Onboarding/Offboarding', href: '/admin/rrhh?panel=onboarding' },
     ],
   },
+  { label: 'Planilla RR.HH.', href: '/admin/colaboradores', icon: IconClipboardText },
   {
     label: 'Nómina',
     href: '/admin/payroll?panel=runs',
     icon: IconCashBanknote,
     subItems: [
-      { label: 'Registros salariales', href: '/admin/payroll?panel=salary' },
+      { label: 'Remuneraciones', href: '/admin/payroll?panel=salary' },
       { label: 'Calendario de pagos', href: '/admin/payroll?panel=periods' },
       { label: 'Bonos y comisiones', href: '/admin/payroll?panel=variables' },
       { label: 'Reportes', href: '/admin/payroll?panel=reports' },
