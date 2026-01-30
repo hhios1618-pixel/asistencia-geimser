@@ -61,6 +61,7 @@ export const ADMIN_NAV: NavItem[] = [
     icon: IconBuilding,
     subItems: [
       { label: 'Colaboradores', href: '/admin/rrhh?panel=employees' },
+      { label: 'Planilla', href: '/admin/colaboradores' },
       { label: 'Usuarios', href: '/admin/usuarios' },
       { label: 'Roles y permisos', href: '/admin/rrhh?panel=roles' },
       { label: 'Gestión de ausencias', href: '/admin/rrhh?panel=absences' },
