@@ -36,6 +36,7 @@ const SHIFT_PRESETS: ShiftPreset[] = [
   { id: 'shift-6', label: 'Turno 6', description: 'L–S · 09:00 – 17:30 · Sáb 09:00 – 15:00', days: [...[1, 2, 3, 4, 5].map((day) => ({ dayOfWeek: day, start: '09:00', end: '17:30', breakMinutes: DEFAULT_BREAK_MINUTES })), { dayOfWeek: 6, start: '09:00', end: '15:00', breakMinutes: DEFAULT_BREAK_MINUTES }] },
   { id: 'shift-7', label: 'Turno 7', description: 'L–V · 09:00 – 18:00 · Sáb 09:30 – 13:30', days: [...[1, 2, 3, 4, 5].map((day) => ({ dayOfWeek: day, start: '09:00', end: '18:00', breakMinutes: 90 })), { dayOfWeek: 6, start: '09:30', end: '13:30', breakMinutes: 15 }] },
   { id: 'shift-8', label: 'Turno 8', description: 'L–J · 09:00 – 19:00 · V 09:00 – 18:00', days: [...[1, 2, 3, 4].map((day) => ({ dayOfWeek: day, start: '09:00', end: '19:00', breakMinutes: 90 })), { dayOfWeek: 5, start: '09:00', end: '18:00', breakMinutes: 90 }] },
+  { id: 'shift-9', label: 'Turno 9', description: 'L–J · 08:30 – 18:00 · V 08:30 – 14:30', days: [...[1, 2, 3, 4].map((day) => ({ dayOfWeek: day, start: '08:30', end: '18:00', breakMinutes: 60 })), { dayOfWeek: 5, start: '08:30', end: '14:30', breakMinutes: 0 }] },
 ];
 
 const normalizeTime = (value: string) => value.slice(0, 5);
