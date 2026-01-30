@@ -5,6 +5,27 @@ let ensured = false;
 export const ensureHrCollaboratorsSheetTable = async () => {
   if (ensured) return;
 
+  const forceTextColumns = async (columns: string[]) => {
+    for (const column of columns) {
+      const { rows } = await runQuery<{ data_type: string }>(
+        `select data_type
+         from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'hr_collaborators_sheet'
+           and column_name = $1
+         limit 1`,
+        [column]
+      );
+      const type = rows[0]?.data_type ?? null;
+      if (type && type !== 'text') {
+        await runQuery(
+          `alter table public.hr_collaborators_sheet
+           alter column ${column} type text using ${column}::text`
+        );
+      }
+    }
+  };
+
   await runQuery(`
     create table if not exists public.hr_collaborators_sheet (
       rut_full text primary key,
@@ -87,6 +108,10 @@ export const ensureHrCollaboratorsSheetTable = async () => {
       add column if not exists correo_cliente text;
   `);
 
+  // Some real-world sheets include values (e.g. account numbers) that exceed 32-bit integer range.
+  // If these columns were created earlier as integer/bigint, force them back to text.
+  await forceTextColumns(['numero_cuenta', 'centro_costo_id']);
+
   await runQuery('create index if not exists idx_hr_collaborators_sheet_estado on public.hr_collaborators_sheet(estado);');
   await runQuery('create index if not exists idx_hr_collaborators_sheet_area on public.hr_collaborators_sheet(area);');
   await runQuery('create index if not exists idx_hr_collaborators_sheet_cliente on public.hr_collaborators_sheet(cliente);');
@@ -96,4 +121,3 @@ export const ensureHrCollaboratorsSheetTable = async () => {
 
   ensured = true;
 };
-
