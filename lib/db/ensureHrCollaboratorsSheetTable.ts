@@ -1,10 +1,6 @@
 import { runQuery } from './postgres';
 
-let ensured = false;
-
 export const ensureHrCollaboratorsSheetTable = async () => {
-  if (ensured) return;
-
   const forceTextColumns = async (columns: string[]) => {
     for (const column of columns) {
       const { rows } = await runQuery<{ data_type: string }>(
@@ -118,6 +114,4 @@ export const ensureHrCollaboratorsSheetTable = async () => {
   await runQuery(
     'create index if not exists idx_hr_collaborators_sheet_termino_contrato on public.hr_collaborators_sheet(termino_contrato);'
   );
-
-  ensured = true;
 };
