@@ -19,6 +19,7 @@ type BulkResult = { total: number; imported?: number; errors?: Array<{ index: nu
 type AiShift = { person_id: string; day_of_week: number; start: string; end: string; break_minutes?: number; notes?: string; };
 type AiPlan = { period?: string; shifts: AiShift[]; warnings?: string[]; coverage?: { utilization?: string; service_level?: string }; };
 type AiFormState = { period: string; industry: string; industryPreset: string; service: string; demand: string; rules: string; requiredPeople: string; maxWeeklyHours: string; minRestHours: string; allowWeekends: boolean; allowNight: boolean; extraPrompt: string; };
+type ScheduleScope = 'week' | 'template';
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6];
 const LEGAL_WEEKLY_MINUTES = 44 * 60;
@@ -91,6 +92,7 @@ export function TurnosAdmin() {
   const [selectedShiftId, setSelectedShiftId] = useState(SHIFT_PRESETS[0].id);
   const [customShiftActive, setCustomShiftActive] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [scheduleScope, setScheduleScope] = useState<ScheduleScope>('week');
   const [scheduleMap, setScheduleMap] = useState<Record<number, ScheduleEntry>>({});
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
@@ -129,6 +131,7 @@ export function TurnosAdmin() {
 
   // Placeholder for logic re-insertion
   const selectedPreset = useMemo(() => SHIFT_PRESETS.find((p) => p.id === selectedShiftId), [selectedShiftId]);
+  const selectedWeekStartISO = useMemo(() => format(currentWeekStart, 'yyyy-MM-dd'), [currentWeekStart]);
   const weekDays: WeekDayView[] = useMemo(() => WEEKDAY_ORDER.map((day, index) => {
     const date = addDays(currentWeekStart, index);
     const dateKey = format(date, 'yyyy-MM-dd');
@@ -171,13 +174,20 @@ export function TurnosAdmin() {
   const loadSchedules = useCallback(async (pid: string) => {
     setLoadingSchedules(true);
     try {
-      const res = await fetch(`/api/admin/attendance/schedules?personId=${pid}`);
+      const params = new URLSearchParams({ personId: pid });
+      if (scheduleScope === 'template') {
+        params.set('scope', 'template');
+      } else {
+        params.set('scope', 'week');
+        params.set('weekStart', selectedWeekStartISO);
+      }
+      const res = await fetch(`/api/admin/attendance/schedules?${params.toString()}`);
       const body = await res.json();
       const map: Record<number, ScheduleEntry> = {};
       body.items.forEach((e: ScheduleEntry) => map[e.day_of_week] = e);
       setScheduleMap(map);
     } catch (e) { setScheduleMap({}); } finally { setLoadingSchedules(false); }
-  }, []);
+  }, [scheduleScope, selectedWeekStartISO]);
 
   useEffect(() => { void fetchPeople(); }, [fetchPeople]);
   useEffect(() => { if (selectedPersonId) void loadSchedules(selectedPersonId); else setScheduleMap({}); }, [selectedPersonId, loadSchedules]);
@@ -229,9 +239,11 @@ export function TurnosAdmin() {
     try {
       const existing = { ...scheduleMap };
       const ops: Promise<Response>[] = [];
+      const weekStart = scheduleScope === 'week' ? selectedWeekStartISO : null;
       weekDays.forEach(d => {
         const payload = {
           person_id: selectedPersonId,
+          week_start: weekStart,
           day_of_week: d.dayOfWeek,
           start_time: normalizeTime(d.start),
           end_time: normalizeTime(d.end),
@@ -324,8 +336,14 @@ export function TurnosAdmin() {
                   <IconChevronLeft size={18} />
                 </button>
                 <div className="flex flex-col items-center px-4 w-40">
-                  <span className="text-xs font-semibold text-slate-300">Semana del</span>
-                  <span className="text-xs text-slate-500">{format(currentWeekStart, 'dd MMM', { locale: es })}</span>
+                  <span className="text-xs font-semibold text-slate-300">
+                    {scheduleScope === 'week' ? 'Semana del' : 'Plantilla'}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {scheduleScope === 'week'
+                      ? format(currentWeekStart, 'dd MMM', { locale: es })
+                      : 'Todas las semanas'}
+                  </span>
                 </div>
                 <button onClick={() => handleWeekChange('next')} className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition">
                   <IconChevronRight size={18} />
@@ -333,6 +351,29 @@ export function TurnosAdmin() {
               </div>
 
               <div className="h-8 w-px bg-white/10 mx-2 hidden md:block" />
+
+              <div className="flex items-center gap-2 rounded-lg bg-white/5 p-1 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setScheduleScope('week')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${scheduleScope === 'week'
+                    ? 'bg-blue-500/15 text-blue-300'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    }`}
+                >
+                  Semana
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleScope('template')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${scheduleScope === 'template'
+                    ? 'bg-blue-500/15 text-blue-300'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    }`}
+                >
+                  Plantilla
+                </button>
+              </div>
 
               <div className="relative">
                 <select

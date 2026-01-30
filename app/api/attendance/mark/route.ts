@@ -8,6 +8,7 @@ import { computeHash } from '../../../../lib/dt/hashchain';
 import { generateAndStoreReceipt } from '../../../../lib/dt/receipts';
 import { evaluateAlerts, buildAlertRecords } from '../../../../lib/alerts/rules';
 import { writeAuditTrail } from '../../../../lib/audit/log';
+import { getEffectiveScheduleForDate } from '../../../../lib/attendance/schedules';
 import type { Tables, TableInsert } from '../../../../types/database';
 
 export const runtime = 'nodejs';
@@ -252,21 +253,17 @@ export async function POST(request: NextRequest) {
       }).catch(() => undefined);
     }
 
-    const { data: schedule, error: scheduleError } = await serviceSupabase
-      .from('schedules')
-      .select('*')
-      .eq('person_id', person.id)
-      .eq('day_of_week', new Date(eventTs).getDay())
-      .maybeSingle();
-
-    if (scheduleError && scheduleError.code !== 'PGRST116') {
+    let schedule: Tables['schedules']['Row'] | null = null;
+    try {
+      schedule = await getEffectiveScheduleForDate(person.id, new Date(eventTs));
+    } catch (scheduleError) {
       await writeAuditTrail(serviceSupabase, {
         actorId: person.id,
         action: 'attendance.alerts.schedule_lookup_failed',
         entity: 'schedules',
         entityId: person.id,
         before: null,
-        after: { error: scheduleError.message },
+        after: { error: (scheduleError as Error).message },
       }).catch(() => undefined);
     }
 

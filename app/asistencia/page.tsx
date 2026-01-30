@@ -9,6 +9,7 @@ import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColumn';
 import { getUserDisplayName } from '../../lib/auth/displayName';
+import { getEffectiveScheduleForDate } from '../../lib/attendance/schedules';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,13 +122,7 @@ export default async function AsistenciaPage() {
     sites = siteRows;
   }
 
-  const today = new Date();
-  const { data: schedule } = await serviceSupabase
-    .from('schedules')
-    .select('*')
-    .eq('person_id', user.id as string)
-    .eq('day_of_week', today.getDay())
-    .maybeSingle<Tables['schedules']['Row']>();
+  const schedule = await getEffectiveScheduleForDate(user.id as string, new Date());
 
   let birthdaysThisMonth: Array<{ name: string; service: string | null; birth_date: string }> = [];
   try {

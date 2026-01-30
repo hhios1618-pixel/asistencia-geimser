@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { createRouteSupabaseClient } from '../../../../../../lib/supabase/server';
 import { runQuery } from '../../../../../../lib/db/postgres';
+import { ensureSchedulesWeekStart } from '../../../../../../lib/db/ensureSchedulesWeekStart';
 import type { Tables } from '../../../../../../types/database';
 import { resolveUserRole } from '../../../../../../lib/auth/role';
 
@@ -38,6 +39,7 @@ type NormalizedRow = {
   start_time: string;
   end_time: string;
   break_minutes: number;
+  week_start?: string;
   week_label?: string;
 };
 
@@ -53,6 +55,7 @@ const jsonRowSchema = z
     start_time: z.string(),
     end_time: z.string(),
     break_minutes: z.number().int().min(0).default(60),
+    week_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     week_label: z.string().optional(),
   })
   .extend({ index: z.number().optional() });
@@ -122,6 +125,14 @@ const normalizeTime = (value: string) => {
   return null;
 };
 
+const parseWeekStart = (value?: string | null) => {
+  const raw = (value ?? '').trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const match = raw.match(/\d{4}-\d{2}-\d{2}/);
+  return match?.[0] ?? null;
+};
+
 function normalizeRows(rows: RawCsvRow[], defaultWeek?: string) {
   const normalized: NormalizedRow[] = [];
   const errors: Array<{ index: number; error: string }> = [];
@@ -178,6 +189,7 @@ function normalizeRows(rows: RawCsvRow[], defaultWeek?: string) {
       start_time: start,
       end_time: end,
       break_minutes: breakMinutes,
+      week_start: parseWeekStart(lowerRow.week_start ?? lowerRow.semana ?? lowerRow.week_label ?? defaultWeek) ?? undefined,
       week_label: (lowerRow.semana ?? lowerRow.week_label ?? defaultWeek ?? '').trim() || undefined,
     });
   });
@@ -247,7 +259,20 @@ async function insertBatch(
 
   const personIds = Array.from(new Set(resolvedRows.map((row) => row.person_id)));
   if (mode === 'replace') {
-    await runQuery('delete from public.schedules where person_id = any($1::uuid[])', [personIds]);
+    await ensureSchedulesWeekStart();
+    const weekStarts = Array.from(new Set(resolvedRows.map((row) => row.week_start ?? null)));
+    for (const weekStart of weekStarts) {
+      if (weekStart) {
+        await runQuery('delete from public.schedules where person_id = any($1::uuid[]) and week_start = $2::date', [
+          personIds,
+          weekStart,
+        ]);
+      } else {
+        await runQuery('delete from public.schedules where person_id = any($1::uuid[]) and week_start is null', [
+          personIds,
+        ]);
+      }
+    }
   }
 
   const groupId = randomUUID();
@@ -255,9 +280,9 @@ async function insertBatch(
 
   for (const row of resolvedRows) {
     await runQuery(
-      `insert into public.schedules (person_id, group_id, day_of_week, start_time, end_time, break_minutes)
-       values ($1, $2, $3, $4, $5, $6)`,
-      [row.person_id, groupId, row.day_of_week, row.start_time, row.end_time, row.break_minutes]
+      `insert into public.schedules (person_id, group_id, week_start, day_of_week, start_time, end_time, break_minutes)
+       values ($1, $2, $3::date, $4, $5, $6, $7)`,
+      [row.person_id, groupId, row.week_start ?? null, row.day_of_week, row.start_time, row.end_time, row.break_minutes]
     );
     imported += 1;
   }
@@ -297,6 +322,7 @@ async function handleJsonBody(body: unknown) {
       start_time: start,
       end_time: end,
       break_minutes: row.break_minutes ?? 60,
+      week_start: parseWeekStart(row.week_start ?? week_label) ?? undefined,
       week_label,
     });
   });
@@ -312,6 +338,8 @@ export async function POST(request: NextRequest) {
   if (!role) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
+
+  await ensureSchedulesWeekStart();
 
   let normalized: NormalizedRow[] = [];
   let mode: BulkMode = 'replace';

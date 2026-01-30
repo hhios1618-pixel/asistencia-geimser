@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRouteSupabaseClient } from '../../../../../lib/supabase/server';
 import { runQuery } from '../../../../../lib/db/postgres';
+import { ensureSchedulesWeekStart } from '../../../../../lib/db/ensureSchedulesWeekStart';
 import type { Tables } from '../../../../../types/database';
 import { resolveUserRole } from '../../../../../lib/auth/role';
 
 const scheduleSchema = z.object({
   person_id: z.string().uuid().optional(),
   group_id: z.string().uuid().optional(),
+  week_start: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
   day_of_week: z.number().int().min(0).max(6),
   start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
@@ -42,17 +48,53 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
+  await ensureSchedulesWeekStart();
+
   const personId = request.nextUrl.searchParams.get('personId');
+  const weekStart = request.nextUrl.searchParams.get('weekStart');
+  const scope = request.nextUrl.searchParams.get('scope') ?? 'all';
+
+  if (scope === 'effective') {
+    if (!personId || !weekStart) {
+      return NextResponse.json({ error: 'WEEK_AND_PERSON_REQUIRED' }, { status: 400 });
+    }
+    const { rows } = await runQuery<Tables['schedules']['Row'] & { week_start?: string | null }>(
+      `select distinct on (day_of_week) *
+       from public.schedules
+       where person_id = $1
+         and (week_start = $2::date or week_start is null)
+       order by day_of_week, (week_start is null) asc, start_time asc`,
+      [personId, weekStart]
+    );
+    return NextResponse.json({ items: rows });
+  }
 
   const filters: string[] = [];
   const params: unknown[] = [];
+  let paramIndex = 1;
+
   if (personId) {
-    filters.push('person_id = $1');
+    filters.push(`person_id = $${paramIndex++}`);
     params.push(personId);
   }
+
+  if (scope === 'template') {
+    filters.push('week_start is null');
+  } else if (scope === 'week') {
+    if (!weekStart) {
+      return NextResponse.json({ error: 'WEEK_REQUIRED' }, { status: 400 });
+    }
+    filters.push(`week_start = $${paramIndex++}::date`);
+    params.push(weekStart);
+  } else if (weekStart) {
+    // Backwards-compatible: if weekStart is provided without scope, return only that week's overrides.
+    filters.push(`week_start = $${paramIndex++}::date`);
+    params.push(weekStart);
+  }
+
   const whereClause = filters.length > 0 ? ` where ${filters.join(' and ')}` : '';
-  const { rows } = await runQuery<Tables['schedules']['Row']>(
-    `select * from public.schedules${whereClause} order by day_of_week, start_time`,
+  const { rows } = await runQuery<Tables['schedules']['Row'] & { week_start?: string | null }>(
+    `select * from public.schedules${whereClause} order by week_start nulls first, day_of_week, start_time`,
     params
   );
 
@@ -65,6 +107,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
+  await ensureSchedulesWeekStart();
+
   let payload: z.infer<typeof scheduleSchema>;
   try {
     payload = scheduleSchema.parse(await request.json());
@@ -73,12 +117,13 @@ export async function POST(request: NextRequest) {
   }
 
   const { rows } = await runQuery<Tables['schedules']['Row']>(
-    `insert into public.schedules (person_id, group_id, day_of_week, start_time, end_time, break_minutes)
-     values ($1, $2, $3, $4, $5, $6)
+    `insert into public.schedules (person_id, group_id, week_start, day_of_week, start_time, end_time, break_minutes)
+     values ($1, $2, $3::date, $4, $5, $6, $7)
      returning *`,
     [
       payload.person_id ?? null,
       payload.group_id ?? null,
+      payload.week_start ?? null,
       payload.day_of_week,
       payload.start_time,
       payload.end_time,
@@ -94,6 +139,8 @@ export async function PATCH(request: NextRequest) {
   if (!role) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
+
+  await ensureSchedulesWeekStart();
 
   let payload: z.infer<typeof updateSchema>;
   try {
@@ -133,6 +180,8 @@ export async function DELETE(request: NextRequest) {
   if (!role) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
+
+  await ensureSchedulesWeekStart();
 
   const id = request.nextUrl.searchParams.get('id');
   if (!id) {

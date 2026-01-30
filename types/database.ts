@@ -122,6 +122,7 @@ export interface Database {
           id: string;
           person_id: string | null;
           group_id: string | null;
+          week_start: string | null;
           day_of_week: number;
           start_time: string;
           end_time: string;
@@ -132,6 +133,7 @@ export interface Database {
           id?: string;
           person_id?: string | null;
           group_id?: string | null;
+          week_start?: string | null;
           day_of_week: number;
           start_time: string;
           end_time: string;
@@ -141,6 +143,7 @@ export interface Database {
         Update: {
           person_id?: string | null;
           group_id?: string | null;
+          week_start?: string | null;
           day_of_week?: number;
           start_time?: string;
           end_time?: string;

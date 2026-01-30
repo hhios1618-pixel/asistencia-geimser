@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import DashboardLayout, { WORKER_NAV } from '../../../components/layout/DashboardLayout';
 import { createServerSupabaseClient } from '../../../lib/supabase/server';
-import type { Tables } from '../../../types/database';
+import { getEffectiveWeeklySchedules, toWeekStartISO } from '../../../lib/attendance/schedules';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,12 +17,8 @@ export default async function WorkerSchedulePage() {
     redirect('/login');
   }
 
-  const { data: schedules } = await supabase
-    .from('schedules')
-    .select('*')
-    .eq('person_id', user.id as string)
-    .order('day_of_week', { ascending: true })
-    .returns<Tables['schedules']['Row'][]>();
+  const weekStartISO = toWeekStartISO(new Date());
+  const schedules = await getEffectiveWeeklySchedules(user.id as string, weekStartISO);
 
   return (
     <DashboardLayout
@@ -34,6 +30,7 @@ export default async function WorkerSchedulePage() {
       <section className="glass-panel rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_32px_90px_-60px_rgba(0,0,0,0.55)]">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Semana</p>
         <h2 className="mt-2 text-xl font-semibold text-slate-900">Turnos configurados</h2>
+        <p className="mt-2 text-sm text-slate-500">Semana desde {weekStartISO}.</p>
         <p className="mt-2 text-sm text-slate-500">Si ves inconsistencias, solicita un cambio a tu supervisor.</p>
 
         <div className="mt-6 overflow-auto rounded-3xl border border-slate-100 bg-white/80">
