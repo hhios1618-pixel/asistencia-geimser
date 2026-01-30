@@ -74,7 +74,8 @@ export default function PayrollRunsAdmin() {
       setRuns(runsBody.items ?? []);
 
       if (!selectedPeriodId && (periodsBody.items?.length ?? 0) > 0) {
-        setSelectedPeriodId(periodsBody.items[0].id);
+        const preferred = (periodsBody.items ?? []).find((p) => p.status === 'OPEN') ?? periodsBody.items[0]!;
+        setSelectedPeriodId(preferred.id);
       }
     } catch (err) {
       setError((err as Error).message);

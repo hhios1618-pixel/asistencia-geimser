@@ -491,6 +491,32 @@ export async function POST(request: NextRequest) {
       syncedBusinesses = master.syncedBusinesses;
       syncedPositions = master.syncedPositions;
       warnings.push(...master.warnings);
+
+      // When replacing the sheet, keep master data in sync by deactivating entries
+      // not present in the current import (avoids garbage options in Nómina).
+      if (replaceAll) {
+        const businessLower = businesses.map((b) => b.toLowerCase());
+        const positionLower = positions.map((p) => p.toLowerCase());
+
+        try {
+          if (businessLower.length > 0) {
+            await runQuery(
+              `update public.hr_businesses
+               set is_active = case when lower(name) = any($1::text[]) then true else false end`,
+              [businessLower]
+            );
+          }
+          if (positionLower.length > 0) {
+            await runQuery(
+              `update public.hr_positions
+               set is_active = case when lower(name) = any($1::text[]) then true else false end`,
+              [positionLower]
+            );
+          }
+        } catch {
+          warnings.push('No se pudieron actualizar estados de maestros (hr_businesses/hr_positions).');
+        }
+      }
     }
 
     // Optional: sync users into auth + people + HR columns
