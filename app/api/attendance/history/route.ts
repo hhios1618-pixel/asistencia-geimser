@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/supabase/server';
 import type { PostgrestError } from '@supabase/supabase-js';
 import type { Tables } from '../../../../types/database';
+import { getUserDisplayName } from '../../../../lib/auth/displayName';
 
 const querySchema = z.object({
   from: z.string().datetime({ offset: true }).optional(),
@@ -45,11 +46,7 @@ export async function GET(request: NextRequest) {
     let personProfile = personRow ? { ...personRow, role: personRow.role ?? 'WORKER' } : null;
 
     if (!personProfile) {
-      const fallbackName =
-        (authData.user.user_metadata?.name as string | undefined) ??
-        (authData.user.user_metadata?.full_name as string | undefined) ??
-        authData.user.email?.split('@')[0]?.replace(/\./g, ' ') ??
-        'Colaborador';
+      const fallbackName = getUserDisplayName(authData.user);
       const defaultRole =
         (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'WORKER';
 

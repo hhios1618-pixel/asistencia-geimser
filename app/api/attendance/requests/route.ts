@@ -4,6 +4,7 @@ import { createRouteSupabaseClient, getServiceSupabase } from '../../../../lib/s
 import type { Tables, TableInsert, TableUpdate } from '../../../../types/database';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { ensurePeopleServiceColumn } from '../../../../lib/db/ensurePeopleServiceColumn';
+import { getUserDisplayName } from '../../../../lib/auth/displayName';
 
 const REQUEST_TYPES = ['TIME_OFF', 'SHIFT_CHANGE', 'PERMISSION'] as const;
 const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const;
@@ -35,9 +36,7 @@ const ensurePersonProfile = async (userId: string, email?: string | null) => {
     return personRow;
   }
 
-  const fallbackName =
-    email?.split('@')[0]?.replace(/\./g, ' ') ??
-    'Colaborador';
+  const fallbackName = getUserDisplayName({ email });
   const defaultRole =
     (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'WORKER';
 

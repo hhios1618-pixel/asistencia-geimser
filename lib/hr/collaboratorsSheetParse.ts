@@ -9,6 +9,14 @@ const normalizeCell = (value: string | undefined) => {
   return cleaned.length > 0 ? cleaned : null;
 };
 
+const normalizeHeader = (value: string | undefined) =>
+  (value ?? '')
+    .replace(/\u00a0/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
 const parseDateToIso = (raw: string | null): string | null => {
   if (!raw) return null;
   const value = raw.trim();
@@ -16,20 +24,38 @@ const parseDateToIso = (raw: string | null): string | null => {
   // ISO already
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
-  // M/D/YYYY or D/M/YYYY from exports (we assume M/D/YYYY as in the sample)
-  const parts = value.split('/');
-  if (parts.length === 3) {
-    const [m, d, y] = parts;
-    const month = Number.parseInt(m, 10);
-    const day = Number.parseInt(d, 10);
-    const year = Number.parseInt(y, 10);
-    if (!Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(year)) return null;
+  const parseTriplet = (aRaw: string, bRaw: string, yRaw: string) => {
+    const a = Number.parseInt(aRaw, 10);
+    const b = Number.parseInt(bRaw, 10);
+    const year = Number.parseInt(yRaw, 10);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(year)) return null;
     if (year < 1900 || year > 2200) return null;
+
+    // Heuristic: default to M/D/YYYY, but switch to D/M/YYYY when obvious.
+    const month = a > 12 && b <= 12 ? b : a;
+    const day = a > 12 && b <= 12 ? a : b;
+
     if (month < 1 || month > 12) return null;
     if (day < 1 || day > 31) return null;
     const mm = String(month).padStart(2, '0');
     const dd = String(day).padStart(2, '0');
     return `${year}-${mm}-${dd}`;
+  };
+
+  // M/D/YYYY or D/M/YYYY from exports (Excel/Sheets)
+  const slash = value.split('/');
+  if (slash.length === 3) {
+    const [a, b, y] = slash;
+    const parsed = parseTriplet(a, b, y);
+    if (parsed) return parsed;
+  }
+
+  // D-M-YYYY / M-D-YYYY (some locales)
+  const dash = value.split('-');
+  if (dash.length === 3 && dash[0]?.length <= 2 && dash[1]?.length <= 2 && dash[2]?.length === 4) {
+    const [a, b, y] = dash;
+    const parsed = parseTriplet(a, b, y);
+    if (parsed) return parsed;
   }
 
   return null;
@@ -73,13 +99,19 @@ export const parseCollaboratorsTsv = (tsv: string): CollaboratorSheetRow[] => {
   const expected = COLLABORATORS_SHEET_HEADERS;
 
   // Accept either exact template header or a data-only paste (without header).
-  const hasHeader = headerCells.length >= expected.length && expected.every((h, idx) => headerCells[idx] === h);
+  const hasHeader =
+    headerCells.length >= expected.length &&
+    expected.every((h, idx) => normalizeHeader(headerCells[idx]) === normalizeHeader(h));
   const dataLines = hasHeader ? lines.slice(1) : lines;
 
   const rows: CollaboratorSheetRow[] = [];
   for (const line of dataLines) {
     const cells = line.split('\t');
     const rutFull = normalizeCell(cells[0]);
+    if (rutFull && normalizeHeader(rutFull) === normalizeHeader(expected[0])) {
+      // Header-like row slipped in; skip.
+      continue;
+    }
     if (!rutFull) continue;
 
     const row: CollaboratorSheetRow = {
@@ -161,4 +193,3 @@ export const parseCollaboratorsTsv = (tsv: string): CollaboratorSheetRow[] => {
 
   return rows;
 };
-

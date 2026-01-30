@@ -5,6 +5,7 @@ import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColumn';
 import { getPersonRoleFromDb, resolveUserRole } from '../../lib/auth/role';
+import { getUserDisplayName } from '../../lib/auth/displayName';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,11 +57,7 @@ export default async function LoginPage() {
   }
 
   if (user) {
-    const defaultName =
-      (user.user_metadata?.name as string | undefined) ??
-      (user.user_metadata?.full_name as string | undefined) ??
-      user.email?.split('@')[0]?.replace(/\./g, ' ') ??
-      'Colaborador';
+    const defaultName = getUserDisplayName(user);
     const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
     const resolvedRole = await resolveUserRole(user, defaultRole);
     const existingDbRole = await getPersonRoleFromDb(user.id);

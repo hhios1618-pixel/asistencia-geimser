@@ -8,6 +8,7 @@ import LocationPermissionGuard from './components/LocationPermissionGuard';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../../lib/db/postgres';
 import { ensurePeopleServiceColumn } from '../../lib/db/ensurePeopleServiceColumn';
+import { getUserDisplayName } from '../../lib/auth/displayName';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,12 +46,19 @@ export default async function AsistenciaPage() {
 
   let person = personFromDb;
 
+  const preferredName = getUserDisplayName(user, personFromDb?.name ?? null);
+
+  if (person && (person.name ?? '').includes('@') && preferredName && preferredName !== person.name) {
+    try {
+      await runQuery('update public.people set name = $2 where id = $1', [user.id as string, preferredName]);
+      person = { ...person, name: preferredName };
+    } catch (error) {
+      console.warn('[asistencia] could not upgrade display name', error);
+    }
+  }
+
   if (!person) {
-    const fallbackName =
-      (user.user_metadata?.name as string | undefined) ??
-      (user.user_metadata?.full_name as string | undefined) ??
-      user.email?.split('@')[0]?.replace(/\./g, ' ') ??
-      'Colaborador';
+    const fallbackName = preferredName;
 
     await ensurePeopleServiceColumn();
     await runQuery(

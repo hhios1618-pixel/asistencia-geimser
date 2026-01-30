@@ -12,6 +12,7 @@ import type { Tables } from '../../types/database';
 import { IconUserCheck, IconBuilding, IconCashBanknote, IconBellRinging, IconCake } from '@tabler/icons-react';
 import { runQuery } from '../../lib/db/postgres';
 import { resolveUserRole } from '../../lib/auth/role';
+import { getUserDisplayName } from '../../lib/auth/displayName';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,28 +56,17 @@ export default async function AdminHomePage() {
   const { user } = await authorizeAdmin();
   const overview = await getAdminOverview();
 
-  let displayName: string =
-    (user.user_metadata?.name as string | undefined) ??
-    (user.user_metadata?.full_name as string | undefined) ??
-    '';
-
-  if (!displayName.trim()) {
-    try {
-      const { rows } = await runQuery<{ name: string | null }>('select name from public.people where id = $1', [
-        user.id as string,
-      ]);
-      displayName = rows[0]?.name?.trim() ?? '';
-    } catch (error) {
-      console.warn('[admin] display name fallback failed', error);
-    }
+  let dbName: string | null = null;
+  try {
+    const { rows } = await runQuery<{ name: string | null }>('select name from public.people where id = $1', [
+      user.id as string,
+    ]);
+    dbName = rows[0]?.name?.trim() ?? null;
+  } catch (error) {
+    console.warn('[admin] display name lookup failed', error);
   }
 
-  if (!displayName.trim()) {
-    displayName =
-      user.email?.split('@')[0]?.replace(/\./g, ' ') ??
-      user.email ??
-      'Admin';
-  }
+  const displayName = getUserDisplayName(user, dbName);
 
   const [{ rows: attendanceTodayRows }, { rows: pendingRequestRows }, { rows: payrollRows }, { rows: birthdaysRows }] =
     await Promise.all([

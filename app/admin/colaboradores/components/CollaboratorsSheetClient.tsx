@@ -13,11 +13,11 @@ import {
   IconCalendarEvent,
   IconBuilding,
   IconX,
+  IconFileSpreadsheet,
 } from '@tabler/icons-react';
 import SectionHeader from '../../../../components/ui/SectionHeader';
 import KpiCard from '../../../../components/ui/KpiCard';
 import DataTable, { type Column } from '../../../../components/ui/DataTable';
-import { getTemplateTsv } from '../../../../lib/hr/collaboratorsSheetParse';
 
 type Kpis = {
   total: number;
@@ -55,7 +55,10 @@ export default function CollaboratorsSheetClient() {
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loading, setLoading] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [tsv, setTsv] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [syncUsers, setSyncUsers] = useState(true);
+  const [syncTeams, setSyncTeams] = useState(true);
+  const [syncMasters, setSyncMasters] = useState(true);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -136,14 +139,21 @@ export default function CollaboratorsSheetClient() {
     ];
   }, []);
 
-  const downloadTemplate = () => {
-    const blob = new Blob([getTemplateTsv()], { type: 'text/tab-separated-values;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'planilla_colaboradores_template.tsv';
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadTemplate = async () => {
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/hr/collaborators-sheet/template', { cache: 'no-store' });
+      if (!res.ok) throw new Error('No fue posible descargar la plantilla');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'planilla_colaboradores_template.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
 
   const submitImport = async () => {
@@ -151,16 +161,69 @@ export default function CollaboratorsSheetClient() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch('/api/admin/hr/collaborators-sheet', {
+      if (!file) throw new Error('Debes seleccionar un archivo Excel/CSV/TSV');
+
+      const form = new FormData();
+      form.append('file', file);
+      form.append('sync_users', String(syncUsers));
+      form.append('sync_teams', String(syncTeams));
+      form.append('sync_hr_masters', String(syncMasters));
+
+      const res = await fetch('/api/admin/hr/collaborators-sheet/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tsv }),
+        body: form,
       });
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; imported?: number; error?: string };
-      if (!res.ok) throw new Error(body.error ?? 'No fue posible importar');
-      setSuccess(`Importación completada: ${body.imported ?? 0} filas.`);
+      const body = (await res.json().catch(() => ({}))) as
+        | {
+            ok?: boolean;
+            imported?: number;
+            created_auth_users?: number;
+            updated_auth_users?: number;
+            synced_people?: number;
+            synced_businesses?: number;
+            synced_positions?: number;
+            synced_team_assignments?: number;
+            warnings?: string[];
+            error?: string;
+          }
+        | { error?: string };
+      if (!res.ok) {
+        const raw = (body as { error?: string }).error ?? 'No fue posible importar';
+        const msg =
+          raw === 'NO_ROWS'
+            ? 'No se encontraron filas. Verifica que el archivo tenga datos y una columna RUT.'
+            : raw === 'FILE_REQUIRED'
+              ? 'Debes adjuntar un archivo.'
+              : raw === 'INVALID_FORM'
+                ? 'No fue posible leer el archivo (formulario inválido).'
+                : raw === 'FORBIDDEN'
+                  ? 'No tienes permisos para importar.'
+                  : raw;
+        throw new Error(msg);
+      }
+
+      const okBody = body as {
+        imported?: number;
+        created_auth_users?: number;
+        updated_auth_users?: number;
+        synced_people?: number;
+        synced_businesses?: number;
+        synced_positions?: number;
+        synced_team_assignments?: number;
+        warnings?: string[];
+      };
+      const warnings = okBody.warnings ?? [];
+      const stats = [
+        `Filas: ${okBody.imported ?? 0}`,
+        `Usuarios: +${okBody.created_auth_users ?? 0} / upd ${okBody.updated_auth_users ?? 0}`,
+        `People: ${okBody.synced_people ?? 0}`,
+        `Maestros: emp ${okBody.synced_businesses ?? 0} / cargo ${okBody.synced_positions ?? 0}`,
+        `Equipo: ${okBody.synced_team_assignments ?? 0}`,
+      ].join(' · ');
+
+      setSuccess(`Importación completada. ${stats}${warnings.length ? ` · Advertencias: ${warnings.length}` : ''}`);
       setImportOpen(false);
-      setTsv('');
+      setFile(null);
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -193,7 +256,7 @@ export default function CollaboratorsSheetClient() {
       <SectionHeader
         overline="RR.HH."
         title="Planilla base"
-        description="Pega la planilla (TSV) para cargar colaboradores reales. La información se guarda en el repositorio RR.HH."
+        description="Sube un Excel/CSV/TSV con la planilla de colaboradores. Se identifica por RUT y se cruza con Remuneraciones."
         actions={headerActions}
       />
 
@@ -244,9 +307,9 @@ export default function CollaboratorsSheetClient() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-bold text-white">Importar planilla (TSV)</h3>
+                  <h3 className="text-lg font-bold text-white">Importar planilla</h3>
                   <p className="mt-1 text-sm text-slate-400">
-                    Copia desde Excel/Sheets y pega aquí (tabulado). Se identifican filas por RUT.
+                    Sube un archivo Excel (.xlsx) o CSV/TSV. Se identifican filas por RUT y opcionalmente se sincronizan usuarios y equipos.
                   </p>
                 </div>
                 <button
@@ -258,20 +321,122 @@ export default function CollaboratorsSheetClient() {
                 </button>
               </div>
 
-              <textarea
-                value={tsv}
-                onChange={(e) => setTsv(e.target.value)}
-                placeholder="Pega aquí la planilla completa (incluye encabezados si puedes)."
-                className="mt-4 h-64 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none font-mono"
-              />
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">
+                        <IconFileSpreadsheet size={18} />
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-white">Archivo</span>
+                        <span className="text-xs text-slate-400">.xlsx, .xls, .csv, .tsv</span>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">
+                      Seleccionar
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv,.tsv,text/csv,text/tab-separated-values,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        className="hidden"
+                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 rounded-2xl border border-dashed border-white/15 bg-black/20 p-4">
+                    <p className="text-sm text-slate-300">
+                      {file ? (
+                        <>
+                          <span className="font-semibold text-white">{file.name}</span>
+                          <span className="text-slate-500"> · {Math.ceil(file.size / 1024)} KB</span>
+                        </>
+                      ) : (
+                        'Aún no seleccionas un archivo.'
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Consejo: exporta desde Excel como “Libro de Excel” o “CSV UTF‑8”.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-sm font-semibold text-white">Opciones</p>
+                  <div className="mt-3 space-y-3">
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-slate-200">Sincronizar usuarios</span>
+                        <span className="text-xs text-slate-500">Crea/actualiza Auth + people (requiere Service Role).</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSyncUsers((v) => !v)}
+                        className={`inline-flex h-8 w-14 items-center rounded-full border transition ${
+                          syncUsers ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-white/5 border-white/10'
+                        }`}
+                        aria-pressed={syncUsers}
+                        title={syncUsers ? 'Activo' : 'Inactivo'}
+                      >
+                        <span
+                          className={`ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full transition ${
+                            syncUsers ? 'translate-x-6 bg-emerald-400 text-black' : 'translate-x-0 bg-slate-400 text-black'
+                          }`}
+                        />
+                      </button>
+                    </label>
+
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-slate-200">Asignar supervisores</span>
+                        <span className="text-xs text-slate-500">Crea team_assignments desde columna Supervisor.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSyncTeams((v) => !v)}
+                        className={`inline-flex h-8 w-14 items-center rounded-full border transition ${
+                          syncTeams ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-white/5 border-white/10'
+                        }`}
+                        aria-pressed={syncTeams}
+                        title={syncTeams ? 'Activo' : 'Inactivo'}
+                      >
+                        <span
+                          className={`ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full transition ${
+                            syncTeams ? 'translate-x-6 bg-emerald-400 text-black' : 'translate-x-0 bg-slate-400 text-black'
+                          }`}
+                        />
+                      </button>
+                    </label>
+
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-slate-200">Actualizar maestros</span>
+                        <span className="text-xs text-slate-500">Empresa (hr_businesses) y Cargo (hr_positions).</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSyncMasters((v) => !v)}
+                        className={`inline-flex h-8 w-14 items-center rounded-full border transition ${
+                          syncMasters ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-white/5 border-white/10'
+                        }`}
+                        aria-pressed={syncMasters}
+                        title={syncMasters ? 'Activo' : 'Inactivo'}
+                      >
+                        <span
+                          className={`ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full transition ${
+                            syncMasters ? 'translate-x-6 bg-emerald-400 text-black' : 'translate-x-0 bg-slate-400 text-black'
+                          }`}
+                        />
+                      </button>
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div className="mt-4 flex items-center justify-between gap-3">
-                <button
-                  onClick={() => setTsv(getTemplateTsv())}
-                  className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/15"
-                >
-                  Pegar plantilla
-                </button>
+                <span className="text-xs text-slate-500">
+                  Importa la planilla y luego revisa `Nómina → Remuneraciones` para ver el cruce.
+                </span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setImportOpen(false)}
@@ -281,7 +446,7 @@ export default function CollaboratorsSheetClient() {
                   </button>
                   <button
                     onClick={submitImport}
-                    disabled={importing || tsv.trim().length === 0}
+                    disabled={importing || !file}
                     className="rounded-full bg-blue-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 disabled:opacity-50 transition"
                   >
                     {importing ? 'Importando…' : 'Importar'}
