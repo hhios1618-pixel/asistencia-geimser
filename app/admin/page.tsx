@@ -55,6 +55,29 @@ export default async function AdminHomePage() {
   const { user } = await authorizeAdmin();
   const overview = await getAdminOverview();
 
+  let displayName: string =
+    (user.user_metadata?.name as string | undefined) ??
+    (user.user_metadata?.full_name as string | undefined) ??
+    '';
+
+  if (!displayName.trim()) {
+    try {
+      const { rows } = await runQuery<{ name: string | null }>('select name from public.people where id = $1', [
+        user.id as string,
+      ]);
+      displayName = rows[0]?.name?.trim() ?? '';
+    } catch (error) {
+      console.warn('[admin] display name fallback failed', error);
+    }
+  }
+
+  if (!displayName.trim()) {
+    displayName =
+      user.email?.split('@')[0]?.replace(/\./g, ' ') ??
+      user.email ??
+      'Admin';
+  }
+
   const [{ rows: attendanceTodayRows }, { rows: pendingRequestRows }, { rows: payrollRows }, { rows: birthdaysRows }] =
     await Promise.all([
       runQuery<{ active_checkins: number; in_today: number }>(
@@ -156,7 +179,7 @@ export default async function AdminHomePage() {
     >
       {/* 1. Hero Section (No Cards) */}
       <AdminHero
-        userName={(user.user_metadata?.name as string | undefined) ?? (user.user_metadata?.full_name as string | undefined) ?? user.email ?? 'Admin'}
+        userName={displayName}
         stats={[
           { label: 'Colaboradores', value: overview.totals.active_people, subtext: 'Activos en nómina' },
           { label: 'Sitios', value: overview.totals.total_sites, subtext: 'Operativos hoy' },
