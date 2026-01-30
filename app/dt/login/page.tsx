@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 export default function DtLoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -79,13 +80,25 @@ export default function DtLoginPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700">Contraseña</label>
-                        <input
-                            type="password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="mt-1 block w-full rounded-md border border-slate-300 p-2 focus:border-blue-500 focus:ring-blue-500"
-                        />
+                        <div className="relative mt-1">
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="block w-full rounded-md border border-slate-300 p-2 pr-12 focus:border-blue-500 focus:ring-blue-500"
+                                autoComplete="current-password"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                aria-pressed={showPassword}
+                            >
+                                {showPassword ? 'Ocultar' : 'Ver'}
+                            </button>
+                        </div>
                     </div>
 
                     <button

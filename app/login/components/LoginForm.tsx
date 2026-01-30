@@ -9,6 +9,7 @@ export function LoginForm() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +79,7 @@ export function LoginForm() {
               </svg>
             </span>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="h-12 w-full bg-transparent text-base text-white placeholder:text-slate-500 focus:outline-none"
@@ -86,6 +87,24 @@ export function LoginForm() {
               required
               autoComplete="current-password"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[rgba(124,200,255,0.25)]"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              aria-pressed={showPassword}
+            >
+              {showPassword ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                  <path d="M3.53 2.47a.75.75 0 0 0-1.06 1.06l3.04 3.04C3.38 7.93 1.88 9.86 1.16 11.2a1.5 1.5 0 0 0 0 1.6C2.66 15.61 6.45 20 12 20c1.86 0 3.52-.49 4.97-1.23l3.5 3.5a.75.75 0 1 0 1.06-1.06l-18-18ZM12 18.5c-4.6 0-7.9-3.64-9.33-6.5 0 0 1.54-2.77 4.02-4.48l2.13 2.13a4.5 4.5 0 0 0 6.23 6.23l.93.93c-1.1.48-2.35.69-3.98.69Zm2.61-4.11-1.06-1.06a2.99 2.99 0 0 0-3.88-3.88L8.61 8.39a4.5 4.5 0 0 1 6 6Z" />
+                  <path d="M20.84 12.8a1.5 1.5 0 0 0 0-1.6C19.34 8.39 15.55 4 10 4c-.77 0-1.51.08-2.21.23a.75.75 0 0 0-.23 1.33l2.1 2.1A4.5 4.5 0 0 1 16.34 14.34l1.35 1.35c1.6-1.1 2.72-2.45 3.15-2.89Z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                  <path d="M12 5c5.55 0 9.34 4.39 10.84 7.2a1.5 1.5 0 0 1 0 1.6C21.34 16.61 17.55 21 12 21S2.66 16.61 1.16 13.8a1.5 1.5 0 0 1 0-1.6C2.66 9.39 6.45 5 12 5Zm0 14.5c4.6 0 7.9-3.64 9.33-6.5C19.9 10.14 16.6 6.5 12 6.5S4.1 10.14 2.67 13c1.43 2.86 4.73 6.5 9.33 6.5Zm0-11a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm0 1.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
+                </svg>
+              )}
+            </button>
           </div>
         </label>
       </div>
