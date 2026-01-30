@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSearch, IconChevronDown, IconChevronUp, IconDatabaseOff } from '@tabler/icons-react';
+import { IconSearch, IconChevronDown, IconChevronUp, IconDatabaseOff, IconArrowsHorizontal } from '@tabler/icons-react';
 
 export interface Column<T> {
     header: string;
@@ -29,6 +29,7 @@ interface Props<T> {
     title?: string;
     subtitle?: string;
     actions?: (item: T) => React.ReactNode;
+    actionsAlwaysVisible?: boolean;
     headerActions?: React.ReactNode;
     loading?: boolean;
     emptyMessage?: string;
@@ -43,12 +44,17 @@ export function DataTable<T>({
     title,
     subtitle,
     actions,
+    actionsAlwaysVisible = false,
     headerActions,
     loading = false,
     emptyMessage = 'No se encontraron registros.',
 }: Props<T>) {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: keyof T; direction: 'asc' | 'desc' } | null>(null);
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
+    const [atStart, setAtStart] = useState(true);
+    const [atEnd, setAtEnd] = useState(true);
 
     // Filtering
     const filteredData = useMemo(() => {
@@ -84,6 +90,31 @@ export function DataTable<T>({
             return { key, direction: 'asc' };
         });
     };
+
+    const syncScrollState = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const overflow = el.scrollWidth > el.clientWidth + 2;
+        setHasHorizontalOverflow(overflow);
+        setAtStart(el.scrollLeft <= 1);
+        setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+    };
+
+    useEffect(() => {
+        syncScrollState();
+        const el = scrollRef.current;
+        if (!el) return;
+        const onScroll = () => syncScrollState();
+        el.addEventListener('scroll', onScroll, { passive: true });
+
+        const ro = new ResizeObserver(() => syncScrollState());
+        ro.observe(el);
+        return () => {
+            el.removeEventListener('scroll', onScroll);
+            ro.disconnect();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data, columns.length, loading]);
 
     return (
         <div className="flex flex-col gap-5">
@@ -124,7 +155,11 @@ export function DataTable<T>({
                     </div>
                 )}
 
-                <div className="overflow-x-auto">
+                <div
+                    ref={scrollRef}
+                    className="relative overflow-x-scroll"
+                    style={{ scrollbarGutter: 'stable both-edges' }}
+                >
                     <table className="w-full text-left text-sm">
                         <thead>
                             <tr className="border-b border-white/10 bg-white/5 text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -162,7 +197,11 @@ export function DataTable<T>({
                                         ))}
                                         {actions && (
                                             <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 transition group-hover:opacity-100">
+                                                <div
+                                                    className={`flex items-center justify-end gap-2 transition ${
+                                                        actionsAlwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                                    }`}
+                                                >
                                                     {actions(item)}
                                                 </div>
                                             </td>
@@ -182,6 +221,21 @@ export function DataTable<T>({
                             )}
                         </tbody>
                     </table>
+
+                    {hasHorizontalOverflow && !atStart && (
+                        <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-[#0A0C10] to-transparent" />
+                    )}
+                    {hasHorizontalOverflow && !atEnd && (
+                        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0A0C10] to-transparent" />
+                    )}
+                    {hasHorizontalOverflow && atStart && !loading && (
+                        <div className="pointer-events-none absolute bottom-3 right-4 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-slate-200 backdrop-blur">
+                            <span className="inline-flex items-center gap-2">
+                                <IconArrowsHorizontal size={14} className="text-slate-300" />
+                                Desliza para ver más columnas
+                            </span>
+                        </div>
+                    )}
                 </div>
                 {/* Footer / Pagination could go here */}
                 <div className="border-t border-white/10 bg-white/[0.02] px-6 py-3 text-xs text-slate-500">

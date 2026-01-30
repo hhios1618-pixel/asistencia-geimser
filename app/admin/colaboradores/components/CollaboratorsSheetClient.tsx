@@ -430,6 +430,7 @@ export default function CollaboratorsSheetClient() {
         columns={columns}
         keyExtractor={(row) => String(row.rut_full)}
         loading={loading}
+        actionsAlwaysVisible
         actions={(row) => (
           <div className="flex gap-2">
             <button
