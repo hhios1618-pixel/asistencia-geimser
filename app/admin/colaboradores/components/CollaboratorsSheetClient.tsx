@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   IconUpload,
@@ -48,6 +49,8 @@ type Row = {
 } & Record<string, unknown>;
 
 export default function CollaboratorsSheetClient() {
+  const searchParams = useSearchParams();
+  const rutToOpenRef = useRef<string | null>(null);
   const [items, setItems] = useState<Row[]>([]);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,6 +61,11 @@ export default function CollaboratorsSheetClient() {
   const [success, setSuccess] = useState<string | null>(null);
   const [selected, setSelected] = useState<Row | null>(null);
 
+  useEffect(() => {
+    const rut = (searchParams?.get('rut') ?? '').trim();
+    rutToOpenRef.current = rut.length > 0 ? rut : null;
+  }, [searchParams]);
+
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -67,6 +75,18 @@ export default function CollaboratorsSheetClient() {
       if (!res.ok) throw new Error(body.error ?? 'No fue posible cargar la planilla');
       setItems(body.items ?? []);
       setKpis(body.kpis ?? null);
+
+      const pendingRut = rutToOpenRef.current;
+      if (pendingRut) {
+        const match = (body.items ?? []).find((row) => String(row.rut_full).trim() === pendingRut);
+        if (match) {
+          setSelected(match);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('rut');
+          window.history.replaceState({}, '', url.toString());
+        }
+        rutToOpenRef.current = null;
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -320,4 +340,3 @@ export default function CollaboratorsSheetClient() {
     </section>
   );
 }
-
