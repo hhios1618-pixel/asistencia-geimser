@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -48,6 +49,12 @@ type Row = {
   termino_contrato: string | null;
 } & Record<string, unknown>;
 
+type ImportFeedback =
+  | { kind: 'idle' }
+  | { kind: 'progress'; message: string }
+  | { kind: 'error'; message: string }
+  | { kind: 'success'; message: string; warnings: string[] };
+
 export default function CollaboratorsSheetClient() {
   const searchParams = useSearchParams();
   const rutToOpenRef = useRef<string | null>(null);
@@ -60,6 +67,7 @@ export default function CollaboratorsSheetClient() {
   const [syncTeams, setSyncTeams] = useState(true);
   const [syncMasters, setSyncMasters] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<ImportFeedback>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selected, setSelected] = useState<Row | null>(null);
@@ -160,6 +168,7 @@ export default function CollaboratorsSheetClient() {
     setImporting(true);
     setError(null);
     setSuccess(null);
+    setImportFeedback({ kind: 'progress', message: 'Importando…' });
     try {
       if (!file) throw new Error('Debes seleccionar un archivo Excel/CSV/TSV');
 
@@ -185,20 +194,26 @@ export default function CollaboratorsSheetClient() {
             synced_team_assignments?: number;
             warnings?: string[];
             error?: string;
+            message?: string;
           }
         | { error?: string };
       if (!res.ok) {
         const raw = (body as { error?: string }).error ?? 'No fue posible importar';
+        const details = (body as { message?: string }).message ?? '';
         const msg =
           raw === 'NO_ROWS'
             ? 'No se encontraron filas. Verifica que el archivo tenga datos y una columna RUT.'
             : raw === 'FILE_REQUIRED'
               ? 'Debes adjuntar un archivo.'
-              : raw === 'INVALID_FORM'
-                ? 'No fue posible leer el archivo (formulario inválido).'
-                : raw === 'FORBIDDEN'
-                  ? 'No tienes permisos para importar.'
-                  : raw;
+            : raw === 'INVALID_FORM'
+              ? 'No fue posible leer el archivo (formulario inválido).'
+              : raw === 'FILE_TOO_LARGE'
+                ? 'Archivo demasiado grande para importar. Exporta como CSV o divide la planilla.'
+            : raw === 'FORBIDDEN'
+              ? 'No tienes permisos para importar.'
+              : raw === 'IMPORT_FAILED'
+                ? details || 'Falló la importación en el servidor. Revisa el formato del archivo.'
+                : raw;
         throw new Error(msg);
       }
 
@@ -221,12 +236,14 @@ export default function CollaboratorsSheetClient() {
         `Equipo: ${okBody.synced_team_assignments ?? 0}`,
       ].join(' · ');
 
-      setSuccess(`Importación completada. ${stats}${warnings.length ? ` · Advertencias: ${warnings.length}` : ''}`);
-      setImportOpen(false);
-      setFile(null);
+      const summary = `Carga exitosa. ${stats}${warnings.length ? ` · Advertencias: ${warnings.length}` : ''}`;
+      setSuccess(summary);
+      setImportFeedback({ kind: 'success', message: summary, warnings });
       await load();
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message || 'No fue posible importar';
+      setError(msg);
+      setImportFeedback({ kind: 'error', message: msg });
     } finally {
       setImporting(false);
     }
@@ -242,7 +259,12 @@ export default function CollaboratorsSheetClient() {
         Descargar plantilla
       </button>
       <button
-        onClick={() => setImportOpen(true)}
+        onClick={() => {
+          setImportOpen(true);
+          setImportFeedback({ kind: 'idle' });
+          setError(null);
+          setSuccess(null);
+        }}
         className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
       >
         <IconUpload size={16} />
@@ -313,13 +335,38 @@ export default function CollaboratorsSheetClient() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setImportOpen(false)}
+                  onClick={() => {
+                    setImportOpen(false);
+                    setImportFeedback({ kind: 'idle' });
+                  }}
                   className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white transition"
                   title="Cerrar"
                 >
                   <IconX size={18} />
                 </button>
               </div>
+
+              {importFeedback.kind !== 'idle' && (
+                <div
+                  className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+                    importFeedback.kind === 'success'
+                      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
+                      : importFeedback.kind === 'error'
+                        ? 'border-rose-500/20 bg-rose-500/10 text-rose-200'
+                        : 'border-white/10 bg-white/5 text-slate-200'
+                  }`}
+                >
+                  <p className="font-semibold">{importFeedback.message}</p>
+                  {importFeedback.kind === 'success' && importFeedback.warnings.length > 0 && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-emerald-100/80">
+                      {importFeedback.warnings.slice(0, 6).map((w, idx) => (
+                        <li key={idx}>{w}</li>
+                      ))}
+                      {importFeedback.warnings.length > 6 && <li>…y {importFeedback.warnings.length - 6} más.</li>}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -434,12 +481,21 @@ export default function CollaboratorsSheetClient() {
               </div>
 
               <div className="mt-4 flex items-center justify-between gap-3">
-                <span className="text-xs text-slate-500">
-                  Importa la planilla y luego revisa `Nómina → Remuneraciones` para ver el cruce.
-                </span>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span>Importa la planilla y luego revisa Remuneraciones para ver el cruce.</span>
+                  <Link
+                    href="/admin/payroll?panel=salary"
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-semibold text-slate-200 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Ir a Remuneraciones
+                  </Link>
+                </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setImportOpen(false)}
+                    onClick={() => {
+                      setImportOpen(false);
+                      setImportFeedback({ kind: 'idle' });
+                    }}
                     className="rounded-full px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white transition"
                   >
                     Cancelar

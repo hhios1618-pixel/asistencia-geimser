@@ -186,40 +186,47 @@ const getOrCreateAuthUser = async (email: string, metadata: Record<string, unkno
 };
 
 export async function POST(request: NextRequest) {
-  const { role } = await authorizeManager();
-  if (!role) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-  }
+  try {
+    const { role } = await authorizeManager();
+    if (!role) {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    }
 
-  const form = await request.formData().catch(() => null);
-  if (!form) {
-    return NextResponse.json({ error: 'INVALID_FORM' }, { status: 400 });
-  }
+    let form: FormData | null = null;
+    try {
+      form = await request.formData();
+    } catch (err) {
+      const msg = (err as Error).message ?? '';
+      if (msg.toLowerCase().includes('body') && msg.toLowerCase().includes('too')) {
+        return NextResponse.json({ error: 'FILE_TOO_LARGE' }, { status: 413 });
+      }
+      return NextResponse.json({ error: 'INVALID_FORM', message: msg }, { status: 400 });
+    }
 
-  const file = form.get('file');
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'FILE_REQUIRED' }, { status: 400 });
-  }
+    const file = form.get('file');
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: 'FILE_REQUIRED' }, { status: 400 });
+    }
 
-  const doSyncUsers = String(form.get('sync_users') ?? 'true') !== 'false';
-  const doSyncTeams = String(form.get('sync_teams') ?? 'true') !== 'false';
-  const doSyncHrMasters = String(form.get('sync_hr_masters') ?? 'true') !== 'false';
+    const doSyncUsers = String(form.get('sync_users') ?? 'true') !== 'false';
+    const doSyncTeams = String(form.get('sync_teams') ?? 'true') !== 'false';
+    const doSyncHrMasters = String(form.get('sync_hr_masters') ?? 'true') !== 'false';
 
-  const warnings: string[] = [];
+    const warnings: string[] = [];
 
-  const tsv = await readFileAsTsv(file);
-  const items = parseCollaboratorsTsv(tsv);
-  if (items.length === 0) {
-    return NextResponse.json({ error: 'NO_ROWS' }, { status: 400 });
-  }
+    const tsv = await readFileAsTsv(file);
+    const items = parseCollaboratorsTsv(tsv);
+    if (items.length === 0) {
+      return NextResponse.json({ error: 'NO_ROWS' }, { status: 400 });
+    }
 
-  await ensureHrCollaboratorsSheetTable();
+    await ensureHrCollaboratorsSheetTable();
 
-  // Upsert sheet rows
-  await withTransaction(async (client) => {
-    for (const row of items) {
-      await client.query(
-        `insert into public.hr_collaborators_sheet (
+    // Upsert sheet rows
+    await withTransaction(async (client) => {
+      for (const row of items) {
+        await client.query(
+          `insert into public.hr_collaborators_sheet (
           rut_full,
           rut_base,
           rut_dv,
@@ -374,169 +381,169 @@ export async function POST(request: NextRequest) {
           correo_gmail_corporativo = excluded.correo_gmail_corporativo,
           correo_cliente = excluded.correo_cliente,
           updated_at = now()`,
-        [
-          row.rut_full,
-          row.rut_base,
-          row.rut_dv,
-          row.ficha_numero,
-          row.nombre_completo,
-          row.empresa,
-          row.area,
-          row.estado,
-          row.sub_estado,
-          row.fecha_fin_licencia,
-          row.tipo_contrato,
-          row.jornada_laboral,
-          row.cliente,
-          row.servicio,
-          row.campania,
-          row.cargo,
-          row.supervisor,
-          row.coordinador,
-          row.sub_gerente,
-          row.genero,
-          row.fecha_nacimiento,
-          row.estado_civil,
-          row.nacionalidad,
-          row.correo_personal,
-          row.telefono_celular,
-          row.telefono_fijo,
-          row.direccion,
-          row.comuna,
-          row.ciudad,
-          row.nivel_educacional,
-          row.especialidad,
-          row.contacto_emergencia,
-          row.parentesco_emergencia,
-          row.telefono_emergencia,
-          row.alergias,
-          row.fecha_alta,
-          row.fecha_baja,
-          row.antiguedad_dias,
-          row.motivo_baja,
-          row.tipo_remuneracion,
-          row.centro_costo_id,
-          row.centro_costo_descripcion,
-          row.rol,
-          row.banco_transferencia,
-          row.tipo_cuenta_transferencia,
-          row.numero_cuenta,
-          row.cargas_familiares,
-          row.salud,
-          row.afp,
-          row.fecha_contrato,
-          row.termino_contrato,
-          row.registro_contrato_dt,
-          row.renovacion1_contrato,
-          row.termino_renovacion1_contrato,
-          row.renovacion_indefinido,
-          row.sueldo_bruto,
-          row.gratificacion,
-          row.movilizacion,
-          row.colacion,
-          row.anexo_confidencialidad,
-          row.anexo_horario,
-          row.anexo_cambio_renta,
-          row.pacto_hhee,
-          row.sindicato,
-          row.demanda,
-          row.notebook,
-          row.llaves_oficina_cerr_superior,
-          row.llaves_oficina_cerr_inferior,
-          row.correo_corporativo,
-          row.correo_gmail_corporativo,
-          row.correo_cliente,
-        ]
-      );
+          [
+            row.rut_full,
+            row.rut_base,
+            row.rut_dv,
+            row.ficha_numero,
+            row.nombre_completo,
+            row.empresa,
+            row.area,
+            row.estado,
+            row.sub_estado,
+            row.fecha_fin_licencia,
+            row.tipo_contrato,
+            row.jornada_laboral,
+            row.cliente,
+            row.servicio,
+            row.campania,
+            row.cargo,
+            row.supervisor,
+            row.coordinador,
+            row.sub_gerente,
+            row.genero,
+            row.fecha_nacimiento,
+            row.estado_civil,
+            row.nacionalidad,
+            row.correo_personal,
+            row.telefono_celular,
+            row.telefono_fijo,
+            row.direccion,
+            row.comuna,
+            row.ciudad,
+            row.nivel_educacional,
+            row.especialidad,
+            row.contacto_emergencia,
+            row.parentesco_emergencia,
+            row.telefono_emergencia,
+            row.alergias,
+            row.fecha_alta,
+            row.fecha_baja,
+            row.antiguedad_dias,
+            row.motivo_baja,
+            row.tipo_remuneracion,
+            row.centro_costo_id,
+            row.centro_costo_descripcion,
+            row.rol,
+            row.banco_transferencia,
+            row.tipo_cuenta_transferencia,
+            row.numero_cuenta,
+            row.cargas_familiares,
+            row.salud,
+            row.afp,
+            row.fecha_contrato,
+            row.termino_contrato,
+            row.registro_contrato_dt,
+            row.renovacion1_contrato,
+            row.termino_renovacion1_contrato,
+            row.renovacion_indefinido,
+            row.sueldo_bruto,
+            row.gratificacion,
+            row.movilizacion,
+            row.colacion,
+            row.anexo_confidencialidad,
+            row.anexo_horario,
+            row.anexo_cambio_renta,
+            row.pacto_hhee,
+            row.sindicato,
+            row.demanda,
+            row.notebook,
+            row.llaves_oficina_cerr_superior,
+            row.llaves_oficina_cerr_inferior,
+            row.correo_corporativo,
+            row.correo_gmail_corporativo,
+            row.correo_cliente,
+          ]
+        );
+      }
+    });
+
+    // Optional: sync HR master tables (business/position)
+    let syncedBusinesses = 0;
+    let syncedPositions = 0;
+    if (doSyncHrMasters) {
+      const businesses = Array.from(new Set(items.map((r) => (r.empresa ?? '').trim()).filter(Boolean)));
+      const positions = Array.from(new Set(items.map((r) => (r.cargo ?? '').trim()).filter(Boolean)));
+      const master = await ensureHrMasters(businesses, positions);
+      syncedBusinesses = master.syncedBusinesses;
+      syncedPositions = master.syncedPositions;
+      warnings.push(...master.warnings);
     }
-  });
 
-  // Optional: sync HR master tables (business/position)
-  let syncedBusinesses = 0;
-  let syncedPositions = 0;
-  if (doSyncHrMasters) {
-    const businesses = Array.from(new Set(items.map((r) => (r.empresa ?? '').trim()).filter(Boolean)));
-    const positions = Array.from(new Set(items.map((r) => (r.cargo ?? '').trim()).filter(Boolean)));
-    const master = await ensureHrMasters(businesses, positions);
-    syncedBusinesses = master.syncedBusinesses;
-    syncedPositions = master.syncedPositions;
-    warnings.push(...master.warnings);
-  }
+    // Optional: sync users into auth + people + HR columns
+    const adminNames = new Set(
+      ['LAURA ANDREA PINCHEIRA HERRERA', 'HUGO FELIPE KAROL HORMAZABAL CAVIEDES', 'PAULA ANDREA MELELLI MABE'].map((n) =>
+        n.toLowerCase()
+      )
+    );
+    const supervisorNames = new Set(items.map((r) => (r.supervisor ?? '').trim().toLowerCase()).filter(Boolean));
 
-  // Optional: sync users into auth + people + HR columns
-  const adminNames = new Set(
-    ['LAURA ANDREA PINCHEIRA HERRERA', 'HUGO FELIPE KAROL HORMAZABAL CAVIEDES', 'PAULA ANDREA MELELLI MABE'].map((n) =>
-      n.toLowerCase()
-    )
-  );
-  const supervisorNames = new Set(items.map((r) => (r.supervisor ?? '').trim().toLowerCase()).filter(Boolean));
+    let createdAuthUsers = 0;
+    let updatedAuthUsers = 0;
+    let syncedPeople = 0;
+    const nameToPersonId = new Map<string, string>();
+    const rutNormToPersonId = new Map<string, string>();
 
-  let createdAuthUsers = 0;
-  let updatedAuthUsers = 0;
-  let syncedPeople = 0;
-  const nameToPersonId = new Map<string, string>();
-  const rutNormToPersonId = new Map<string, string>();
-
-  if (doSyncUsers) {
-    try {
-      // Build HR master mappings if available
-      const businessNameToId = new Map<string, string>();
-      const positionNameToId = new Map<string, string>();
-
+    if (doSyncUsers) {
       try {
-        const { rows: businessRows } = await runQuery<{ id: string; name: string }>('select id, name from public.hr_businesses', []);
-        businessRows.forEach((b) => businessNameToId.set(b.name.toLowerCase(), b.id));
-      } catch {
-        // ignore if missing
-      }
-      try {
-        const { rows: positionRows } = await runQuery<{ id: string; name: string }>('select id, name from public.hr_positions', []);
-        positionRows.forEach((p) => positionNameToId.set(p.name.toLowerCase(), p.id));
-      } catch {
-        // ignore if missing
-      }
+        // Build HR master mappings if available
+        const businessNameToId = new Map<string, string>();
+        const positionNameToId = new Map<string, string>();
 
-      for (const row of items) {
-        const email =
-          (row.correo_corporativo ?? '').trim().toLowerCase() ||
-          (row.correo_gmail_corporativo ?? '').trim().toLowerCase() ||
-          (row.correo_personal ?? '').trim().toLowerCase() ||
-          '';
-        if (!email) continue;
-
-        const fullName = (row.nombre_completo ?? '').trim();
-        const roleForAuth = adminNames.has(fullName.toLowerCase())
-          ? 'ADMIN'
-          : supervisorNames.has(fullName.toLowerCase())
-            ? 'SUPERVISOR'
-            : 'WORKER';
-
-        const isActive = (row.estado ?? '').toLowerCase() === 'activo';
-        const metadata = {
-          name: fullName || undefined,
-          full_name: fullName || undefined,
-          rut: row.rut_full,
-          service: row.servicio ?? undefined,
-          role: roleForAuth,
-        };
-
-        let authUser;
         try {
-          authUser = await getOrCreateAuthUser(email, metadata, roleForAuth);
-        } catch (authError) {
-          warnings.push(`No se pudo crear/actualizar Auth para ${email}: ${(authError as Error).message}`);
-          continue;
+          const { rows: businessRows } = await runQuery<{ id: string; name: string }>('select id, name from public.hr_businesses', []);
+          businessRows.forEach((b) => businessNameToId.set(b.name.toLowerCase(), b.id));
+        } catch {
+          // ignore if missing
+        }
+        try {
+          const { rows: positionRows } = await runQuery<{ id: string; name: string }>('select id, name from public.hr_positions', []);
+          positionRows.forEach((p) => positionNameToId.set(p.name.toLowerCase(), p.id));
+        } catch {
+          // ignore if missing
         }
 
-        if (authUser.created) createdAuthUsers += 1;
-        else updatedAuthUsers += 1;
+        for (const row of items) {
+          const email =
+            (row.correo_corporativo ?? '').trim().toLowerCase() ||
+            (row.correo_gmail_corporativo ?? '').trim().toLowerCase() ||
+            (row.correo_personal ?? '').trim().toLowerCase() ||
+            '';
+          if (!email) continue;
 
-        const businessId = row.empresa ? businessNameToId.get(row.empresa.toLowerCase()) ?? null : null;
-        const positionId = row.cargo ? positionNameToId.get(row.cargo.toLowerCase()) ?? null : null;
+          const fullName = (row.nombre_completo ?? '').trim();
+          const roleForAuth = adminNames.has(fullName.toLowerCase())
+            ? 'ADMIN'
+            : supervisorNames.has(fullName.toLowerCase())
+              ? 'SUPERVISOR'
+              : 'WORKER';
 
-        try {
-          await runQuery(
-            `insert into public.people (id, rut, name, service, role, is_active, email, business_id, position_id, salary_monthly, employment_type, hire_date, termination_date)
+          const isActive = (row.estado ?? '').toLowerCase() === 'activo';
+          const metadata = {
+            name: fullName || undefined,
+            full_name: fullName || undefined,
+            rut: row.rut_full,
+            service: row.servicio ?? undefined,
+            role: roleForAuth,
+          };
+
+          let authUser;
+          try {
+            authUser = await getOrCreateAuthUser(email, metadata, roleForAuth);
+          } catch (authError) {
+            warnings.push(`No se pudo crear/actualizar Auth para ${email}: ${(authError as Error).message}`);
+            continue;
+          }
+
+          if (authUser.created) createdAuthUsers += 1;
+          else updatedAuthUsers += 1;
+
+          const businessId = row.empresa ? businessNameToId.get(row.empresa.toLowerCase()) ?? null : null;
+          const positionId = row.cargo ? positionNameToId.get(row.cargo.toLowerCase()) ?? null : null;
+
+          try {
+            await runQuery(
+              `insert into public.people (id, rut, name, service, role, is_active, email, business_id, position_id, salary_monthly, employment_type, hire_date, termination_date)
              values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
              on conflict (id) do update set
                rut = excluded.rut,
@@ -551,80 +558,89 @@ export async function POST(request: NextRequest) {
                employment_type = excluded.employment_type,
                hire_date = excluded.hire_date,
                termination_date = excluded.termination_date`,
-            [
-              authUser.id,
-              row.rut_full,
-              fullName || row.rut_full,
-              row.servicio ?? null,
-              roleForAuth,
-              isActive,
-              email,
-              businessId,
-              positionId,
-              row.sueldo_bruto ?? null,
-              row.tipo_contrato ?? null,
-              row.fecha_alta ?? row.fecha_contrato ?? null,
-              row.fecha_baja ?? row.termino_contrato ?? null,
-            ]
-          );
-          syncedPeople += 1;
-          nameToPersonId.set(fullName.toLowerCase(), authUser.id);
-          const rutNorm = normalizeRutComparable(row.rut_full);
-          if (rutNorm) rutNormToPersonId.set(rutNorm, authUser.id);
-        } catch (dbError) {
-          warnings.push(`No se pudo sincronizar people para ${email}: ${(dbError as Error).message}`);
+              [
+                authUser.id,
+                row.rut_full,
+                fullName || row.rut_full,
+                row.servicio ?? null,
+                roleForAuth,
+                isActive,
+                email,
+                businessId,
+                positionId,
+                row.sueldo_bruto ?? null,
+                row.tipo_contrato ?? null,
+                row.fecha_alta ?? row.fecha_contrato ?? null,
+                row.fecha_baja ?? row.termino_contrato ?? null,
+              ]
+            );
+            syncedPeople += 1;
+            nameToPersonId.set(fullName.toLowerCase(), authUser.id);
+            const rutNorm = normalizeRutComparable(row.rut_full);
+            if (rutNorm) rutNormToPersonId.set(rutNorm, authUser.id);
+          } catch (dbError) {
+            warnings.push(`No se pudo sincronizar people para ${email}: ${(dbError as Error).message}`);
+          }
         }
+      } catch (err) {
+        const msg = (err as Error).message ?? '';
+        warnings.push(`Sincronización de usuarios falló: ${msg || 'revisa SUPABASE_SERVICE_ROLE_KEY y esquema HR.'}`);
       }
-    } catch (error) {
-      warnings.push('Sincronización de usuarios falló. Revisa variables de Supabase Service Role y esquema HR.');
     }
-  }
 
-  // Optional: sync supervisor assignments (team_assignments) by names from sheet
-  let syncedTeam = 0;
-  if (doSyncTeams) {
-    try {
-      for (const row of items) {
-        const memberRutNorm = normalizeRutComparable(row.rut_full);
-        const memberId = memberRutNorm ? rutNormToPersonId.get(memberRutNorm) ?? null : null;
-        if (!memberId) continue;
-        const supervisorName = (row.supervisor ?? '').trim();
-        if (!supervisorName) continue;
+    // Optional: sync supervisor assignments (team_assignments) by names from sheet
+    let syncedTeam = 0;
+    if (doSyncTeams) {
+      try {
+        for (const row of items) {
+          const memberRutNorm = normalizeRutComparable(row.rut_full);
+          const memberId = memberRutNorm ? rutNormToPersonId.get(memberRutNorm) ?? null : null;
+          if (!memberId) continue;
+          const supervisorName = (row.supervisor ?? '').trim();
+          if (!supervisorName) continue;
 
-        let supervisorId = nameToPersonId.get(supervisorName.toLowerCase()) ?? null;
-        if (!supervisorId) {
-          const { rows: supRows } = await runQuery<{ id: string }>(
-            'select id from public.people where lower(name) = lower($1) limit 1',
-            [supervisorName]
-          );
-          supervisorId = supRows[0]?.id ?? null;
-        }
-        if (!supervisorId) continue;
+          let supervisorId = nameToPersonId.get(supervisorName.toLowerCase()) ?? null;
+          if (!supervisorId) {
+            const { rows: supRows } = await runQuery<{ id: string }>(
+              'select id from public.people where lower(name) = lower($1) limit 1',
+              [supervisorName]
+            );
+            supervisorId = supRows[0]?.id ?? null;
+          }
+          if (!supervisorId) continue;
 
-        await runQuery(
-          `insert into public.team_assignments (supervisor_id, member_id, active, assigned_at)
+          await runQuery(
+            `insert into public.team_assignments (supervisor_id, member_id, active, assigned_at)
            values ($1,$2,true,now())
            on conflict (supervisor_id, member_id) do update set active = true, assigned_at = now()`,
-          [supervisorId, memberId]
+            [supervisorId, memberId]
+          );
+          syncedTeam += 1;
+        }
+      } catch (err) {
+        const msg = (err as Error).message ?? '';
+        warnings.push(
+          `No se pudieron sincronizar asignaciones de supervisor (team_assignments): ${msg || 'revisa RLS/permisos.'}`
         );
-        syncedTeam += 1;
       }
-    } catch (error) {
-      warnings.push('No se pudieron sincronizar asignaciones de supervisor (team_assignments).');
     }
+
+    const result: ImportResult = {
+      ok: true,
+      imported: items.length,
+      created_auth_users: createdAuthUsers,
+      updated_auth_users: updatedAuthUsers,
+      synced_people: syncedPeople,
+      synced_businesses: syncedBusinesses,
+      synced_positions: syncedPositions,
+      synced_team_assignments: syncedTeam,
+      warnings,
+    };
+
+    return NextResponse.json(result, { status: 201 });
+  } catch (err) {
+    const message = (err as Error).message ?? 'IMPORT_FAILED';
+    console.error('[hr_collaborators_sheet_import] failed', err);
+    return NextResponse.json({ error: 'IMPORT_FAILED', message }, { status: 500 });
   }
-
-  const result: ImportResult = {
-    ok: true,
-    imported: items.length,
-    created_auth_users: createdAuthUsers,
-    updated_auth_users: updatedAuthUsers,
-    synced_people: syncedPeople,
-    synced_businesses: syncedBusinesses,
-    synced_positions: syncedPositions,
-    synced_team_assignments: syncedTeam,
-    warnings,
-  };
-
-  return NextResponse.json(result, { status: 201 });
 }
