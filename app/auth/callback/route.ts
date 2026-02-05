@@ -18,7 +18,7 @@ export async function GET(request: Request) {
         } else {
             console.error("Auth callback error: ", error);
             // On error, redirect to login with error parameter or a specific error page
-            return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_callback_error`);
+            return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_callback_error&error_description=${encodeURIComponent(error.message)}`);
         }
     }
 

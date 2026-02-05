@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase/client';
 import Link from 'next/link';
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    searchParams.get('error_description') ||
+    (searchParams.get('error') === 'auth_callback_error' ? 'Error al verificar el enlace. Es posible que haya expirado.' : null)
+  );
 
   useEffect(() => {
     const clearStaleSession = async () => {
