@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase/client';
+import Link from 'next/link';
 
 export function LoginForm() {
   const router = useRouter();
@@ -107,6 +108,11 @@ export function LoginForm() {
             </button>
           </div>
         </label>
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-white transition">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
       </div>
       {error && (
         <p
