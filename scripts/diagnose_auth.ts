@@ -43,7 +43,7 @@ async function main() {
         SELECT id, email, raw_user_meta_data, raw_app_meta_data, role, created_at 
         FROM auth.users
         `);
-            console.table(users.rows.map(u => ({
+            console.table(users.rows.map((u: any) => ({
                 id: u.id,
                 email: u.email,
                 auth_role: u.role, // supabase auth role (authenticated/anon/service_role)
