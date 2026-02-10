@@ -141,25 +141,20 @@ const authorize = async () => {
   const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
-    console.error('[API-SITES] authorize failed: No user found in session.');
-    return { person: null, reason: 'NO_SESSION' } as const;
+    return { person: null } as const;
   }
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
   const role = await resolveUserRole(authData.user, defaultRole);
-
-  console.log(`[API-SITES] authorize check: user=${authData.user.email} (${authData.user.id}) role=${role} default=${defaultRole}`);
-
   if (!isManager(role)) {
-    console.error(`[API-SITES] authorize failed: Role "${role}" is not authorized.`);
-    return { person: null, reason: `ROLE_MISMATCH: ${role}` } as const;
+    return { person: null } as const;
   }
-  return { person: { id: authData.user.id as string, role }, reason: null } as const;
+  return { person: { id: authData.user.id as string, role } } as const;
 };
 
 export async function GET() {
-  const { person, reason } = await authorize();
+  const { person } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
   await ensureAddressColumn();
   const sites = await getSitesTarget();
@@ -173,9 +168,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { person, reason } = await authorize();
+  const { person } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
   let payload: z.infer<typeof siteSchema>;
@@ -211,9 +206,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { person, reason } = await authorize();
+  const { person } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
   let payload: z.infer<typeof siteUpdateSchema>;
@@ -250,9 +245,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { person, reason } = await authorize();
+  const { person } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
   const id = request.nextUrl.searchParams.get('id');
