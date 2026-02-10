@@ -50,15 +50,23 @@ const authorize = async () => {
   const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user ?? null;
+
   if (!user) {
-    return { supabase, user: null, role: null as Tables['people']['Row']['role'] | null } as const;
+    console.error('[API] authorize failed: No user found in session.');
+    return { supabase, user: null, role: null, reason: 'NO_SESSION' } as const;
   }
+
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
   const role = await resolveUserRole(user, defaultRole);
+
+  console.log(`[API] authorize check: user=${user.email} (${user.id}) role=${role} default=${defaultRole}`);
+
   if (!isManager(role)) {
-    return { supabase, user: null, role: null as Tables['people']['Row']['role'] | null } as const;
+    console.error(`[API] authorize failed: Role "${role}" is not authorized (requires ADMIN or SUPERVISOR).`);
+    return { supabase, user: null, role: null, reason: `ROLE_MISMATCH: ${role}` } as const;
   }
-  return { supabase, user, role } as const;
+
+  return { supabase, user, role, reason: null } as const;
 };
 
 const normalizeService = (service?: string | null) => {
@@ -312,9 +320,9 @@ const selectPeopleRows = async (suffix: string, params: unknown[]): Promise<DbPe
 };
 
 export async function GET() {
-  const { user } = await authorize();
+  const { user, reason } = await authorize();
   if (!user) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
   try {
     const rows = await selectPeopleRows(' order by p.created_at', []);
@@ -329,9 +337,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { user } = await authorize();
+  const { user, reason } = await authorize();
   if (!user) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
   }
 
   let payload: z.infer<typeof personSchema>;
@@ -469,9 +477,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { user } = await authorize();
+  const { user, reason } = await authorize();
   if (!user) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
   }
 
   let payload: z.infer<typeof updateSchema>;
@@ -672,9 +680,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { user } = await authorize();
+  const { user, reason } = await authorize();
   if (!user) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
   }
   const id = request.nextUrl.searchParams.get('id');
   if (!id) {

@@ -141,20 +141,25 @@ const authorize = async () => {
   const supabase = await createRouteSupabaseClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
-    return { person: null } as const;
+    console.error('[API-SITES] authorize failed: No user found in session.');
+    return { person: null, reason: 'NO_SESSION' } as const;
   }
   const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Tables['people']['Row']['role']) ?? 'ADMIN';
   const role = await resolveUserRole(authData.user, defaultRole);
+
+  console.log(`[API-SITES] authorize check: user=${authData.user.email} (${authData.user.id}) role=${role} default=${defaultRole}`);
+
   if (!isManager(role)) {
-    return { person: null } as const;
+    console.error(`[API-SITES] authorize failed: Role "${role}" is not authorized.`);
+    return { person: null, reason: `ROLE_MISMATCH: ${role}` } as const;
   }
-  return { person: { id: authData.user.id as string, role } } as const;
+  return { person: { id: authData.user.id as string, role }, reason: null } as const;
 };
 
 export async function GET() {
-  const { person } = await authorize();
+  const { person, reason } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
   await ensureAddressColumn();
   const sites = await getSitesTarget();
@@ -168,9 +173,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { person } = await authorize();
+  const { person, reason } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
   }
 
   let payload: z.infer<typeof siteSchema>;
@@ -187,17 +192,17 @@ export async function POST(request: NextRequest) {
     const addressEnabled = addressColumnAvailable ?? (await hasAddressColumn(sites));
     const { rows } = addressEnabled
       ? await runQuery<Tables['sites']['Row']>(
-          `insert into ${sites.qualified} (name, address, lat, lng, radius_m, is_active)
+        `insert into ${sites.qualified} (name, address, lat, lng, radius_m, is_active)
            values ($1, $2, $3, $4, $5, $6)
            returning *`,
-          [payload.name, address, payload.lat, payload.lng, payload.radius_m, payload.is_active ?? true]
-        )
+        [payload.name, address, payload.lat, payload.lng, payload.radius_m, payload.is_active ?? true]
+      )
       : await runQuery<Tables['sites']['Row']>(
-          `insert into ${sites.qualified} (name, lat, lng, radius_m, is_active)
+        `insert into ${sites.qualified} (name, lat, lng, radius_m, is_active)
            values ($1, $2, $3, $4, $5)
            returning *`,
-          [payload.name, payload.lat, payload.lng, payload.radius_m, payload.is_active ?? true]
-        );
+        [payload.name, payload.lat, payload.lng, payload.radius_m, payload.is_active ?? true]
+      );
 
     return NextResponse.json({ item: rows[0] }, { status: 201 });
   } catch (error) {
@@ -206,9 +211,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { person } = await authorize();
+  const { person, reason } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
   }
 
   let payload: z.infer<typeof siteUpdateSchema>;
@@ -245,9 +250,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { person } = await authorize();
+  const { person, reason } = await authorize();
   if (!person) {
-    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+    return NextResponse.json({ error: 'FORBIDDEN', debug_reason: reason }, { status: 403 });
   }
 
   const id = request.nextUrl.searchParams.get('id');
