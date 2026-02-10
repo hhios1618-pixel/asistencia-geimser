@@ -6,6 +6,7 @@ import { runQuery } from '../../../../../../lib/db/postgres';
 import { ensureSchedulesWeekStart } from '../../../../../../lib/db/ensureSchedulesWeekStart';
 import type { Tables } from '../../../../../../types/database';
 import { resolveUserRole } from '../../../../../../lib/auth/role';
+import { recalculateScheduleComplianceAlerts } from '../../../../../../lib/attendance/scheduleCompliance';
 
 export const runtime = 'nodejs';
 
@@ -415,6 +416,16 @@ export async function POST(request: NextRequest) {
   }
 
   const { imported, groupId, errors } = await insertBatch(resolvedRows, personMap, mode, userId, label ?? weekLabel, source);
+
+  const personIds = Array.from(
+    new Set(resolvedRows.map((row) => row.person_id).filter((id): id is string => typeof id === 'string' && id.length > 0))
+  );
+  const weekStarts = Array.from(new Set(resolvedRows.map((row) => row.week_start ?? null)));
+  if (personIds.length > 0) {
+    void recalculateScheduleComplianceAlerts({ personIds, weekStarts }).catch((error) =>
+      console.warn('[schedules/bulk] compliance recalc failed', (error as Error).message)
+    );
+  }
 
   const combinedErrors = [...preInsertErrors, ...errors];
   return NextResponse.json({

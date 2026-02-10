@@ -5,6 +5,7 @@ import { runQuery } from '../../../../../lib/db/postgres';
 import { ensureSchedulesWeekStart } from '../../../../../lib/db/ensureSchedulesWeekStart';
 import type { Tables } from '../../../../../types/database';
 import { resolveUserRole } from '../../../../../lib/auth/role';
+import { recalculateScheduleComplianceAlerts } from '../../../../../lib/attendance/scheduleCompliance';
 
 const scheduleSchema = z.object({
   person_id: z.string().uuid().optional(),
@@ -131,7 +132,15 @@ export async function POST(request: NextRequest) {
     ]
   );
 
-  return NextResponse.json({ item: rows[0] }, { status: 201 });
+  const created = rows[0] ?? null;
+  if (created?.person_id) {
+    void recalculateScheduleComplianceAlerts({
+      personIds: [created.person_id],
+      weekStarts: [created.week_start ?? null],
+    }).catch((error) => console.warn('[schedules] compliance recalc failed', (error as Error).message));
+  }
+
+  return NextResponse.json({ item: created }, { status: 201 });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -159,6 +168,12 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ item: rows[0] ?? null });
   }
 
+  const { rows: beforeRows } = await runQuery<Pick<Tables['schedules']['Row'], 'person_id' | 'week_start'>>(
+    'select person_id, week_start from public.schedules where id = $1',
+    [id]
+  );
+  const before = beforeRows[0] ?? null;
+
   const columns = Object.keys(changes);
   const setters = columns.map((column, index) => `${column} = $${index + 2}`).join(', ');
   const params = [id, ...columns.map((column) => (changes as Record<string, unknown>)[column])];
@@ -172,7 +187,22 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
   }
 
-  return NextResponse.json({ item: rows[0] });
+  const updated = rows[0];
+  const personId = updated.person_id ?? before?.person_id ?? null;
+  if (personId) {
+    // Include previous week_start so alerts can be cleared if the record moved weeks.
+    const combinedWeekStarts: Array<string | null> = [];
+    combinedWeekStarts.push(updated.week_start ?? null);
+    if ((before?.week_start ?? null) !== (updated.week_start ?? null)) {
+      combinedWeekStarts.push(before?.week_start ?? null);
+    }
+    void recalculateScheduleComplianceAlerts({
+      personIds: [personId],
+      weekStarts: combinedWeekStarts,
+    }).catch((error) => console.warn('[schedules] compliance recalc failed', (error as Error).message));
+  }
+
+  return NextResponse.json({ item: updated });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -189,7 +219,18 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
+    const { rows: beforeRows } = await runQuery<Pick<Tables['schedules']['Row'], 'person_id' | 'week_start'>>(
+      'select person_id, week_start from public.schedules where id = $1',
+      [id]
+    );
+    const before = beforeRows[0] ?? null;
     await runQuery('delete from public.schedules where id = $1', [id]);
+    if (before?.person_id) {
+      void recalculateScheduleComplianceAlerts({
+        personIds: [before.person_id],
+        weekStarts: [before.week_start ?? null],
+      }).catch((error) => console.warn('[schedules] compliance recalc failed', (error as Error).message));
+    }
   } catch (error) {
     return NextResponse.json({ error: 'DELETE_FAILED', details: (error as Error).message }, { status: 500 });
   }
