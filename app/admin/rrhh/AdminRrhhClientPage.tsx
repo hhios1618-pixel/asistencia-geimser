@@ -1,11 +1,20 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import DashboardLayout from '../../../components/layout/DashboardLayout';
 import LogoutButton from '../../asistencia/components/LogoutButton';
 import AdminHrClient from './components/AdminHrClient';
 
 export default function AdminRrhhClientPage() {
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/me', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((body: { role?: string }) => setRole(body.role ?? null))
+      .catch(() => setRole(null));
+  }, []);
+
   return (
     <DashboardLayout
       title="RRHH"
@@ -34,9 +43,8 @@ export default function AdminRrhhClientPage() {
           </div>
         }
       >
-        <AdminHrClient />
+        <AdminHrClient role={role} />
       </Suspense>
     </DashboardLayout>
   );
 }
-

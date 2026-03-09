@@ -81,6 +81,7 @@ export function PeopleAdmin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [blistInfo, setBlistInfo] = useState<{ rut: string; full_name: string | null; source: string | null } | null>(null);
   const [password, setPassword] = useState('');
 
   // Load Data
@@ -136,6 +137,7 @@ export function PeopleAdmin() {
     setAssignedSupervisors([]);
     setSuccessMessage(null);
     setCredentials(null);
+    setBlistInfo(null);
     setPassword('');
   };
 
@@ -158,6 +160,7 @@ export function PeopleAdmin() {
     setAssignedSupervisors(person.supervisors?.map(s => s.supervisor_id) ?? []);
     setSuccessMessage(null);
     setCredentials(null);
+    setBlistInfo(null);
     setPassword('');
   };
 
@@ -266,8 +269,15 @@ export function PeopleAdmin() {
         body: JSON.stringify(payload),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.message || 'Error al guardar');
+      if (!res.ok) {
+        if (body.error === 'RUT_EN_BLIST') {
+          setBlistInfo(body.blist_info ?? null);
+          throw new Error(body.message || 'RUT en lista de no contratables');
+        }
+        throw new Error(body.message || 'Error al guardar');
+      }
 
+      setBlistInfo(null);
       await loadData();
       setEditing(emptyPerson);
       if (body.credentials && !isExisting) {
@@ -393,7 +403,18 @@ export function PeopleAdmin() {
                 {people.some(p => p.id === editing.id) ? 'Editar Persona' : 'Nueva Persona'}
               </h2>
 
-              {error && <p className="mb-4 rounded-xl bg-rose-500/10 p-3 text-sm text-rose-300 border border-rose-500/20">{error}</p>}
+              {error && (
+                <div className="mb-4 rounded-xl bg-rose-500/10 p-3 border border-rose-500/30">
+                  <p className="text-sm font-bold text-rose-300">⛔ {error}</p>
+                  {blistInfo && (
+                    <div className="mt-2 space-y-0.5 text-xs text-rose-200">
+                      {blistInfo.full_name && <p>Nombre registrado: <span className="font-semibold">{blistInfo.full_name}</span></p>}
+                      {blistInfo.rut && <p>RUT: <span className="font-mono">{blistInfo.rut}</span></p>}
+                      {blistInfo.source && <p>Empresa reportante: <span className="font-semibold">{blistInfo.source}</span></p>}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <form onSubmit={submit} className="grid gap-6 md:grid-cols-2">
                 <label className="flex flex-col gap-2">

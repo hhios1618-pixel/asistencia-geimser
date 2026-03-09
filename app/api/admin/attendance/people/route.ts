@@ -369,6 +369,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(duplicateError, { status: 409 });
   }
 
+  // Validar RUT contra Blist antes de crear (alta sensibilidad)
+  if (normalizedRut) {
+    try {
+      const { rows: blistRows } = await runQuery<{
+        rut_display: string;
+        full_name: string | null;
+        source: string | null;
+      }>(
+        `select rut_display, full_name, source
+         from public.hr_blacklist
+         where rut_normalized = $1 and active = true
+         limit 1`,
+        [normalizedRut]
+      );
+      if (blistRows.length > 0) {
+        const bl = blistRows[0];
+        return NextResponse.json(
+          {
+            error: 'RUT_EN_BLIST',
+            message: 'No es posible registrar este RUT. La persona figura en la lista de no contratables (Blist).',
+            blist_info: {
+              rut: bl.rut_display,
+              full_name: bl.full_name ?? null,
+              source: bl.source ?? null,
+            },
+          },
+          { status: 409 }
+        );
+      }
+    } catch {
+      // Si la tabla aún no existe, no bloqueamos la creación
+    }
+  }
+
   try {
     await ensureSupervisorsEligible(supervisorIds);
   } catch (validationError) {

@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   IconUsers,
@@ -11,6 +10,7 @@ import {
   IconBuildingStore,
   IconBadge,
   IconChartPie,
+  IconUserOff,
 } from '@tabler/icons-react';
 import HrBusinessesAdmin from './HrBusinessesAdmin';
 import HrPositionsAdmin from './HrPositionsAdmin';
@@ -20,6 +20,7 @@ import HrRolesPermissionsPanel from './HrRolesPermissionsPanel';
 import HrAbsencesPanel from './HrAbsencesPanel';
 import HrPerformancePanel from './HrPerformancePanel';
 import HrOnboardingPanel from './HrOnboardingPanel';
+import HrBlacklistPanel from './HrBlacklistPanel';
 
 type SectionId =
   | 'employees'
@@ -29,25 +30,43 @@ type SectionId =
   | 'onboarding'
   | 'businesses'
   | 'positions'
-  | 'headcount';
+  | 'headcount'
+  | 'blacklist';
 
-const SECTIONS = [
-  { id: 'employees', label: 'Colaboradores', icon: IconUsers },
-  { id: 'roles', label: 'Roles', icon: IconShieldLock },
-  { id: 'businesses', label: 'Negocios', icon: IconBuildingStore },
-  { id: 'positions', label: 'Cargos', icon: IconBadge },
-  { id: 'headcount', label: 'Headcount', icon: IconChartPie },
-  { id: 'absences', label: 'Ausencias', icon: IconCalendarStats },
-  { id: 'performance', label: 'Desempeño', icon: IconChartBar },
-  { id: 'onboarding', label: 'Onboarding', icon: IconClipboardCheck },
+const ALL_SECTIONS = [
+  { id: 'employees', label: 'Colaboradores', icon: IconUsers, adminOnly: false },
+  { id: 'roles', label: 'Roles', icon: IconShieldLock, adminOnly: false },
+  { id: 'businesses', label: 'Negocios', icon: IconBuildingStore, adminOnly: false },
+  { id: 'positions', label: 'Cargos', icon: IconBadge, adminOnly: false },
+  { id: 'headcount', label: 'Headcount', icon: IconChartPie, adminOnly: false },
+  { id: 'blacklist', label: 'Blist', icon: IconUserOff, adminOnly: true },
+  { id: 'absences', label: 'Ausencias', icon: IconCalendarStats, adminOnly: false },
+  { id: 'performance', label: 'Desempeño', icon: IconChartBar, adminOnly: false },
+  { id: 'onboarding', label: 'Onboarding', icon: IconClipboardCheck, adminOnly: false },
 ];
 
-export default function AdminHrClient() {
+type Props = {
+  role?: string | null;
+};
+
+export default function AdminHrClient({ role }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = (searchParams?.get('panel') ?? 'employees') as SectionId;
+  const isAdmin = role === 'ADMIN';
+
+  const SECTIONS = ALL_SECTIONS.filter((s) => !s.adminOnly || isAdmin);
 
   const renderContent = () => {
+    // Proteger el panel Blist: si el usuario no es ADMIN y intenta acceder, redirigir
+    if (activeTab === 'blacklist' && !isAdmin) {
+      return (
+        <div className="flex items-center justify-center py-20 text-slate-500 text-sm">
+          No tienes permisos para acceder a este módulo.
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'employees': return <HrPeopleAdmin />;
       case 'roles': return <HrRolesPermissionsPanel />;
@@ -57,6 +76,7 @@ export default function AdminHrClient() {
       case 'businesses': return <HrBusinessesAdmin />;
       case 'positions': return <HrPositionsAdmin />;
       case 'headcount': return <HrHeadcountPanel />;
+      case 'blacklist': return <HrBlacklistPanel />;
       default: return <HrPeopleAdmin />;
     }
   };
