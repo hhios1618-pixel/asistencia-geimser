@@ -121,6 +121,7 @@ export default async function AgentePage() {
       description={profile.campaign_name ? `Campaña: ${profile.campaign_name}` : 'Portal del trabajador'}
       breadcrumb={[{ label: profile.name }]}
       navItems={AGENTE_NAV}
+      logoHref={isAdmin ? '/admin' : '/agente'}
       actions={adminBackAction}
     >
       <AgenteDashboard

@@ -268,19 +268,56 @@ function SidebarContent({
   navItems: NavItem[];
   onNavigate: () => void;
 }) {
+  const searchParams = useSearchParams();
+
   return (
     <LayoutGroup>
       <div className="flex flex-col gap-2 p-3">
         {navItems.map((item) => {
-          const basePath = normalizePath(item.href);
-          const isActive = pathname === basePath || pathname.startsWith(`${basePath}/`);
-          // Auto-expand if active or simplified check logic
+          let isActive: boolean;
+
+          if (item.match) {
+            // Custom match function takes priority
+            isActive = item.match(pathname);
+          } else {
+            const basePath = normalizePath(item.href);
+            const itemQS = item.href.includes('?')
+              ? new URLSearchParams(item.href.split('?')[1])
+              : null;
+
+            if (itemQS) {
+              // Item carries query params — require pathname AND all params to match
+              const pathMatches = pathname === basePath;
+              const paramsMatch = Array.from(itemQS.entries()).every(
+                ([key, val]) => searchParams?.get(key) === val
+              );
+              isActive = pathMatches && paramsMatch;
+            } else {
+              // Plain path item — but yield to any sibling that claims the same basePath with params
+              const siblingsWithSamePath = navItems.filter(
+                (s) => s !== item && normalizePath(s.href) === basePath && s.href.includes('?')
+              );
+              if (siblingsWithSamePath.length > 0) {
+                // Only active when none of the sibling's params are present in the current URL
+                const siblingParamKeys = siblingsWithSamePath.flatMap((s) =>
+                  Array.from(new URLSearchParams(s.href.split('?')[1]).keys())
+                );
+                const hasSiblingParam = siblingParamKeys.some((k) => searchParams?.has(k));
+                isActive =
+                  (pathname === basePath || pathname.startsWith(`${basePath}/`)) &&
+                  !hasSiblingParam;
+              } else {
+                isActive = pathname === basePath || pathname.startsWith(`${basePath}/`);
+              }
+            }
+          }
+
           return (
             <NavItemComponent
               key={item.href}
               item={item}
               isActive={isActive}
-              isExpanded={isActive} // Simplified: keep active section expanded
+              isExpanded={isActive}
               onClick={onNavigate}
             />
           );
@@ -298,6 +335,7 @@ type DashboardLayoutProps = {
   breadcrumb?: Array<{ label: string; href?: string }>;
   actions?: React.ReactNode;
   navItems?: NavItem[];
+  logoHref?: string;
   sidebarFooter?: React.ReactNode;
   children: React.ReactNode;
 };
@@ -308,6 +346,7 @@ export function DashboardLayout({
   breadcrumb,
   actions,
   navItems = ADMIN_NAV,
+  logoHref,
   sidebarFooter,
   children,
 }: DashboardLayoutProps) {
@@ -355,7 +394,7 @@ export function DashboardLayout({
           )}
         >
           <div className="sticky top-0 z-20 flex items-center justify-between p-6 md:p-8">
-            <Link href="/" className="group flex items-center gap-3">
+            <Link href={logoHref ?? normalizePath(navItems[0]?.href ?? '/')} className="group flex items-center gap-3">
               <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_20px_var(--accent-soft)] transition-transform duration-500 group-hover:rotate-180">
                 <div className="h-4 w-4 rounded-full bg-black/80" />
               </div>
