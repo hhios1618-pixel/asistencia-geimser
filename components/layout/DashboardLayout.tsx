@@ -329,11 +329,23 @@ function SidebarContent({
 
 // --- Main Layout ---
 
+export type NavVariant = 'admin' | 'agente' | 'supervisor' | 'worker';
+
+const NAV_VARIANT_MAP: Record<NavVariant, NavItem[]> = {
+  admin: ADMIN_NAV,
+  agente: AGENTE_NAV,
+  supervisor: SUPERVISOR_NAV,
+  worker: WORKER_NAV,
+};
+
 type DashboardLayoutProps = {
   title: string;
   description?: string;
   breadcrumb?: Array<{ label: string; href?: string }>;
   actions?: React.ReactNode;
+  /** Pass a string variant — resolves nav on the client avoiding RSC serialization of functions */
+  navVariant?: NavVariant;
+  /** Fallback for legacy callers that pass the array directly */
   navItems?: NavItem[];
   logoHref?: string;
   sidebarFooter?: React.ReactNode;
@@ -345,11 +357,14 @@ export function DashboardLayout({
   description,
   breadcrumb,
   actions,
-  navItems = ADMIN_NAV,
+  navVariant,
+  navItems,
   logoHref,
   sidebarFooter,
   children,
 }: DashboardLayoutProps) {
+  // Resolve nav items on the client — navVariant takes priority to avoid RSC serialization issues
+  const resolvedNavItems = navVariant ? NAV_VARIANT_MAP[navVariant] : (navItems ?? ADMIN_NAV);
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -394,7 +409,7 @@ export function DashboardLayout({
           )}
         >
           <div className="sticky top-0 z-20 flex items-center justify-between p-6 md:p-8">
-            <Link href={logoHref ?? normalizePath(navItems[0]?.href ?? '/')} className="group flex items-center gap-3">
+            <Link href={logoHref ?? normalizePath(resolvedNavItems[0]?.href ?? '/')} className="group flex items-center gap-3">
               <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_20px_var(--accent-soft)] transition-transform duration-500 group-hover:rotate-180">
                 <div className="h-4 w-4 rounded-full bg-black/80" />
               </div>
@@ -409,7 +424,7 @@ export function DashboardLayout({
           </div>
 
           <nav className="flex-1 overflow-y-auto scroll-stable px-4 md:px-5">
-            <SidebarContent pathname={pathname} navItems={navItems} onNavigate={() => setSidebarOpen(false)} />
+            <SidebarContent pathname={pathname} navItems={resolvedNavItems} onNavigate={() => setSidebarOpen(false)} />
           </nav>
 
           <div className="p-6 md:p-8">

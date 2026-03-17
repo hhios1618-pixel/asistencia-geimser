@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import DashboardLayout, { AGENTE_NAV } from '@/components/layout/DashboardLayout';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import { runQuery } from '@/lib/db/postgres';
 import { resolveUserRole } from '@/lib/auth/role';
 import AgenteDashboard from './components/AgenteDashboard';
@@ -120,7 +120,7 @@ export default async function AgentePage() {
       title="Mi espacio"
       description={profile.campaign_name ? `Campaña: ${profile.campaign_name}` : 'Portal del trabajador'}
       breadcrumb={[{ label: profile.name }]}
-      navItems={AGENTE_NAV}
+      navVariant="agente"
       logoHref={isAdmin ? '/admin' : '/agente'}
       actions={adminBackAction}
     >

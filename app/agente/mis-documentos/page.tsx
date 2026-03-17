@@ -1,8 +1,12 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import DashboardLayout, { AGENTE_NAV } from '@/components/layout/DashboardLayout';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import { runQuery } from '@/lib/db/postgres';
+import { resolveUserRole } from '@/lib/auth/role';
 import MisDocumentosClient from './MisDocumentosClient';
+import type { Tables } from '@/types/database';
+type Role = Tables['people']['Row']['role'];
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +14,10 @@ export default async function MisDocumentosPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
+
+  const defaultRole = (process.env.NEXT_PUBLIC_DEFAULT_LOGIN_ROLE as Role) ?? 'ADMIN';
+  const role = await resolveUserRole(user, defaultRole);
+  const isAdmin = role === 'ADMIN' || role === 'SUPERVISOR';
 
   const { rows: documents } = await runQuery(`
     select
@@ -22,12 +30,23 @@ export default async function MisDocumentosPage() {
     order by cd.created_at desc
   `, [user.id]).catch(() => ({ rows: [] }));
 
+  const adminBackAction = isAdmin ? (
+    <Link
+      href="/admin"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-[rgba(255,255,255,0.1)] bg-white/[0.04] text-slate-400 hover:text-white hover:border-[rgba(0,229,255,0.3)] hover:bg-[rgba(0,229,255,0.06)] transition-all"
+    >
+      ← Panel Admin
+    </Link>
+  ) : null;
+
   return (
     <DashboardLayout
       title="Mis documentos"
       description="Todos tus contratos, liquidaciones y documentos disponibles."
       breadcrumb={[{ label: 'Mi espacio', href: '/agente' }, { label: 'Documentos' }]}
-      navItems={AGENTE_NAV}
+      navVariant="agente"
+      logoHref={isAdmin ? '/admin' : '/agente'}
+      actions={adminBackAction}
     >
       <MisDocumentosClient documents={documents as Parameters<typeof MisDocumentosClient>[0]['documents']} />
     </DashboardLayout>
