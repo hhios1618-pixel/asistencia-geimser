@@ -1,19 +1,10 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import type { NavItem } from '@/components/layout/DashboardLayout';
+import DashboardLayout, { AGENTE_NAV } from '@/components/layout/DashboardLayout';
 import { runQuery } from '@/lib/db/postgres';
 import MiAsistenciaClient from './MiAsistenciaClient';
-import { IconCalendar, IconFolder, IconFileText, IconCircleCheck } from '@tabler/icons-react';
 
 export const dynamic = 'force-dynamic';
-
-const AGENTE_NAV: NavItem[] = [
-  { label: 'Resumen',           href: '/agente',                             icon: IconCircleCheck, match: p => p === '/agente' },
-  { label: 'Mis documentos',    href: '/agente/mis-documentos',              icon: IconFolder },
-  { label: 'Mi asistencia',     href: '/agente/mi-asistencia',               icon: IconCalendar },
-  { label: 'Mis liquidaciones', href: '/agente/mis-documentos?tipo=PAYSLIP', icon: IconFileText },
-];
 
 export default async function MiAsistenciaPage() {
   const supabase = await createServerSupabaseClient();
