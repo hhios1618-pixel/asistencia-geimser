@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -424,7 +424,11 @@ export function DashboardLayout({
           </div>
 
           <nav className="flex-1 overflow-y-auto scroll-stable px-4 md:px-5">
-            <SidebarContent pathname={pathname} navItems={resolvedNavItems} onNavigate={() => setSidebarOpen(false)} />
+            <Suspense fallback={<div className="flex flex-col gap-2 p-3">{resolvedNavItems.map(item => (
+              <div key={item.href} className="h-12 rounded-[18px] bg-white/5 animate-pulse" />
+            ))}</div>}>
+              <SidebarContent pathname={pathname} navItems={resolvedNavItems} onNavigate={() => setSidebarOpen(false)} />
+            </Suspense>
           </nav>
 
           <div className="p-6 md:p-8">
