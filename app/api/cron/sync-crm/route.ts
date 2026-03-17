@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   let campaignsSynced = 0;
   let attendanceSynced = 0;
   let workersSynced = 0;
-  let errors: string[] = [];
+  const errors: string[] = [];
 
   try {
     // ===== 1. SYNC CAMPAÑAS =====
