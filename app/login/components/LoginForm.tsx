@@ -1,9 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserSupabaseClient } from '../../../lib/supabase/client';
 import Link from 'next/link';
+
+const sanitizeNextPath = (nextRaw: string | null, fallback = '/asistencia') => {
+  if (!nextRaw) return fallback;
+  const trimmed = nextRaw.trim();
+  if (!trimmed.startsWith('/')) return fallback;
+  if (trimmed.startsWith('//')) return fallback;
+  return trimmed;
+};
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,19 +23,51 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(
     searchParams.get('error_description') ||
-    (searchParams.get('error') === 'auth_callback_error' ? 'Error al verificar el enlace. Es posible que haya expirado.' : null)
+      (searchParams.get('error') === 'auth_callback_error'
+        ? 'Error al verificar el enlace. Es posible que haya expirado.'
+        : null)
   );
 
   useEffect(() => {
-    const clearStaleSession = async () => {
-      try {
-        await supabase.auth.signOut();
-      } catch {
-        // ignore stale session errors
+    let cancelled = false;
+
+    const consumeHashSession = async () => {
+      if (typeof window === 'undefined') return;
+      if (!window.location.hash.includes('access_token=')) return;
+
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      if (!accessToken || !refreshToken) return;
+
+      setLoading(true);
+      setError(null);
+
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (cancelled) return;
+
+      if (setSessionError) {
+        setError('No se pudo iniciar sesión automáticamente. Intenta ingresar con correo y contraseña.');
+        setLoading(false);
+        return;
       }
+
+      const safeNextPath = sanitizeNextPath(searchParams.get('next'));
+      window.history.replaceState({}, document.title, `${window.location.pathname}?next=${encodeURIComponent(safeNextPath)}`);
+      router.replace(safeNextPath);
+      router.refresh();
     };
-    void clearStaleSession();
-  }, [supabase]);
+
+    void consumeHashSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, searchParams, supabase]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

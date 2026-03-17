@@ -1,13 +1,20 @@
 import { createRouteSupabaseClient } from '../../../lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+const sanitizeNextPath = (nextRaw: string | null, fallback = '/asistencia') => {
+    if (!nextRaw) return fallback;
+    const trimmed = nextRaw.trim();
+    if (!trimmed.startsWith('/')) return fallback;
+    if (trimmed.startsWith('//')) return fallback;
+    return trimmed;
+};
 
 export async function GET(request: Request) {
     const requestUrl = new URL(request.url);
     const code = requestUrl.searchParams.get('code');
-    const next = requestUrl.searchParams.get('next') ?? '/asistencia';
+    const next = sanitizeNextPath(requestUrl.searchParams.get('next'));
 
     if (code) {
         const supabase = await createRouteSupabaseClient();
@@ -22,6 +29,7 @@ export async function GET(request: Request) {
         }
     }
 
-    // URL to redirect to after sign in process completes
-    return NextResponse.redirect(`${requestUrl.origin}/login?error=no_code`);
+    // For implicit token flows Supabase may return tokens in URL hash (#access_token),
+    // which the server cannot read. Redirect to login so client can consume hash.
+    return NextResponse.redirect(`${requestUrl.origin}/login?next=${encodeURIComponent(next)}`);
 }

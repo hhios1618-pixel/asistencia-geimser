@@ -3,6 +3,7 @@ import 'server-only';
 import type { User } from '@supabase/supabase-js';
 import type { Tables } from '../../types/database';
 import { runQuery } from '../db/postgres';
+import { resolveCrmRoleFromProfile } from '../integrations/registroIntel';
 
 type Role = Tables['people']['Row']['role'];
 
@@ -29,6 +30,11 @@ export async function resolveUserRole(user: User, defaultRole: Role): Promise<Ro
     return metaRole;
   }
 
+  const crmRole = await resolveCrmRoleFromProfile(user.id);
+  if (crmRole) {
+    return crmRole;
+  }
+
   const dbRole = await getPersonRoleFromDb(user.id);
   if (dbRole) {
     return dbRole;
@@ -36,4 +42,3 @@ export async function resolveUserRole(user: User, defaultRole: Role): Promise<Ro
 
   return defaultRole;
 }
-

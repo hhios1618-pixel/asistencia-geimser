@@ -7,8 +7,7 @@ import OfflineSyncTray from './OfflineSyncTray';
 import ActivityFeed from './ActivityFeed';
 import HoldToMark from './HoldToMark';
 import Link from 'next/link';
-import { IconBuildingSkyscraper, IconCake, IconChevronDown } from '@tabler/icons-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { IconCake, IconChevronDown } from '@tabler/icons-react';
 
 type HistoryItem = {
   id: string;
@@ -122,8 +121,8 @@ export function AttendanceClient({ person, sites, schedule, birthdaysThisMonth }
                 <span className="font-medium text-slate-200">Mis Solicitudes</span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition group-hover:scale-110">→</span>
               </Link>
-              <Link href="/asistencia/documentos" className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10 hover:border-white/20">
-                <span className="font-medium text-slate-200">Mis Documentos</span>
+              <Link href="/asistencia/capacitacion" className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10 hover:border-white/20">
+                <span className="font-medium text-slate-200">Capacitación campaña</span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition group-hover:scale-110">→</span>
               </Link>
             </div>

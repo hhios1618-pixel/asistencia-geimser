@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -19,6 +19,8 @@ import {
   IconCashBanknote,
   IconHelpCircle,
   IconChevronRight,
+  IconBriefcase,
+  IconFolderOpen,
 } from '@tabler/icons-react';
 
 export type NavSubItem = {
@@ -64,6 +66,7 @@ export const ADMIN_NAV: NavItem[] = [
       { label: 'Planilla', href: '/admin/colaboradores' },
       { label: 'Usuarios', href: '/admin/usuarios' },
       { label: 'Roles y permisos', href: '/admin/rrhh?panel=roles' },
+      { label: 'Blacklist contratación', href: '/admin/rrhh?panel=blacklist' },
       { label: 'Gestión de ausencias', href: '/admin/rrhh?panel=absences' },
       { label: 'Evaluaciones', href: '/admin/rrhh?panel=performance' },
       { label: 'Onboarding/Offboarding', href: '/admin/rrhh?panel=onboarding' },
@@ -83,6 +86,17 @@ export const ADMIN_NAV: NavItem[] = [
   },
   { label: 'Sitios y ubicaciones', href: '/admin/sitios', icon: IconMapPins },
   { label: 'Turnos y horarios', href: '/admin/turnos', icon: IconCalendarStats },
+  { label: 'Capacitación campañas', href: '/asistencia/capacitacion', icon: IconClipboardText },
+  {
+    label: 'Campañas RRHH',
+    href: '/campanas',
+    icon: IconBriefcase,
+    match: (pathname) => pathname.startsWith('/campanas'),
+    subItems: [
+      { label: 'Todas las campañas', href: '/campanas' },
+      { label: 'Accesos de clientes', href: '/api/client/access' },
+    ],
+  },
   { label: 'Alertas y notificaciones', href: '/admin/alertas', icon: IconBellRinging },
   { label: 'Ayuda / soporte', href: '/ayuda', icon: IconHelpCircle },
 ];
@@ -90,8 +104,16 @@ export const ADMIN_NAV: NavItem[] = [
 export const SUPERVISOR_NAV: NavItem[] = [
   { label: 'Panel', href: '/supervisor', icon: IconGauge },
   { label: 'Equipo', href: '/supervisor/equipo', icon: IconUsers },
+  {
+    label: 'Campañas',
+    href: '/campanas',
+    icon: IconBriefcase,
+    match: (pathname) => pathname.startsWith('/campanas'),
+  },
+  { label: 'Documentos', href: '/campanas', icon: IconFolderOpen },
   { label: 'Solicitudes', href: '/supervisor/solicitudes', icon: IconClipboardText },
   { label: 'Sitios asignados', href: '/supervisor/sitios', icon: IconMapPins },
+  { label: 'Capacitación', href: '/asistencia/capacitacion', icon: IconClipboardText },
   { label: 'Alertas', href: '/supervisor/alertas', icon: IconBellRinging },
   { label: 'Ayuda', href: '/ayuda', icon: IconHelpCircle },
 ];
@@ -100,6 +122,7 @@ export const WORKER_NAV: NavItem[] = [
   { label: 'Mi horario', href: '/asistencia/horario', icon: IconCalendarStats },
   { label: 'Mi asistencia', href: '/asistencia', icon: IconUserCheck },
   { label: 'Mis solicitudes', href: '/asistencia/solicitudes', icon: IconClipboardText },
+  { label: 'Capacitación', href: '/asistencia/capacitacion', icon: IconClipboardText },
   { label: 'Notificaciones', href: '/asistencia/notificaciones', icon: IconBellRinging },
 ];
 
@@ -365,6 +388,7 @@ export function DashboardLayout({
                 </nav>
               )}
               <h2 className="text-xl font-bold text-white md:text-2xl">{title}</h2>
+              {description && <p className="text-sm text-slate-400">{description}</p>}
             </div>
             <div className="flex items-center gap-4">
               {actions}
