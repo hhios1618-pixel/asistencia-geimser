@@ -27,6 +27,8 @@ import {
   IconFileText,
 } from '@tabler/icons-react';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export type NavSubItem = {
   label: string;
   href: string;
@@ -40,7 +42,10 @@ export type NavItem = {
   match?: (pathname: string) => boolean;
 };
 
-// ... Keep existing NAV constants definitions ...
+export type NavVariant = 'admin' | 'agente' | 'supervisor' | 'worker';
+
+// ─── Nav Arrays ───────────────────────────────────────────────────────────────
+
 export const ADMIN_NAV: NavItem[] = [
   {
     label: 'Panel de control',
@@ -123,10 +128,10 @@ export const SUPERVISOR_NAV: NavItem[] = [
 ];
 
 export const AGENTE_NAV: NavItem[] = [
-  { label: 'Resumen',           href: '/agente',                                icon: IconCircleCheck, match: (p) => p === '/agente' },
-  { label: 'Mis documentos',    href: '/agente/mis-documentos',                 icon: IconFolder },
-  { label: 'Mi asistencia',     href: '/agente/mi-asistencia',                  icon: IconCalendar },
-  { label: 'Mis liquidaciones', href: '/agente/mis-documentos?tipo=PAYSLIP',    icon: IconFileText },
+  { label: 'Resumen',           href: '/agente',                             icon: IconCircleCheck, match: (p) => p === '/agente' },
+  { label: 'Mis documentos',    href: '/agente/mis-documentos',              icon: IconFolder },
+  { label: 'Mi asistencia',     href: '/agente/mi-asistencia',               icon: IconCalendar },
+  { label: 'Mis liquidaciones', href: '/agente/mis-documentos?tipo=PAYSLIP', icon: IconFileText },
 ];
 
 export const WORKER_NAV: NavItem[] = [
@@ -137,6 +142,15 @@ export const WORKER_NAV: NavItem[] = [
   { label: 'Notificaciones', href: '/asistencia/notificaciones', icon: IconBellRinging },
 ];
 
+const NAV_VARIANT_MAP: Record<NavVariant, NavItem[]> = {
+  admin: ADMIN_NAV,
+  agente: AGENTE_NAV,
+  supervisor: SUPERVISOR_NAV,
+  worker: WORKER_NAV,
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 const normalizePath = (href: string) => href.split('?')[0] ?? href;
 
 const getPanelParam = (href: string) => {
@@ -144,7 +158,43 @@ const getPanelParam = (href: string) => {
   return match?.[1] ?? null;
 };
 
-// --- Framer Motion Components ---
+// ─── Sub-item ─────────────────────────────────────────────────────────────────
+
+function NavSubItemComponent({ item }: { item: NavSubItem }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activePanel = searchParams?.get('panel');
+  const basePath = normalizePath(item.href);
+  const panel = getPanelParam(item.href);
+
+  const isActive = pathname === basePath && (panel ? activePanel === panel : !activePanel);
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        'group flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200 outline-none',
+        isActive
+          ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+          : 'text-slate-400 hover:text-white hover:bg-white/5'
+      )}
+    >
+      <span className={cn(
+        'h-1.5 w-1.5 rounded-full transition-all duration-300',
+        isActive ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]' : 'bg-white/20 group-hover:bg-white/40'
+      )} />
+      <span className="truncate">{item.label}</span>
+      {isActive && (
+        <motion.div
+          layoutId="activeSubNav"
+          className="absolute left-0 w-0.5 h-4 bg-[var(--accent)] rounded-r-full"
+        />
+      )}
+    </Link>
+  );
+}
+
+// ─── Nav item ─────────────────────────────────────────────────────────────────
 
 function NavItemComponent({
   item,
@@ -177,27 +227,19 @@ function NavItemComponent({
             transition={{ type: 'spring', stiffness: 500, damping: 35 }}
           />
         )}
-
-        <span
-          className={cn(
-            'relative z-10 flex h-9 w-9 items-center justify-center rounded-[14px] transition-all duration-300',
-            isActive
-              ? 'bg-gradient-to-br from-[var(--accent)] to-[var(--accent-2)] text-black shadow-lg shadow-[var(--accent)]/40'
-              : 'bg-white/5 border border-white/5 shadow-inner group-hover:bg-white/10 group-hover:border-white/10'
-          )}
-        >
-          <Icon size={20} className={cn("transition-transform duration-300", isActive ? "scale-110" : "group-hover:scale-105")} />
+        <span className={cn(
+          'relative z-10 flex h-9 w-9 items-center justify-center rounded-[14px] transition-all duration-300',
+          isActive
+            ? 'bg-gradient-to-br from-[var(--accent)] to-[var(--accent-2)] text-black shadow-lg shadow-[var(--accent)]/40'
+            : 'bg-white/5 border border-white/5 shadow-inner group-hover:bg-white/10 group-hover:border-white/10'
+        )}>
+          <Icon size={20} className={cn('transition-transform duration-300', isActive ? 'scale-110' : 'group-hover:scale-105')} />
         </span>
-
         <span className="relative z-10 truncate tracking-[0.01em] flex-1">{item.label}</span>
-
         {item.subItems && (
           <IconChevronRight
             size={14}
-            className={cn(
-              "relative z-10 text-slate-500 transition-transform duration-300",
-              isExpanded ? "rotate-90" : "rotate-0"
-            )}
+            className={cn('relative z-10 text-slate-500 transition-transform duration-300', isExpanded ? 'rotate-90' : 'rotate-0')}
           />
         )}
       </Link>
@@ -225,39 +267,7 @@ function NavItemComponent({
   );
 }
 
-function NavSubItemComponent({ item }: { item: NavSubItem }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const activePanel = searchParams?.get('panel');
-  const basePath = normalizePath(item.href);
-  const panel = getPanelParam(item.href);
-
-  const isActive = pathname === basePath && (panel ? activePanel === panel : !activePanel);
-
-  return (
-    <Link
-      href={item.href}
-      className={cn(
-        "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200 outline-none",
-        isActive
-          ? "bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
-          : "text-slate-400 hover:text-white hover:bg-white/5"
-      )}
-    >
-      <span className={cn(
-        "h-1.5 w-1.5 rounded-full transition-all duration-300",
-        isActive ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" : "bg-white/20 group-hover:bg-white/40"
-      )} />
-      <span className="truncate">{item.label}</span>
-      {isActive && (
-        <motion.div
-          layoutId="activeSubNav"
-          className="absolute left-0 w-0.5 h-4 bg-[var(--accent)] rounded-r-full"
-        />
-      )}
-    </Link>
-  );
-}
+// ─── Sidebar content (needs Suspense for useSearchParams) ─────────────────────
 
 function SidebarContent({
   pathname,
@@ -277,7 +287,6 @@ function SidebarContent({
           let isActive: boolean;
 
           if (item.match) {
-            // Custom match function takes priority
             isActive = item.match(pathname);
           } else {
             const basePath = normalizePath(item.href);
@@ -286,19 +295,16 @@ function SidebarContent({
               : null;
 
             if (itemQS) {
-              // Item carries query params — require pathname AND all params to match
               const pathMatches = pathname === basePath;
               const paramsMatch = Array.from(itemQS.entries()).every(
                 ([key, val]) => searchParams?.get(key) === val
               );
               isActive = pathMatches && paramsMatch;
             } else {
-              // Plain path item — but yield to any sibling that claims the same basePath with params
               const siblingsWithSamePath = navItems.filter(
                 (s) => s !== item && normalizePath(s.href) === basePath && s.href.includes('?')
               );
               if (siblingsWithSamePath.length > 0) {
-                // Only active when none of the sibling's params are present in the current URL
                 const siblingParamKeys = siblingsWithSamePath.flatMap((s) =>
                   Array.from(new URLSearchParams(s.href.split('?')[1]).keys())
                 );
@@ -327,25 +333,172 @@ function SidebarContent({
   );
 }
 
-// --- Main Layout ---
+// ─── DashboardShell ── sidebar only, no page header ──────────────────────────
+// Use this in layout.tsx so the sidebar persists across navigations.
 
-export type NavVariant = 'admin' | 'agente' | 'supervisor' | 'worker';
-
-const NAV_VARIANT_MAP: Record<NavVariant, NavItem[]> = {
-  admin: ADMIN_NAV,
-  agente: AGENTE_NAV,
-  supervisor: SUPERVISOR_NAV,
-  worker: WORKER_NAV,
+type ShellProps = {
+  navVariant?: NavVariant;
+  navItems?: NavItem[];
+  logoHref?: string;
+  sidebarFooter?: React.ReactNode;
+  children: React.ReactNode;
 };
+
+export function DashboardShell({
+  navVariant,
+  navItems,
+  logoHref,
+  sidebarFooter,
+  children,
+}: ShellProps) {
+  const resolvedNavItems = navVariant ? NAV_VARIANT_MAP[navVariant] : (navItems ?? ADMIN_NAV);
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  return (
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[var(--background)] font-sans text-slate-200 selection:bg-[var(--accent)]/30">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--background-gradient)] opacity-80" />
+
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="presentation"
+            className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="mx-auto flex min-h-screen w-full max-w-[1800px] flex-col md:grid md:grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)]">
+
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed right-6 top-6 z-50 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-white shadow-2xl backdrop-blur-xl transition active:scale-95 md:hidden"
+        >
+          <IconMenu2 />
+        </button>
+
+        <aside className={cn(
+          'fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px] flex-col bg-[#05060A]/95 backdrop-blur-xl border-r border-white/5 transition-transform duration-300 md:relative md:flex md:w-full md:max-w-none md:translate-x-0 md:bg-transparent md:backdrop-blur-none md:border-r-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        )}>
+          <div className="sticky top-0 z-20 flex items-center justify-between p-6 md:p-8">
+            <Link href={logoHref ?? normalizePath(resolvedNavItems[0]?.href ?? '/')} className="group flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_20px_var(--accent-soft)] transition-transform duration-500 group-hover:rotate-180">
+                <div className="h-4 w-4 rounded-full bg-black/80" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight text-white">G-Trace</h1>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Enterprise</p>
+              </div>
+            </Link>
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden text-slate-400">
+              <IconX />
+            </button>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto scroll-stable px-4 md:px-5">
+            <Suspense fallback={
+              <div className="flex flex-col gap-2 p-3">
+                {resolvedNavItems.map(item => (
+                  <div key={item.href} className="h-12 rounded-[18px] bg-white/5 animate-pulse" />
+                ))}
+              </div>
+            }>
+              <SidebarContent pathname={pathname} navItems={resolvedNavItems} onNavigate={() => setSidebarOpen(false)} />
+            </Suspense>
+          </nav>
+
+          <div className="p-6 md:p-8">
+            {sidebarFooter ?? (
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-4">
+                <div className="absolute top-0 right-0 p-2 opacity-50">
+                  <IconHelpCircle size={16} className="text-[var(--accent)]" />
+                </div>
+                <p className="text-xs font-medium text-[var(--accent)]">Sistema Operativo</p>
+                <p className="mt-1 text-xs text-slate-400">v2.4.0 (Stable)</p>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Page content column — children provide their own header + main */}
+        <div className="flex min-w-0 flex-col">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PageHeader ── sticky header, use inside DashboardShell children ──────────
+
+type PageHeaderProps = {
+  title: string;
+  description?: string;
+  breadcrumb?: Array<{ label: string; href?: string }>;
+  actions?: React.ReactNode;
+};
+
+export function PageHeader({ title, description, breadcrumb, actions }: PageHeaderProps) {
+  return (
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-[#05060A]/80 px-6 py-4 backdrop-blur-xl md:px-10">
+      <div className="flex flex-col gap-1">
+        {breadcrumb && (
+          <nav className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest text-slate-500">
+            {breadcrumb.map((item, i) => (
+              <span key={i} className="flex items-center gap-2">
+                {item.href
+                  ? <Link href={item.href} className="hover:text-[var(--accent)] transition-colors">{item.label}</Link>
+                  : item.label}
+                {i < breadcrumb.length - 1 && <span className="opacity-30">/</span>}
+              </span>
+            ))}
+          </nav>
+        )}
+        <h2 className="text-xl font-bold text-white md:text-2xl">{title}</h2>
+        {description && <p className="text-sm text-slate-400">{description}</p>}
+      </div>
+      <div className="flex items-center gap-4">{actions}</div>
+    </header>
+  );
+}
+
+// ─── PageContent ── animated main area, use after PageHeader ──────────────────
+
+export function PageContent({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  return (
+    <main className="flex-1 p-6 md:p-10">
+      <motion.div
+        key={pathname}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
+        className="mx-auto w-full max-w-[1400px] flex flex-col gap-8"
+      >
+        {children}
+      </motion.div>
+    </main>
+  );
+}
+
+// ─── DashboardLayout ── backward-compatible (admin/supervisor pages) ──────────
+// For new page sections, prefer: DashboardShell in layout.tsx + PageHeader + PageContent in page.tsx
 
 type DashboardLayoutProps = {
   title: string;
   description?: string;
   breadcrumb?: Array<{ label: string; href?: string }>;
   actions?: React.ReactNode;
-  /** Pass a string variant — resolves nav on the client avoiding RSC serialization of functions */
   navVariant?: NavVariant;
-  /** Fallback for legacy callers that pass the array directly */
   navItems?: NavItem[];
   logoHref?: string;
   sidebarFooter?: React.ReactNode;
@@ -363,121 +516,16 @@ export function DashboardLayout({
   sidebarFooter,
   children,
 }: DashboardLayoutProps) {
-  // Resolve nav items on the client — navVariant takes priority to avoid RSC serialization issues
-  const resolvedNavItems = navVariant ? NAV_VARIANT_MAP[navVariant] : (navItems ?? ADMIN_NAV);
-  const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [pathname]);
-
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden bg-[var(--background)] font-sans text-slate-200 selection:bg-[var(--accent)]/30">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--background-gradient)] opacity-80" />
-
-      {/* Mobile Backdrop */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            role="presentation"
-            className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <div className="mx-auto flex min-h-screen w-full max-w-[1800px] flex-col md:grid md:grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)]">
-
-        {/* Mobile Toggle */}
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed right-6 top-6 z-50 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-white shadow-2xl backdrop-blur-xl transition active:scale-95 md:hidden"
-        >
-          <IconMenu2 />
-        </button>
-
-        {/* Sidebar */}
-        <aside
-          className={cn(
-            "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px] flex-col bg-[#05060A]/95 backdrop-blur-xl border-r border-white/5 transition-transform duration-300 md:relative md:flex md:w-full md:max-w-none md:translate-x-0 md:bg-transparent md:backdrop-blur-none md:border-r-0",
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-        >
-          <div className="sticky top-0 z-20 flex items-center justify-between p-6 md:p-8">
-            <Link href={logoHref ?? normalizePath(resolvedNavItems[0]?.href ?? '/')} className="group flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-2)] shadow-[0_0_20px_var(--accent-soft)] transition-transform duration-500 group-hover:rotate-180">
-                <div className="h-4 w-4 rounded-full bg-black/80" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold tracking-tight text-white">G-Trace</h1>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Enterprise</p>
-              </div>
-            </Link>
-            <button onClick={() => setSidebarOpen(false)} className="md:hidden text-slate-400">
-              <IconX />
-            </button>
-          </div>
-
-          <nav className="flex-1 overflow-y-auto scroll-stable px-4 md:px-5">
-            <Suspense fallback={<div className="flex flex-col gap-2 p-3">{resolvedNavItems.map(item => (
-              <div key={item.href} className="h-12 rounded-[18px] bg-white/5 animate-pulse" />
-            ))}</div>}>
-              <SidebarContent pathname={pathname} navItems={resolvedNavItems} onNavigate={() => setSidebarOpen(false)} />
-            </Suspense>
-          </nav>
-
-          <div className="p-6 md:p-8">
-            {sidebarFooter ?? (
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-4">
-                <div className="absolute top-0 right-0 p-2 opacity-50"><IconHelpCircle size={16} className="text-[var(--accent)]" /></div>
-                <p className="text-xs font-medium text-[var(--accent)]">Sistema Operativo</p>
-                <p className="mt-1 text-xs text-slate-400">v2.4.0 (Stable)</p>
-              </div>
-            )}
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <div className="flex min-w-0 flex-col">
-          <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-[#05060A]/80 px-6 py-4 backdrop-blur-xl md:px-10">
-            <div className="flex flex-col gap-1">
-              {breadcrumb && (
-                <nav className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest text-slate-500">
-                  {breadcrumb.map((item, i) => (
-                    <span key={i} className="flex items-center gap-2">
-                      {item.href ? <Link href={item.href} className="hover:text-[var(--accent)] transition-colors">{item.label}</Link> : item.label}
-                      {i < breadcrumb.length - 1 && <span className="opacity-30">/</span>}
-                    </span>
-                  ))}
-                </nav>
-              )}
-              <h2 className="text-xl font-bold text-white md:text-2xl">{title}</h2>
-              {description && <p className="text-sm text-slate-400">{description}</p>}
-            </div>
-            <div className="flex items-center gap-4">
-              {actions}
-            </div>
-          </header>
-
-          <main className="flex-1 p-6 md:p-10">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
-              className="mx-auto w-full max-w-[1400px] flex flex-col gap-8"
-            >
-              {children}
-            </motion.div>
-          </main>
-        </div>
-      </div>
-    </div>
+    <DashboardShell
+      navVariant={navVariant}
+      navItems={navItems}
+      logoHref={logoHref}
+      sidebarFooter={sidebarFooter}
+    >
+      <PageHeader title={title} description={description} breadcrumb={breadcrumb} actions={actions} />
+      <PageContent>{children}</PageContent>
+    </DashboardShell>
   );
 }
 
