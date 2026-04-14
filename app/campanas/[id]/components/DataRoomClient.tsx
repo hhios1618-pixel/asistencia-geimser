@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   IconUsers, IconFolder, IconCalendar, IconBuildingSkyscraper,
   IconUpload, IconUserPlus, IconDownload, IconChevronLeft,
   IconCircleCheck, IconCircleX, IconShield, IconClock,
-  IconFileTypePdf, IconFileTypeXls, IconFile, IconDots,
-  IconRefresh, IconTrash, IconEye, IconEyeOff,
+  IconFileTypePdf, IconFileTypeXls, IconFile,
+  IconTrash, IconEye, IconEyeOff, IconX, IconLoader2, IconAlertCircle,
 } from '@tabler/icons-react';
 
 type Campaign = Record<string, unknown> & {
@@ -122,35 +122,49 @@ type Props = {
 
 export default function DataRoomClient({ campaign, team, documents, accesses, attendance, userRole, campaignId }: Props) {
   const [tab, setTab] = useState<Tab>('equipo');
-  const [uploading, setUploading] = useState(false);
   const [showAccessForm, setShowAccessForm] = useState(false);
   const [newCreds, setNewCreds] = useState<{ email: string; password?: string; message: string } | null>(null);
   const [accessForm, setAccessForm] = useState({ client_email: '', client_name: '', access_level: 'DOWNLOAD', expires_at: '' });
   const [docFilter, setDocFilter] = useState('all');
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadForm, setUploadForm] = useState({ doc_type: 'OTHER', period_label: '', visible_to_client: true, visible_to_worker: false });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const docType = prompt('Tipo de documento:\nCONTRACT / PAYSLIP / COTIZACION / REPORT / INVOICE / OTHER', 'REPORT')?.toUpperCase();
-    if (!docType) return;
-    const period = prompt('Período (ej: 2024-03) — dejar vacío si no aplica:') || '';
-    const visClient = confirm('¿Visible para el cliente?');
-    const visWorker = confirm('¿Visible para el trabajador?');
+    setPendingFile(file);
+    setUploadError(null);
+    setShowUploadModal(true);
+    e.target.value = '';
+  };
 
+  const handleUploadSubmit = async () => {
+    if (!pendingFile) return;
     setUploading(true);
+    setUploadError(null);
     const form = new FormData();
-    form.append('file', file);
-    form.append('doc_type', docType);
-    form.append('visible_to_client', String(visClient));
-    form.append('visible_to_worker', String(visWorker));
-    if (period) form.append('period_label', period);
-
+    form.append('file', pendingFile);
+    form.append('doc_type', uploadForm.doc_type);
+    form.append('visible_to_client', String(uploadForm.visible_to_client));
+    form.append('visible_to_worker', String(uploadForm.visible_to_worker));
+    if (uploadForm.period_label) form.append('period_label', uploadForm.period_label);
     try {
-      await fetch(`/api/campaigns/${campaignId}/documents`, { method: 'POST', body: form });
+      const res = await fetch(`/api/campaigns/${campaignId}/documents`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir archivo');
+      setShowUploadModal(false);
+      setPendingFile(null);
       window.location.reload();
+    } catch (err) {
+      setUploadError((err as Error).message);
     } finally {
       setUploading(false);
-      e.target.value = '';
     }
   };
 
@@ -377,16 +391,14 @@ export default function DataRoomClient({ campaign, team, documents, accesses, at
                     </button>
                   ))}
                 </div>
-
-                <label className={`ml-auto flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] rounded-2xl cursor-pointer transition-all ${
-                  uploading
-                    ? 'bg-white/10 text-slate-500 cursor-not-allowed'
-                    : 'bg-[var(--accent)] text-black shadow-[0_0_16px_rgba(0,229,255,0.3)] hover:shadow-[0_0_24px_rgba(0,229,255,0.45)]'
-                }`}>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="ml-auto flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] rounded-2xl cursor-pointer transition-all bg-[var(--accent)] text-black shadow-[0_0_16px_rgba(0,229,255,0.3)] hover:shadow-[0_0_24px_rgba(0,229,255,0.45)]"
+                >
                   <IconUpload size={13} />
-                  {uploading ? 'Subiendo...' : 'Subir doc'}
-                  <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept=".pdf,.xlsx,.xls,.docx,.jpg,.png" />
-                </label>
+                  Subir doc
+                </button>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept=".pdf,.xlsx,.xls,.docx,.jpg,.png" />
               </div>
 
               {filteredDocs.length === 0 ? (
@@ -673,6 +685,124 @@ export default function DataRoomClient({ campaign, team, documents, accesses, at
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      {/* ═══ UPLOAD MODAL ═══ */}
+      <AnimatePresence>
+        {showUploadModal && pendingFile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+            onClick={e => { if (e.target === e.currentTarget) setShowUploadModal(false); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="w-full max-w-md rounded-3xl border border-[rgba(255,255,255,0.1)] bg-[rgba(10,12,18,0.98)] shadow-2xl p-6 flex flex-col gap-5"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-white">Subir Documento</p>
+                <button onClick={() => setShowUploadModal(false)} className="w-7 h-7 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 transition-all">
+                  <IconX size={14} />
+                </button>
+              </div>
+
+              {/* File info */}
+              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-white/[0.03]">
+                <FileIcon name={pendingFile.name} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-200 truncate">{pendingFile.name}</p>
+                  <p className="text-xs text-slate-600">{formatBytes(pendingFile.size)}</p>
+                </div>
+              </div>
+
+              {/* Doc type */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Tipo de documento</label>
+                <select
+                  value={uploadForm.doc_type}
+                  onChange={e => setUploadForm(p => ({ ...p, doc_type: e.target.value }))}
+                  className="w-full px-4 py-2.5 text-sm rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(0,0,0,0.5)] text-slate-200 focus:outline-none focus:border-[var(--accent)]/50"
+                >
+                  {Object.entries(DOC_LABELS).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Period */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Período (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: 2025-03, Q1-2025"
+                  value={uploadForm.period_label}
+                  onChange={e => setUploadForm(p => ({ ...p, period_label: e.target.value }))}
+                  className="w-full px-4 py-2.5 text-sm rounded-xl border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] text-slate-200 placeholder-slate-600 focus:outline-none focus:border-[var(--accent)]/50"
+                />
+              </div>
+
+              {/* Visibility */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Visibilidad</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'visible_to_client', label: '👁 Visible al cliente', color: 'text-[var(--accent)]' },
+                    { key: 'visible_to_worker', label: '👤 Visible al trabajador', color: 'text-violet-400' },
+                  ].map(({ key, label, color }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setUploadForm(p => ({ ...p, [key]: !p[key as keyof typeof p] }))}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                        uploadForm[key as keyof typeof uploadForm]
+                          ? `border-current ${color} bg-current/10`
+                          : 'border-[rgba(255,255,255,0.08)] text-slate-600 bg-white/[0.02]'
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded flex items-center justify-center text-[10px] ${
+                        uploadForm[key as keyof typeof uploadForm] ? 'bg-current/20' : 'bg-white/5'
+                      }`}>
+                        {uploadForm[key as keyof typeof uploadForm] ? '✓' : ''}
+                      </span>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error */}
+              {uploadError && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-rose-400/30 bg-rose-400/10 text-sm text-rose-300">
+                  <IconAlertCircle size={15} />
+                  {uploadError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleUploadSubmit}
+                  disabled={uploading}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold uppercase tracking-[0.2em] rounded-2xl bg-[var(--accent)] text-black disabled:opacity-50 shadow-[0_0_16px_rgba(0,229,255,0.3)] hover:shadow-[0_0_24px_rgba(0,229,255,0.45)] transition-all"
+                >
+                  {uploading ? <IconLoader2 size={15} className="animate-spin" /> : <IconUpload size={15} />}
+                  {uploading ? 'Subiendo...' : 'Confirmar Subida'}
+                </button>
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2.5 text-sm text-slate-500 hover:text-slate-300 rounded-2xl hover:bg-white/5 transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
