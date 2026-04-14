@@ -249,12 +249,16 @@ export default function ClientePortal({
       >
         {/* Avatar */}
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-2)] flex items-center justify-center text-black font-bold text-xl flex-shrink-0">
-          {clientName.charAt(0).toUpperCase()}
+          {selectedCampaign ? selectedCampaign.name.charAt(0).toUpperCase() : clientName.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[var(--accent)] mb-0.5">Portal de Cliente</p>
-          <h1 className="text-xl font-bold text-white truncate">{clientName}</h1>
-          <p className="text-sm text-slate-500 truncate">{clientEmail}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[var(--accent)] mb-0.5">Espacio de Cliente — Geimser RRHH</p>
+          <h1 className="text-xl font-bold text-white truncate">
+            {selectedCampaign ? `Campaña: ${selectedCampaign.name}` : clientName}
+          </h1>
+          <p className="text-sm text-slate-500 truncate">
+            Bienvenido, {clientName} {clientEmail ? `(${clientEmail})` : ''}
+          </p>
         </div>
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10">
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
