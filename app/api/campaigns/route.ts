@@ -144,13 +144,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'nombre requerido' }, { status: 400 });
     }
 
+    // Si no se provee crm_campaign_id (espacio manual sin CRM), generamos uno único
+    const effectiveCrmId = crm_campaign_id?.trim() ||
+      `local-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${Date.now()}`;
+
     const { rows: [campaign] } = await runQuery(`
       insert into campaigns_local (
         crm_campaign_id, name, status, channel, client_name, client_rut, client_contact_name, client_contact_email
       ) values ($1, $2, $3, $4, $5, $6, $7, $8)
       returning *
     `, [
-      crm_campaign_id || null,
+      effectiveCrmId,
       name,
       status || 'active',
       channel || null,
