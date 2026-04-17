@@ -129,7 +129,7 @@ export const SUPERVISOR_NAV: NavItem[] = [
 
 export const AGENTE_NAV: NavItem[] = [
   { label: 'Resumen',           href: '/agente',                             icon: IconCircleCheck, match: (p) => p === '/agente' },
-  { label: 'Mis documentos',    href: '/agente/mis-documentos',              icon: IconFolder },
+  { label: 'Mi carpeta',        href: '/agente/mis-documentos',              icon: IconFolder },
   { label: 'Mi asistencia',     href: '/agente/mi-asistencia',               icon: IconCalendar },
   { label: 'Mis liquidaciones', href: '/agente/mis-documentos?tipo=PAYSLIP', icon: IconFileText },
 ];

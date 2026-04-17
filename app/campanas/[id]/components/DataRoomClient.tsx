@@ -10,6 +10,7 @@ import {
   IconFileTypePdf, IconFileTypeXls, IconFile,
   IconTrash, IconEye, IconEyeOff, IconX, IconLoader2, IconAlertCircle,
 } from '@tabler/icons-react';
+import CampaignWorkspaceManager from './CampaignWorkspaceManager';
 
 type Campaign = Record<string, unknown> & {
   id: string;
@@ -87,6 +88,7 @@ const DOC_LABELS: Record<string, { label: string; accent: string }> = {
 const TABS = [
   { key: 'equipo',      label: 'Equipo',          icon: IconUsers },
   { key: 'documentos',  label: 'Documentos',       icon: IconFolder },
+  { key: 'carpetas',    label: 'Carpetas',         icon: IconFolder },
   { key: 'asistencia',  label: 'Asistencia',       icon: IconCalendar },
   { key: 'accesos',     label: 'Accesos Cliente',  icon: IconShield },
 ] as const;
@@ -458,6 +460,20 @@ export default function DataRoomClient({ campaign, team, documents, accesses, at
                 </div>
               )}
             </div>
+          )}
+
+          {/* ═══ ASISTENCIA ═══ */}
+          {tab === 'carpetas' && (
+            <CampaignWorkspaceManager
+              campaignId={campaignId}
+              team={team.map((member) => ({
+                id: member.id,
+                name: member.name,
+                email: member.email,
+                rut: member.rut,
+              }))}
+              userRole={userRole}
+            />
           )}
 
           {/* ═══ ASISTENCIA ═══ */}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconFolder, IconDownload, IconSearch, IconFileTypePdf, IconFileTypeXls, IconFile, IconCalendar } from '@tabler/icons-react';
+import { IconFolder, IconDownload, IconSearch, IconFileTypePdf, IconFileTypeXls, IconFile, IconCalendar, IconUpload, IconEdit, IconTrash, IconLoader2 } from '@tabler/icons-react';
 
 type Doc = {
   id: string;
@@ -13,6 +13,16 @@ type Doc = {
   mime_type: string | null;
   created_at: string;
   campaign_name: string | null;
+};
+
+type WorkspaceFile = {
+  id: string;
+  file_name: string;
+  file_size_bytes: number | null;
+  mime_type: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 const DOC_CONFIG: Record<string, { label: string; accent: string; border: string }> = {
@@ -37,9 +47,23 @@ function formatBytes(b: number | null) {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function MisDocumentosClient({ documents }: { documents: Doc[] }) {
+export default function MisDocumentosClient({
+  documents,
+  workspaceFiles: initialWorkspaceFiles,
+  campaignId,
+  campaignName,
+}: {
+  documents: Doc[];
+  workspaceFiles: WorkspaceFile[];
+  campaignId: string | null;
+  campaignName: string | null;
+}) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(initialWorkspaceFiles);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceMessage, setWorkspaceMessage] = useState<string | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const types = ['all', ...new Set(documents.map(d => d.doc_type))];
 
@@ -59,8 +83,152 @@ export default function MisDocumentosClient({ documents }: { documents: Doc[] })
     return acc;
   }, {});
 
+  const handleWorkspaceUpload = async (file: File) => {
+    if (!campaignId) return;
+    setWorkspaceBusy(true);
+    setWorkspaceMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`/api/campaigns/${campaignId}/workspace`, {
+        method: 'POST',
+        body: formData,
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'No fue posible subir el archivo');
+      setWorkspaceFiles((current) => [body.file, ...current]);
+      setWorkspaceMessage('Archivo subido a tu carpeta.');
+    } catch (error) {
+      setWorkspaceMessage((error as Error).message);
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  };
+
+  const handleWorkspaceRename = async (file: WorkspaceFile) => {
+    if (!campaignId) return;
+    const nextName = window.prompt('Nuevo nombre del archivo', file.file_name)?.trim();
+    if (!nextName || nextName === file.file_name) return;
+    setWorkspaceBusy(true);
+    setWorkspaceMessage(null);
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/workspace/${file.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_name: nextName }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'No fue posible renombrar');
+      setWorkspaceFiles((current) => current.map((item) => (item.id === file.id ? body.file : item)));
+    } catch (error) {
+      setWorkspaceMessage((error as Error).message);
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  };
+
+  const handleWorkspaceDelete = async (file: WorkspaceFile) => {
+    if (!campaignId || !window.confirm(`¿Eliminar "${file.file_name}"?`)) return;
+    setWorkspaceBusy(true);
+    setWorkspaceMessage(null);
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/workspace/${file.id}`, {
+        method: 'DELETE',
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'No fue posible eliminar');
+      setWorkspaceFiles((current) => current.filter((item) => item.id !== file.id));
+    } catch (error) {
+      setWorkspaceMessage((error as Error).message);
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
+      {campaignId && (
+        <section className="rounded-3xl border border-white/10 bg-[linear-gradient(150deg,rgba(17,23,34,0.95),rgba(10,12,18,0.9))] p-5">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Mi carpeta</p>
+              <p className="text-sm text-slate-300">
+                {campaignName ? `Campaña ${campaignName}` : 'Espacio compartido'} con acceso solo para ti, admin y cliente autorizado.
+              </p>
+            </div>
+            <button
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={workspaceBusy}
+              className="ml-auto flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-black hover:shadow-[0_0_16px_rgba(0,229,255,0.3)] disabled:opacity-50"
+            >
+              {workspaceBusy ? <IconLoader2 size={14} className="animate-spin" /> : <IconUpload size={14} />}
+              Subir archivo
+            </button>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.zip"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleWorkspaceUpload(file);
+                event.target.value = '';
+              }}
+            />
+          </div>
+
+          {workspaceMessage && (
+            <div className="mb-4 rounded-2xl border border-[rgba(0,229,255,0.18)] bg-[rgba(0,229,255,0.06)] px-4 py-3 text-sm text-slate-200">
+              {workspaceMessage}
+            </div>
+          )}
+
+          {workspaceFiles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-600">
+                <IconFolder size={28} />
+              </div>
+              <p className="text-slate-300">Tu carpeta está vacía.</p>
+              <p className="text-sm text-slate-600">Sube aquí lo que quieras compartir con Geimser y el cliente.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {workspaceFiles.map((file) => (
+                <div key={file.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <FileIcon name={file.file_name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-200">{file.file_name}</p>
+                    <p className="text-xs text-slate-600">
+                      {formatBytes(file.file_size_bytes)} · {new Date(file.updated_at).toLocaleDateString('es-CL')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => window.open(`/api/campaigns/${campaignId}/workspace/${file.id}`)}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    >
+                      <IconDownload size={14} />
+                    </button>
+                    <button
+                      onClick={() => void handleWorkspaceRename(file)}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    >
+                      <IconEdit size={14} />
+                    </button>
+                    <button
+                      onClick={() => void handleWorkspaceDelete(file)}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:bg-rose-400/20"
+                    >
+                      <IconTrash size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
