@@ -53,18 +53,6 @@ export const ADMIN_NAV: NavItem[] = [
     icon: IconGauge,
     match: (pathname) => pathname === '/admin',
   },
-  {
-    label: 'Asistencia',
-    href: '/admin/asistencia?panel=overview',
-    icon: IconUserCheck,
-    subItems: [
-      { label: 'Visión general', href: '/admin/asistencia?panel=overview' },
-      { label: 'Control diario', href: '/admin/asistencia?panel=daily' },
-      { label: 'Correcciones', href: '/admin/asistencia?panel=modifications' },
-      { label: 'Políticas', href: '/admin/asistencia?panel=policies' },
-      { label: 'Auditoría', href: '/admin/asistencia?panel=audit' },
-    ],
-  },
   { label: 'Usuarios', href: '/admin/usuarios', icon: IconUsers },
   {
     label: 'Gestión de RR.HH.',
