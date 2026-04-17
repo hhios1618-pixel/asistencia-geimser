@@ -314,15 +314,27 @@ export async function POST(
       }
 
       const storagePath = buildWorkspaceFolderPlaceholderPath(campaignId, personId, nextFolderPath);
-      const { error: folderUploadError } = await serviceSupabase.storage
-        .from('hr-documents')
-        .upload(storagePath, new Uint8Array(0), {
-          contentType: WORKSPACE_FOLDER_MIME,
-          upsert: true,
-        });
+      const { rows: existingFolderRows } = await runQuery<{ id: string }>(
+        `
+          select id::text
+          from campaign_documents
+          where campaign_id = $1::uuid
+            and person_id = $2::uuid
+            and doc_type = $3
+            and storage_path = $4
+          limit 1
+        `,
+        [campaignId, personId, WORKSPACE_DOC_TYPE, storagePath]
+      );
 
-      if (folderUploadError) {
-        return NextResponse.json({ error: folderUploadError.message }, { status: 500 });
+      if (existingFolderRows.length > 0) {
+        return NextResponse.json({
+          ok: true,
+          folder: {
+            path: nextFolderPath,
+            name: nextFolderPath.split('/').pop() ?? nextFolderPath,
+          },
+        }, { status: 200 });
       }
 
       const { rows: [folderDoc] } = await runQuery<FileRow>(
@@ -367,6 +379,10 @@ export async function POST(
           nextFolderPath,
         ]
       );
+
+      if (!folderDoc) {
+        return NextResponse.json({ error: 'No fue posible registrar la subcarpeta' }, { status: 500 });
+      }
 
       await registerWorkspaceAudit({
         actorId: user.id,
