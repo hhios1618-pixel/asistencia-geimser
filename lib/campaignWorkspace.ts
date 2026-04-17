@@ -28,6 +28,8 @@ type ActorRow = {
 };
 
 export const WORKSPACE_DOC_TYPE = 'WORKSPACE';
+export const WORKSPACE_FOLDER_MIME = 'application/x-directory';
+export const WORKSPACE_FOLDER_PLACEHOLDER = '.folder';
 
 export async function getWorkspaceActor(userId: string, campaignId: string): Promise<WorkspaceActor | null> {
   const { rows: [row] } = await runQuery<ActorRow>(
@@ -108,8 +110,67 @@ export const sanitizeFileName = (name: string) =>
     .replace(/\s+/g, '_')
     .slice(0, 160) || 'archivo';
 
-export const buildWorkspaceStoragePath = (campaignId: string, personId: string, fileName: string) =>
-  `${campaignId}/workspace/${personId}/${Date.now()}_${sanitizeFileName(fileName)}`;
+export const sanitizeWorkspacePathSegment = (value: string) =>
+  value
+    .normalize('NFKD')
+    .replace(/[^\w.\- /]+/g, '')
+    .trim()
+    .replace(/\/+/g, '/')
+    .split('/')
+    .map((segment) => sanitizeFileName(segment).replace(/\./g, '_'))
+    .filter(Boolean)
+    .join('/');
+
+export const sanitizeWorkspaceFolderPath = (value: string | null | undefined) => {
+  if (!value) {
+    return '';
+  }
+  return sanitizeWorkspacePathSegment(value);
+};
+
+export const getWorkspaceBasePrefix = (campaignId: string, personId: string) =>
+  `${campaignId}/workspace/${personId}`;
+
+export const buildWorkspaceStoragePath = (
+  campaignId: string,
+  personId: string,
+  fileName: string,
+  folderPath?: string | null
+) => {
+  const cleanFolderPath = sanitizeWorkspaceFolderPath(folderPath);
+  const prefix = getWorkspaceBasePrefix(campaignId, personId);
+  const folderPrefix = cleanFolderPath ? `${prefix}/${cleanFolderPath}` : prefix;
+  return `${folderPrefix}/${Date.now()}_${sanitizeFileName(fileName)}`;
+};
+
+export const buildWorkspaceFolderPlaceholderPath = (
+  campaignId: string,
+  personId: string,
+  folderPath: string
+) => `${getWorkspaceBasePrefix(campaignId, personId)}/${sanitizeWorkspaceFolderPath(folderPath)}/${WORKSPACE_FOLDER_PLACEHOLDER}`;
+
+export const getWorkspaceRelativePath = (storagePath: string, campaignId: string, personId: string) => {
+  const prefix = `${getWorkspaceBasePrefix(campaignId, personId)}/`;
+  if (!storagePath.startsWith(prefix)) {
+    return '';
+  }
+  return storagePath.slice(prefix.length);
+};
+
+export const getWorkspaceItemFolderPath = (storagePath: string, campaignId: string, personId: string) => {
+  const relativePath = getWorkspaceRelativePath(storagePath, campaignId, personId);
+  if (!relativePath) {
+    return '';
+  }
+  const segments = relativePath.split('/').filter(Boolean);
+  if (segments.length <= 1) {
+    return '';
+  }
+  return segments.slice(0, -1).join('/');
+};
+
+export const isWorkspaceFolderPlaceholder = (fileName: string, mimeType: string | null) =>
+  fileName === WORKSPACE_FOLDER_PLACEHOLDER || mimeType === WORKSPACE_FOLDER_MIME;
 
 export function getRequestMetadata(request: NextRequest) {
   const ipHeader = request.headers.get('x-forwarded-for');

@@ -3,10 +3,16 @@ import { createRouteSupabaseClient, getServiceSupabase } from '@/lib/supabase/se
 import { runQuery } from '@/lib/db/postgres';
 import {
   WORKSPACE_DOC_TYPE,
+  WORKSPACE_FOLDER_MIME,
   buildWorkspaceStoragePath,
+  buildWorkspaceFolderPlaceholderPath,
   getRequestMetadata,
+  getWorkspaceItemFolderPath,
+  getWorkspaceRelativePath,
   getWorkspaceActor,
+  isWorkspaceFolderPlaceholder,
   registerWorkspaceAudit,
+  sanitizeWorkspaceFolderPath,
 } from '@/lib/campaignWorkspace';
 
 export const runtime = 'nodejs';
@@ -26,6 +32,7 @@ type FileRow = {
   person_id: string;
   worker_name: string;
   file_name: string;
+  folder_path?: string;
   storage_path: string;
   file_size_bytes: number | null;
   mime_type: string | null;
@@ -36,6 +43,12 @@ type FileRow = {
   uploaded_by_name: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type WorkspaceSubfolder = {
+  path: string;
+  name: string;
+  file_count: number;
 };
 
 type AuditRow = {
@@ -70,6 +83,7 @@ export async function GET(
     }
 
     const requestedPersonId = request.nextUrl.searchParams.get('person_id');
+    const requestedFolderPath = sanitizeWorkspaceFolderPath(request.nextUrl.searchParams.get('folder_path'));
     const targetPersonId = actor.canManageCampaign
       ? requestedPersonId
       : actor.canManageOwnFolder
@@ -112,7 +126,7 @@ export async function GET(
       personClause += ' and cd.visible_to_client = true';
     }
 
-    const { rows: files } = await runQuery<FileRow>(
+    const { rows: rawFiles } = await runQuery<FileRow>(
       `
         select
           cd.id,
@@ -139,6 +153,52 @@ export async function GET(
       `,
       fileParams
     );
+
+    const subfoldersMap = new Map<string, WorkspaceSubfolder>();
+    const files = rawFiles.filter((file) => {
+      if (!targetPersonId) {
+        return !isWorkspaceFolderPlaceholder(file.file_name, file.mime_type);
+      }
+
+      const itemFolderPath = getWorkspaceItemFolderPath(file.storage_path, campaignId, targetPersonId);
+      const relativePath = getWorkspaceRelativePath(file.storage_path, campaignId, targetPersonId);
+      const remainder = requestedFolderPath
+        ? relativePath.startsWith(`${requestedFolderPath}/`)
+          ? relativePath.slice(requestedFolderPath.length + 1)
+          : null
+        : relativePath;
+
+      if (remainder === null) {
+        return false;
+      }
+
+      const segments = remainder.split('/').filter(Boolean);
+      if (segments.length > 1) {
+        const nextFolderPath = requestedFolderPath
+          ? `${requestedFolderPath}/${segments[0]}`
+          : segments[0];
+        const existing = subfoldersMap.get(nextFolderPath);
+        if (existing) {
+          existing.file_count += isWorkspaceFolderPlaceholder(file.file_name, file.mime_type) ? 0 : 1;
+        } else {
+          subfoldersMap.set(nextFolderPath, {
+            path: nextFolderPath,
+            name: segments[0],
+            file_count: isWorkspaceFolderPlaceholder(file.file_name, file.mime_type) ? 0 : 1,
+          });
+        }
+        return false;
+      }
+
+      if (itemFolderPath !== requestedFolderPath) {
+        return false;
+      }
+
+      file.folder_path = itemFolderPath;
+      return !isWorkspaceFolderPlaceholder(file.file_name, file.mime_type);
+    });
+
+    const subfolders = Array.from(subfoldersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
     const auditParams: unknown[] = [campaignId];
     let auditPersonClause = '';
@@ -174,10 +234,12 @@ export async function GET(
       scope: {
         role: actor.role,
         target_person_id: targetPersonId,
+        current_folder_path: requestedFolderPath,
         can_manage_campaign: actor.canManageCampaign,
         can_manage_own_folder: actor.canManageOwnFolder,
       },
       folders,
+      subfolders,
       files,
       logs,
     });
@@ -210,14 +272,13 @@ export async function POST(
 
     const formData = await request.formData();
     const file = formData.get('file');
+    const mode = String(formData.get('mode') ?? 'upload');
     const rawPersonId = String(formData.get('person_id') ?? '').trim();
+    const rawFolderPath = sanitizeWorkspaceFolderPath(String(formData.get('folder_path') ?? '').trim());
+    const rawFolderName = String(formData.get('folder_name') ?? '').trim();
     const notesValue = String(formData.get('notes') ?? '').trim();
     const visibleToClient = String(formData.get('visible_to_client') ?? 'true') === 'true';
     const visibleToWorker = String(formData.get('visible_to_worker') ?? 'true') === 'true';
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Debes adjuntar un archivo' }, { status: 400 });
-    }
 
     const personId = actor.canManageCampaign ? rawPersonId : user.id;
     if (!personId) {
@@ -242,7 +303,100 @@ export async function POST(
     }
 
     const serviceSupabase = getServiceSupabase();
-    const storagePath = buildWorkspaceStoragePath(campaignId, personId, file.name);
+    const meta = getRequestMetadata(request);
+
+    if (mode === 'create_folder') {
+      const nextFolderPath = sanitizeWorkspaceFolderPath(
+        rawFolderPath ? `${rawFolderPath}/${rawFolderName}` : rawFolderName
+      );
+      if (!nextFolderPath) {
+        return NextResponse.json({ error: 'Debes indicar un nombre para la subcarpeta' }, { status: 400 });
+      }
+
+      const storagePath = buildWorkspaceFolderPlaceholderPath(campaignId, personId, nextFolderPath);
+      const { error: folderUploadError } = await serviceSupabase.storage
+        .from('hr-documents')
+        .upload(storagePath, new Uint8Array(0), {
+          contentType: WORKSPACE_FOLDER_MIME,
+          upsert: true,
+        });
+
+      if (folderUploadError) {
+        return NextResponse.json({ error: folderUploadError.message }, { status: 500 });
+      }
+
+      const { rows: [folderDoc] } = await runQuery<FileRow>(
+        `
+          insert into campaign_documents (
+            campaign_id,
+            person_id,
+            doc_type,
+            file_name,
+            storage_path,
+            file_size_bytes,
+            mime_type,
+            visible_to_worker,
+            visible_to_client,
+            uploaded_by,
+            notes
+          )
+          values ($1::uuid, $2::uuid, $3, $4, $5, 0, $6, true, true, $7::uuid, $8)
+          on conflict do nothing
+          returning
+            id::text,
+            person_id::text,
+            file_name,
+            storage_path,
+            file_size_bytes,
+            mime_type,
+            notes,
+            visible_to_client,
+            visible_to_worker,
+            uploaded_by::text,
+            created_at::text,
+            updated_at::text
+        `,
+        [
+          campaignId,
+          personId,
+          WORKSPACE_DOC_TYPE,
+          '.folder',
+          storagePath,
+          WORKSPACE_FOLDER_MIME,
+          user.id,
+          nextFolderPath,
+        ]
+      );
+
+      await registerWorkspaceAudit({
+        actorId: user.id,
+        action: 'workspace.create_folder',
+        entityId: folderDoc?.id ?? null,
+        after: {
+          campaign_id: campaignId,
+          person_id: personId,
+          folder_path: nextFolderPath,
+          person_name: person.name,
+        },
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        supabase: serviceSupabase,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        folder: {
+          path: nextFolderPath,
+          name: nextFolderPath.split('/').pop() ?? nextFolderPath,
+        },
+      }, { status: 201 });
+    }
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: 'Debes adjuntar un archivo' }, { status: 400 });
+    }
+
+    const storagePath = buildWorkspaceStoragePath(campaignId, personId, file.name, rawFolderPath);
     const buffer = await file.arrayBuffer();
 
     const { error: uploadError } = await serviceSupabase.storage
@@ -301,7 +455,6 @@ export async function POST(
       ]
     );
 
-    const meta = getRequestMetadata(request);
     await registerWorkspaceAudit({
       actorId: user.id,
       action: 'workspace.upload',
@@ -310,6 +463,7 @@ export async function POST(
         campaign_id: campaignId,
         person_id: personId,
         person_name: person.name,
+        folder_path: rawFolderPath,
         file_name: inserted.file_name,
         visible_to_client: visibleToClient,
         visible_to_worker: visibleToWorker,

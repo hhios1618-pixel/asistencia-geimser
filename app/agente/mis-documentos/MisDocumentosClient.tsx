@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconFolder, IconDownload, IconSearch, IconFileTypePdf, IconFileTypeXls, IconFile, IconCalendar, IconUpload, IconEdit, IconTrash, IconLoader2 } from '@tabler/icons-react';
+import { IconFolder, IconDownload, IconSearch, IconFileTypePdf, IconFileTypeXls, IconFile, IconCalendar, IconUpload, IconEdit, IconTrash, IconLoader2, IconChevronRight, IconFolderPlus } from '@tabler/icons-react';
 
 type Doc = {
   id: string;
@@ -18,11 +18,18 @@ type Doc = {
 type WorkspaceFile = {
   id: string;
   file_name: string;
+  folder_path?: string;
   file_size_bytes: number | null;
   mime_type: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type WorkspaceSubfolder = {
+  path: string;
+  name: string;
+  file_count: number;
 };
 
 const DOC_CONFIG: Record<string, { label: string; accent: string; border: string }> = {
@@ -61,9 +68,36 @@ export default function MisDocumentosClient({
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(initialWorkspaceFiles);
+  const [workspaceSubfolders, setWorkspaceSubfolders] = useState<WorkspaceSubfolder[]>([]);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceMessage, setWorkspaceMessage] = useState<string | null>(null);
+  const [currentFolderPath, setCurrentFolderPath] = useState('');
   const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const loadWorkspace = async (folderPath = currentFolderPath) => {
+    if (!campaignId) return;
+    setWorkspaceLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (folderPath) params.set('folder_path', folderPath);
+      const response = await fetch(`/api/campaigns/${campaignId}/workspace?${params.toString()}`, { cache: 'no-store' });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'No fue posible cargar tu carpeta');
+      setWorkspaceFiles(body.files ?? []);
+      setWorkspaceSubfolders(body.subfolders ?? []);
+      setCurrentFolderPath(body.scope?.current_folder_path ?? '');
+    } catch (error) {
+      setWorkspaceMessage((error as Error).message);
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadWorkspace(currentFolderPath);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId, currentFolderPath]);
 
   const types = ['all', ...new Set(documents.map(d => d.doc_type))];
 
@@ -90,14 +124,15 @@ export default function MisDocumentosClient({
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('folder_path', currentFolderPath);
       const response = await fetch(`/api/campaigns/${campaignId}/workspace`, {
         method: 'POST',
         body: formData,
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No fue posible subir el archivo');
-      setWorkspaceFiles((current) => [body.file, ...current]);
       setWorkspaceMessage('Archivo subido a tu carpeta.');
+      await loadWorkspace(currentFolderPath);
     } catch (error) {
       setWorkspaceMessage((error as Error).message);
     } finally {
@@ -119,7 +154,7 @@ export default function MisDocumentosClient({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No fue posible renombrar');
-      setWorkspaceFiles((current) => current.map((item) => (item.id === file.id ? body.file : item)));
+      await loadWorkspace(currentFolderPath);
     } catch (error) {
       setWorkspaceMessage((error as Error).message);
     } finally {
@@ -137,13 +172,41 @@ export default function MisDocumentosClient({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No fue posible eliminar');
-      setWorkspaceFiles((current) => current.filter((item) => item.id !== file.id));
+      await loadWorkspace(currentFolderPath);
     } catch (error) {
       setWorkspaceMessage((error as Error).message);
     } finally {
       setWorkspaceBusy(false);
     }
   };
+
+  const handleCreateSubfolder = async () => {
+    if (!campaignId) return;
+    const folderName = window.prompt('Nombre de la subcarpeta')?.trim();
+    if (!folderName) return;
+    setWorkspaceBusy(true);
+    setWorkspaceMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append('mode', 'create_folder');
+      formData.append('folder_path', currentFolderPath);
+      formData.append('folder_name', folderName);
+      const response = await fetch(`/api/campaigns/${campaignId}/workspace`, {
+        method: 'POST',
+        body: formData,
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'No fue posible crear la subcarpeta');
+      setWorkspaceMessage(`Subcarpeta creada: ${body.folder.name}`);
+      await loadWorkspace(currentFolderPath);
+    } catch (error) {
+      setWorkspaceMessage((error as Error).message);
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  };
+
+  const breadcrumbParts = currentFolderPath ? currentFolderPath.split('/').filter(Boolean) : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -164,6 +227,14 @@ export default function MisDocumentosClient({
               {workspaceBusy ? <IconLoader2 size={14} className="animate-spin" /> : <IconUpload size={14} />}
               Subir archivo
             </button>
+            <button
+              onClick={() => void handleCreateSubfolder()}
+              disabled={workspaceBusy}
+              className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-300 disabled:opacity-50"
+            >
+              <IconFolderPlus size={14} />
+              Nueva subcarpeta
+            </button>
             <input
               ref={uploadInputRef}
               type="file"
@@ -183,7 +254,35 @@ export default function MisDocumentosClient({
             </div>
           )}
 
-          {workspaceFiles.length === 0 ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <button
+              onClick={() => setCurrentFolderPath('')}
+              className={`rounded-xl px-2 py-1 ${currentFolderPath === '' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+            >
+              Raíz
+            </button>
+            {breadcrumbParts.map((part, index) => {
+              const path = breadcrumbParts.slice(0, index + 1).join('/');
+              return (
+                <div key={path} className="flex items-center gap-2">
+                  <IconChevronRight size={12} className="text-slate-700" />
+                  <button
+                    onClick={() => setCurrentFolderPath(path)}
+                    className={`rounded-xl px-2 py-1 ${currentFolderPath === path ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+                  >
+                    {part}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {workspaceLoading ? (
+            <div className="flex items-center gap-2 py-10 text-sm text-slate-400">
+              <IconLoader2 size={16} className="animate-spin" />
+              Cargando carpeta...
+            </div>
+          ) : workspaceFiles.length === 0 && workspaceSubfolders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-600">
                 <IconFolder size={28} />
@@ -192,7 +291,31 @@ export default function MisDocumentosClient({
               <p className="text-sm text-slate-600">Sube aquí lo que quieras compartir con Geimser y el cliente.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              {workspaceSubfolders.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {workspaceSubfolders.map((folder) => (
+                    <button
+                      key={folder.path}
+                      onClick={() => setCurrentFolderPath(folder.path)}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left hover:bg-white/[0.06] transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[var(--accent)]">
+                          <IconFolder size={18} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-200">{folder.name}</p>
+                          <p className="text-xs text-slate-600">{folder.file_count} archivo{folder.file_count === 1 ? '' : 's'}</p>
+                        </div>
+                      </div>
+                      <IconChevronRight size={16} className="text-slate-600" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
               {workspaceFiles.map((file) => (
                 <div key={file.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
                   <FileIcon name={file.file_name} />
@@ -224,6 +347,7 @@ export default function MisDocumentosClient({
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </section>

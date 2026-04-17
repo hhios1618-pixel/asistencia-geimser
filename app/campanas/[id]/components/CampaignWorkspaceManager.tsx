@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
+  IconChevronRight,
   IconDownload,
   IconEdit,
   IconFile,
   IconFileTypePdf,
   IconFileTypeXls,
+  IconFolderPlus,
   IconFolder,
   IconLoader2,
   IconTrash,
@@ -37,12 +39,19 @@ type WorkspaceFile = {
   person_id: string;
   worker_name: string;
   file_name: string;
+  folder_path?: string;
   file_size_bytes: number | null;
   notes: string | null;
   visible_to_client: boolean;
   visible_to_worker: boolean;
   updated_at: string;
   created_at: string;
+};
+
+type WorkspaceSubfolder = {
+  path: string;
+  name: string;
+  file_count: number;
 };
 
 type WorkspaceLog = {
@@ -87,8 +96,10 @@ function formatDate(value: string | null) {
 export default function CampaignWorkspaceManager({ campaignId, team, userRole }: Props) {
   const [folders, setFolders] = useState<WorkspaceFolder[]>([]);
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [subfolders, setSubfolders] = useState<WorkspaceSubfolder[]>([]);
   const [logs, setLogs] = useState<WorkspaceLog[]>([]);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(team[0]?.id ?? null);
+  const [currentFolderPath, setCurrentFolderPath] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -101,16 +112,21 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
     [folders, selectedPersonId]
   );
 
-  const loadWorkspace = async (personId = selectedPersonId) => {
+  const loadWorkspace = async (personId = selectedPersonId, folderPath = currentFolderPath) => {
     setLoading(true);
     try {
-      const search = personId ? `?person_id=${encodeURIComponent(personId)}` : '';
+      const params = new URLSearchParams();
+      if (personId) params.set('person_id', personId);
+      if (folderPath) params.set('folder_path', folderPath);
+      const search = params.size > 0 ? `?${params.toString()}` : '';
       const response = await fetch(`/api/campaigns/${campaignId}/workspace${search}`, { cache: 'no-store' });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No fue posible cargar el workspace');
       setFolders(body.folders ?? []);
+      setSubfolders(body.subfolders ?? []);
       setFiles(body.files ?? []);
       setLogs(body.logs ?? []);
+      setCurrentFolderPath(body.scope?.current_folder_path ?? '');
       if (!selectedPersonId && body.folders?.[0]?.person_id) {
         setSelectedPersonId(body.folders[0].person_id);
       }
@@ -122,9 +138,9 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
   };
 
   useEffect(() => {
-    void loadWorkspace(selectedPersonId);
+    void loadWorkspace(selectedPersonId, currentFolderPath);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignId, selectedPersonId]);
+  }, [campaignId, selectedPersonId, currentFolderPath]);
 
   const handleImport = async (file: File) => {
     setBusy(true);
@@ -161,6 +177,7 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
       const formData = new FormData();
       formData.append('file', file);
       formData.append('person_id', selectedPersonId);
+      formData.append('folder_path', currentFolderPath);
       formData.append('visible_to_client', 'true');
       formData.append('visible_to_worker', 'true');
       const response = await fetch(`/api/campaigns/${campaignId}/workspace`, {
@@ -170,7 +187,7 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No pude subir el archivo');
       setMessage(`Archivo cargado en la carpeta de ${selectedFolder?.name ?? 'la usuaria'}.`);
-      await loadWorkspace(selectedPersonId);
+      await loadWorkspace(selectedPersonId, currentFolderPath);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -191,7 +208,7 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No pude renombrar el archivo');
-      await loadWorkspace(selectedPersonId);
+      await loadWorkspace(selectedPersonId, currentFolderPath);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -209,13 +226,45 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'No pude eliminar el archivo');
-      await loadWorkspace(selectedPersonId);
+      await loadWorkspace(selectedPersonId, currentFolderPath);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
       setBusy(false);
     }
   };
+
+  const handleCreateSubfolder = async () => {
+    if (!selectedPersonId) {
+      setMessage('Primero selecciona una ejecutiva.');
+      return;
+    }
+    const folderName = window.prompt('Nombre de la subcarpeta')?.trim();
+    if (!folderName) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append('mode', 'create_folder');
+      formData.append('person_id', selectedPersonId);
+      formData.append('folder_path', currentFolderPath);
+      formData.append('folder_name', folderName);
+      const response = await fetch(`/api/campaigns/${campaignId}/workspace`, {
+        method: 'POST',
+        body: formData,
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? 'No pude crear la subcarpeta');
+      setMessage(`Subcarpeta creada: ${body.folder.name}`);
+      await loadWorkspace(selectedPersonId, currentFolderPath);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const breadcrumbParts = currentFolderPath ? currentFolderPath.split('/').filter(Boolean) : [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -310,7 +359,10 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
             }))).map((folder) => (
               <button
                 key={folder.person_id}
-                onClick={() => setSelectedPersonId(folder.person_id)}
+                onClick={() => {
+                  setSelectedPersonId(folder.person_id);
+                  setCurrentFolderPath('');
+                }}
                 className={`rounded-2xl border px-4 py-3 text-left transition-all ${
                   selectedPersonId === folder.person_id
                     ? 'border-[var(--accent)]/40 bg-[rgba(0,229,255,0.08)]'
@@ -342,9 +394,42 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
                 {selectedFolder?.updated_at ? `Última actividad: ${formatDate(selectedFolder.updated_at)}` : 'Sin actividad todavía'}
               </p>
             </div>
-            <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-              {files.length} archivo{files.length === 1 ? '' : 's'}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void handleCreateSubfolder()}
+                disabled={busy || !selectedPersonId}
+                className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-300 disabled:opacity-50"
+              >
+                <IconFolderPlus size={14} />
+                Nueva subcarpeta
+              </button>
+              <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                {files.length} archivo{files.length === 1 ? '' : 's'}
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <button
+              onClick={() => setCurrentFolderPath('')}
+              className={`rounded-xl px-2 py-1 ${currentFolderPath === '' ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+            >
+              Raíz
+            </button>
+            {breadcrumbParts.map((part, index) => {
+              const path = breadcrumbParts.slice(0, index + 1).join('/');
+              return (
+                <div key={path} className="flex items-center gap-2">
+                  <IconChevronRight size={12} className="text-slate-700" />
+                  <button
+                    onClick={() => setCurrentFolderPath(path)}
+                    className={`rounded-xl px-2 py-1 ${currentFolderPath === path ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
+                  >
+                    {part}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {loading ? (
@@ -352,7 +437,7 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
               <IconLoader2 size={16} className="animate-spin" />
               Cargando carpeta...
             </div>
-          ) : files.length === 0 ? (
+          ) : files.length === 0 && subfolders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-600">
                 <IconFolder size={28} />
@@ -361,7 +446,30 @@ export default function CampaignWorkspaceManager({ campaignId, team, userRole }:
               <p className="text-xs text-slate-600">Sube el primero desde este panel.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              {subfolders.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {subfolders.map((folder) => (
+                    <button
+                      key={folder.path}
+                      onClick={() => setCurrentFolderPath(folder.path)}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left hover:bg-white/[0.06] transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[var(--accent)]">
+                          <IconFolder size={18} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-200">{folder.name}</p>
+                          <p className="text-xs text-slate-600">{folder.file_count} archivo{folder.file_count === 1 ? '' : 's'}</p>
+                        </div>
+                      </div>
+                      <IconChevronRight size={16} className="text-slate-600" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {files.map((file, index) => (
                 <motion.div
                   key={file.id}
